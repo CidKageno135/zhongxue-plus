@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-hanzi: "Songti SC", "Noto Serif CJK SC", "STSong", "SimSun", "KaiTi",
+    "STKaiti", serif;
+}
+
+body {
+  background-color: var(--zx-paper, #fafaf9);
+  color: var(--zx-ink, #243c35);
+}
+
+::selection {
+  background-color: #fecaca;
+}
+
+/* 3D flip utilities */
+.perspective-1200 {
+  perspective: 1400px;
+}
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Animations */
+@keyframes hf-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-hf-fade-up {
+  animation: hf-fade-up 0.3s ease-out both;
+}
+
+@keyframes hf-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-hf-pop {
+  animation: hf-pop 0.25s ease-out both;
+}
+
+@keyframes hf-toast {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-hf-toast {
+  animation: hf-toast 0.25s ease-out both;
+}
+
+@keyframes hf-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.animate-hf-float {
+  animation: hf-float 5s ease-in-out infinite;
+}

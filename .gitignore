@@ -1,0 +1,14 @@
+node_modules/
+.codex-test-dependencies/
+.next/
+.data/
+*.sqlite*
+.env*
+!.env.example
+test-results/
+coverage/
+*.tsbuildinfo
+*.log
+.DS_Store
+Thumbs.db
+

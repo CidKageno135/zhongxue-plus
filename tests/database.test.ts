@@ -1,0 +1,57 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,readdirSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {PGlite} from '@electric-sql/pglite';
+import {eq,sql} from 'drizzle-orm';
+import {db,ensureDbReady} from '../src/db';
+import {users,learningActivities} from '../src/db/schema';
+import {ApiError,apiFailure,assertSameOrigin,enforcePolicies,enforceRequests} from '../src/lib/api-security';
+import {newDialogue,findDialogue,loadDialogue,storeReply} from '../src/lib/conversation-store';
+import {learningOverview} from '../src/lib/learning-store';
+
+test('persistent storage isolates users, protects concurrent writes, and paginates without losing totals',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'zhongxue-store-test-'));process.env.ZHONGXUE_DATA_DIR=dir;
+ // Never let this test initialize the learner's real database.
+ assert.ok(process.env.ZHONGXUE_DATA_DIR.includes('zhongxue-store-test-'));
+ await ensureDbReady();
+ assert.ok(readdirSync(dir).length>0,'The isolated database directory must be in use before fixture writes.');
+ const [a,b]=await db.insert(users).values([{name:'QA A',email:'a@example.test',passwordHash:'test'},{name:'QA B',email:'b@example.test',passwordHash:'test'}]).returning();
+ const first=await newDialogue(a.id,1,'guided');
+ assert.equal((await loadDialogue(b.id,1,'guided')).thread,null);
+ await assert.rejects(findDialogue(b.id,1,'guided',first.id),e=>e instanceof ApiError&&e.status===404);
+ const reply=await storeReply(a.id,1,'guided',first,'你好','你好！');assert.equal(reply.messages.length,2);
+ await assert.rejects(storeReply(a.id,1,'guided',first,'stale','lost update'),e=>e instanceof ApiError&&e.status===409);
+ assert.equal((await loadDialogue(a.id,1,'guided',first.id)).thread?.messages[1].content,'你好！');
+ await db.insert(learningActivities).values(Array.from({length:31},(_,i)=>({userId:a.id,unitId:i%20+1,kind:i===0?'lesson':'text',score:100})));
+ const page=await learningOverview(a.id,0),next=await learningOverview(a.id,1);
+ assert.equal(page.records.length,30);assert.equal(page.hasMore,true);assert.equal(next.records.length,2);
+ assert.equal(page.summary.completedUnits,1);assert.equal(next.summary.completedUnits,1);assert.equal(page.summary.conversationTurns,1);
+ assert.equal((await learningOverview(b.id,0)).records.length,0);
+ const policy={key:'qa:atomic',limit:2,windowMs:60000};
+ const attempts=await Promise.allSettled([enforcePolicies([policy]),enforcePolicies([policy]),enforcePolicies([policy])]);
+ assert.equal(attempts.filter(r=>r.status==='fulfilled').length,2);
+ const rejection=attempts.find(r=>r.status==='rejected');assert.ok(rejection&&rejection.status==='rejected'&&rejection.reason.status===429);
+ await assert.rejects(enforcePolicies([{key:'qa:rollback',limit:1,windowMs:60000},policy]));
+ assert.equal((await db.execute(sql`SELECT count(*)::int AS n FROM request_counters WHERE key='qa:rollback'`)).rows[0].n,0);
+ await enforceRequests(new Request('http://localhost:3001/api'),'practice',a);
+ await enforceRequests(new Request('http://localhost:3001/api'),'register');
+ await enforceRequests(new Request('http://localhost:3001/api'),'login',undefined,'a@example.test');
+ await enforceRequests(new Request('http://localhost:3001/api'),'ai',a);
+ assert.equal((await db.select().from(users).where(eq(users.id,b.id))).length,1);
+ const client=(globalThis as typeof globalThis&{zxClient?:PGlite}).zxClient;
+ await client?.close();
+ const reopened=new PGlite(dir);await reopened.waitReady;
+ assert.equal((await reopened.query<{count:number}>("SELECT count FROM request_counters WHERE key='qa:atomic'")).rows[0]?.count,2);
+ assert.equal((await reopened.query<{n:number}>('SELECT count(*)::int AS n FROM conversation_threads')).rows[0].n,1);
+ await reopened.close();
+});
+test('origin checks and error responses expose safe messages and retry timing',async()=>{
+ assertSameOrigin(new Request('http://localhost:3001/api'));
+ assertSameOrigin(new Request('http://localhost:3001/api',{headers:{origin:'http://localhost:3001'}}));
+ assert.throws(()=>assertSameOrigin(new Request('http://localhost:3001/api',{headers:{origin:'https://other.example'}})),ApiError);
+ const limited=apiFailure(new ApiError('wait',429,10),'qa');assert.equal(limited.status,429);assert.equal(limited.headers.get('Retry-After'),'10');
+ assert.equal(apiFailure(new Error('AI safe failure'),'qa').status,502);
+ const response=apiFailure(new Error('private details'),'qa expected failure');assert.equal(response.status,500);assert.ok(!JSON.stringify(await response.json()).includes('private details'));
+});

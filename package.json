@@ -1,0 +1,47 @@
+{
+  "name": "zhongxue-learning-app",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack -p 3001",
+    "build": "next build --webpack",
+    "start": "next start -p 3001",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:coverage": "node --import tsx --experimental-test-coverage --test-coverage-include=src/lib/{learning,conversation,curriculum,dictionary,practice,practice-feedback,request-policy,api-security,conversation-store,learning-store}.ts --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80 --test tests/*.test.ts",
+    "test:improvements-api": "node --import tsx tests/improvements-api.cjs",
+    "qa:start": "node scripts/qa-server.cjs",
+    "backup:data": "node scripts/backup-data.cjs",
+    "test:dictionary-api": "node tests/dictionary-api.cjs",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "17.3.1",
+    "drizzle-orm": "0.45.2",
+    "hanzi-writer": "^3.7.3",
+    "lucide-react": "^1.34.0",
+    "next": "16.2.6",
+    "pg": "8.20.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "swr": "^2.5.1",
+    "tsx": "^4.23.12"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@tailwindcss/postcss": "4.1.17",
+    "@types/node": "22.19.15",
+    "@types/pg": "8.18.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "postcss": "8.5.8",
+    "tailwindcss": "4.1.17",
+    "typescript": "5.9.3"
+  }
+}
