@@ -28,15 +28,20 @@ export function HanziStrokeWriter({ text, onClose }: HanziStrokeWriterProps) {
 
   const currentChar = characters[activeCharIndex] || characters[0] || "中";
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-
+  const handleSelectChar = (index: number) => {
+    if (index === activeCharIndex) return;
+    setActiveCharIndex(index);
     setIsLoading(true);
     setLoadError(false);
     setIsQuizMode(false);
     setQuizScore(null);
     setStatusMessage("Đang tải dữ liệu nét bút...");
+  };
 
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    let cancelled = false;
     containerRef.current.innerHTML = "";
 
     try {
@@ -53,10 +58,13 @@ export function HanziStrokeWriter({ text, onClose }: HanziStrokeWriterProps) {
         outlineColor: isDark ? "#475569" : "#cbd5e1",
         showCharacter: true,
         onLoadCharDataSuccess() {
+          if (cancelled) return;
           setIsLoading(false);
+          setLoadError(false);
           setStatusMessage("Sẵn sàng: Xem animation hoặc chuyển sang chế độ tự viết.");
         },
         onLoadCharDataError() {
+          if (cancelled) return;
           setIsLoading(false);
           setLoadError(true);
           setStatusMessage("Chưa có dữ liệu nét cho chữ này hoặc kết nối mạng bị gián đoạn.");
@@ -64,13 +72,17 @@ export function HanziStrokeWriter({ text, onClose }: HanziStrokeWriterProps) {
       });
 
       writerRef.current = writer;
-    } catch (e) {
-      setIsLoading(false);
-      setLoadError(true);
-      setStatusMessage("Không thể khởi tạo bảng vẽ nét chữ.");
+    } catch {
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setIsLoading(false);
+        setLoadError(true);
+        setStatusMessage("Không thể khởi tạo bảng vẽ nét chữ.");
+      });
     }
 
     return () => {
+      cancelled = true;
       writerRef.current = null;
     };
   }, [currentChar]);
@@ -184,7 +196,7 @@ export function HanziStrokeWriter({ text, onClose }: HanziStrokeWriterProps) {
           {characters.map((char, index) => (
             <button
               key={index}
-              onClick={() => setActiveCharIndex(index)}
+              onClick={() => handleSelectChar(index)}
               style={{
                 width: "42px",
                 height: "42px",

@@ -6,6 +6,26 @@ import {BookOpen,Mic,MessagesSquare,ChartNoAxesCombined,House,Menu,X,Search,Rota
 import {requestJson} from "./learning-common";
 const NAV=[{href:"/dashboard",label:"學習首頁",vi:"Trang chủ",icon:House},{href:"/vocabulary",label:"詞彙與語法",vi:"Từ vựng và ngữ pháp",icon:BookOpen},{href:"/dictionary",label:"詞典",vi:"Từ điển Trung–Việt",icon:Search},{href:"/flashcards",label:"生詞複習",vi:"Ôn từ đã lưu",icon:RotateCcw},{href:"/speaking",label:"口說練習",vi:"Luyện nói",icon:Mic},{href:"/conversation",label:"AI 對話",vi:"Hội thoại",icon:MessagesSquare},{href:"/progress",label:"學習紀錄",vi:"Tiến độ",icon:ChartNoAxesCombined}];
 const subscribeMobile=(callback:()=>void)=>{const q=window.matchMedia("(max-width:800px)");q.addEventListener("change",callback);return()=>q.removeEventListener("change",callback);};
+const subscribeTheme=(callback:()=>void)=>{
+ const q=window.matchMedia("(prefers-color-scheme: dark)");
+ q.addEventListener("change",callback);
+ window.addEventListener("storage",callback);
+ window.addEventListener("zx-theme-change",callback);
+ return()=>{
+  q.removeEventListener("change",callback);
+  window.removeEventListener("storage",callback);
+  window.removeEventListener("zx-theme-change",callback);
+ };
+};
+const getClientTheme=():"light"|"dark"=>{
+ const currentAttr=document.documentElement.getAttribute("data-theme");
+ if(currentAttr==="dark"||currentAttr==="light")return currentAttr;
+ try{
+  const saved=localStorage.getItem("zx_theme");
+  if(saved==="dark"||saved==="light")return saved;
+ }catch{}
+ return window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+};
 export function Logo({light=false}:{light?:boolean}){
  return <div className={`zx-logo ${light?"light":""}`}><span>中</span><div><strong>ZhongXue<span>+</span></strong><small>智慧華語學習 · A1–A2</small></div></div>;
 }
@@ -22,27 +42,18 @@ function useMenuFocus(open:boolean,sidebar:React.RefObject<HTMLElement|null>,but
 }
 export function Shell({user,children}:{user:{id:number;name:string;email:string};children:ReactNode}){
  const pathname=usePathname(),[open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
- const [theme,setTheme]=useState<"light"|"dark">("light");
+ const theme=useSyncExternalStore(subscribeTheme,getClientTheme,()=>"light");
  const sidebar=useRef<HTMLElement>(null),menuButton=useRef<HTMLButtonElement>(null);
  const mobile=useSyncExternalStore(subscribeMobile,()=>window.matchMedia("(max-width:800px)").matches,()=>false),isDemo=user.email==="demo@hanzi.app";
  useMenuFocus(open&&mobile,sidebar,menuButton);
  useEffect(()=>{
-  const currentAttr = typeof document !== "undefined" ? (document.documentElement.getAttribute("data-theme") as "light" | "dark" | null) : null;
-  if (currentAttr === "dark" || currentAttr === "light") {
-   setTheme(currentAttr);
-  } else {
-   const saved=typeof window!=="undefined"?(localStorage.getItem("zx_theme") as "light"|"dark"|null):null;
-   const preferred=saved||(typeof window!=="undefined"&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
-   setTheme(preferred);
-   document.documentElement.setAttribute("data-theme",preferred);
-  }
- },[]);
+  document.documentElement.setAttribute("data-theme",theme);
+ },[theme]);
  function toggleTheme(){
-  const currentAttr = (typeof document !== "undefined" && (document.documentElement.getAttribute("data-theme") as "light" | "dark")) || theme;
-  const next = currentAttr === "dark" ? "light" : "dark";
-  setTheme(next);
+  const next = theme === "dark" ? "light" : "dark";
   try { localStorage.setItem("zx_theme",next); } catch {}
   document.documentElement.setAttribute("data-theme",next);
+  window.dispatchEvent(new Event("zx-theme-change"));
  }
  async function logout(){setBusy(true);setError("");try{await requestJson("/api/auth/logout",{});window.location.assign("/dashboard");}catch(e){setError(e instanceof Error?e.message:"無法登出。");setBusy(false);}}
  return <div className="zx-app"><a href="#zx-main" className="zx-skip-link">Chuyển đến nội dung chính / 跳至主要內容</a><header className="zx-mobile-header"><Logo/><div style={{display:"flex",gap:"8px",alignItems:"center"}}><button type="button" onClick={toggleTheme} aria-label="Đổi giao diện sáng/tối" style={{background:"none",border:"1px solid var(--zx-line)",color:"var(--zx-ink)",padding:"6px 10px",borderRadius:"8px",cursor:"pointer",display:"flex",alignItems:"center"}}>{theme==="dark"?<Sun size={18}/>:<Moon size={18}/>}</button><button ref={menuButton} onClick={()=>setOpen(!open)} aria-expanded={open} aria-controls="zx-sidebar" aria-label={open?"關閉選單":"開啟選單"}>{open?<X/>:<Menu/>}</button></div></header>
