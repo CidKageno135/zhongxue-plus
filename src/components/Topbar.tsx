@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Menu, Search, X, Edit3 } from 'lucide-react';
+import { useEffect } from 'react';
+import { Menu, X } from 'lucide-react';
 import type { Route } from './Sidebar';
 import { navigationItems } from './Sidebar';
-import { HandwritingPad } from './HandwritingPad';
 
 interface TopbarProps {
     route: Route;
@@ -12,8 +11,6 @@ interface TopbarProps {
     profileName: string;
     onNavigate: (r: Route) => void;
     dueCount?: number;
-    searchValue?: string;
-    onSearch?: (query: string) => void;
 }
 
 export function Topbar({
@@ -23,24 +20,25 @@ export function Topbar({
     streak = 0,
     profileName,
     onNavigate,
-    dueCount = 0,
-    searchValue = '',
-    onSearch
+    dueCount = 0
 }: TopbarProps) {
     const initial = profileName?.slice(0, 1).toUpperCase() || '中';
-    const searchInputRef = useRef<HTMLInputElement>(null);
-    const [showHandwriting, setShowHandwriting] = useState(false);
 
+    // Global ⌘K / Ctrl+K shortcut: navigate to Dictionary and focus search input
     useEffect(() => {
         function handleKeyDown(e: KeyboardEvent) {
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
                 e.preventDefault();
-                searchInputRef.current?.focus();
+                onNavigate('dictionary');
+                setTimeout(() => {
+                    const dictInput = document.querySelector('input[aria-label="Tìm từ vựng"]') as HTMLInputElement | null;
+                    dictInput?.focus();
+                }, 60);
             }
         }
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+    }, [onNavigate]);
 
     return (
         <header className="bento-header">
@@ -78,50 +76,6 @@ export function Topbar({
                         <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>school</span>
                         <span>TOCFL A2</span>
                     </div>
-                </div>
-
-                {/* Omnibar Search */}
-                <div className="bento-search-box">
-                    <Search size={16} color="var(--on-surface-variant)" />
-                    <input
-                        ref={searchInputRef}
-                        type="text"
-                        className="bento-search-input"
-                        aria-label="Tra cứu Hán tự, Pinyin, Hán-Việt"
-                        placeholder="Tra cứu Hán tự, Pinyin, Hán-Việt..."
-                        value={searchValue}
-                        onChange={e => onSearch?.(e.target.value)}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                                onNavigate('dictionary');
-                            }
-                        }}
-                    />
-                    <button
-                        type="button"
-                        onClick={() => setShowHandwriting(true)}
-                        aria-label="Vẽ chữ viết tay để tra từ"
-                        title="Vẽ chữ viết tay (giống Hanzii)"
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '2px 4px',
-                            color: 'var(--vermilion-cinnabar)'
-                        }}
-                    >
-                        <Edit3 size={15} />
-                    </button>
-                    <kbd
-                        className="bento-search-kbd"
-                        onClick={() => searchInputRef.current?.focus()}
-                        style={{ cursor: 'pointer' }}
-                        title="Phím tắt: Ctrl+K hoặc ⌘K"
-                    >
-                        ⌘K
-                    </kbd>
                 </div>
 
                 {/* Profile & Demo stats */}
@@ -178,16 +132,6 @@ export function Topbar({
                     </nav>
                 </div>
             </div>
-
-            {showHandwriting && (
-                <HandwritingPad
-                    onSelectWord={char => {
-                        onSearch?.(char);
-                        onNavigate('dictionary');
-                    }}
-                    onClose={() => setShowHandwriting(false)}
-                />
-            )}
         </header>
     );
 }

@@ -102,13 +102,6 @@ export default function App() {
                     profileName={state.profile.name}
                     onNavigate={navigate}
                     dueCount={due.length}
-                    searchValue={query}
-                    onSearch={val => {
-                        setQuery(val);
-                        if (route !== 'dictionary') {
-                            setRoute('dictionary');
-                        }
-                    }}
                 />
 
                 <main id="main-content" tabIndex={-1} ref={heading}>
