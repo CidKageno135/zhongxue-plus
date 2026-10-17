@@ -95,8 +95,8 @@ test.describe("Learner Core Interaction Flows", () => {
     await expect(card).toBeVisible();
     await expect(card).toHaveCSS("background-color", "rgb(255, 255, 255)");
 
-    // Click theme toggle button in sidebar
-    const toggleBtn = page.locator('aside button[aria-label="Đổi giao diện sáng/tối"]');
+    // Click theme toggle button
+    const toggleBtn = page.locator('button[aria-label="Đổi giao diện sáng/tối"]').first();
     await toggleBtn.click();
 
     // Verify dark mode applied on html, body, and card
@@ -137,7 +137,7 @@ test.describe("Learner Core Interaction Flows", () => {
     await expect(strokeCard).toContainText("Luyện viết chữ Hán");
 
     // Toggle theme to dark and verify stroke card adapts
-    const toggleBtn = page.locator('aside button[aria-label="Đổi giao diện sáng/tối"]');
+    const toggleBtn = page.locator('button[aria-label="Đổi giao diện sáng/tối"]').first();
     await toggleBtn.click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(strokeCard).toHaveCSS("background-color", "rgb(22, 32, 50)");

@@ -3,6 +3,7 @@ import type {ReactNode} from "react";
 import "./globals.css";
 import "./zhongxue.css";
 import "./dictionary.css";
+import "@/components/v2/bento-tokens.css";
 export const metadata:Metadata={title:"ZhongXue+ · 智慧華語學習",description:"A1–A2 詞彙語法、口說練習、情境對話與學習紀錄。中越對照，使用繁體中文。"};
 export const dynamic="force-dynamic";
 const themeInitScript = `

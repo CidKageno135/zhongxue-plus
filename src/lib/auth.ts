@@ -70,11 +70,20 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
 async function getDemoUser(): Promise<SessionUser | null> {
   try {
-    const rows = await db
+    let rows = await db
       .select({ id: users.id, name: users.name, email: users.email })
       .from(users)
       .where(eq(users.email, DEMO_USER.email))
       .limit(1);
+    if (!rows[0]) {
+      const { seedIfEmpty } = await import("@/db/seed");
+      await seedIfEmpty();
+      rows = await db
+        .select({ id: users.id, name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.email, DEMO_USER.email))
+        .limit(1);
+    }
     return rows[0] ?? null;
   } catch(error) {
     console.error('Demo lookup failed',{name:error instanceof Error?error.name:'UnknownError'});

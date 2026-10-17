@@ -1,0 +1,116 @@
+/* Bento Glassmorphic Design Tokens & Cultural Aesthetic Styles for ZhongXue+ V2 */
+
+/* Mesh Gradient Background for Light and Dark Modes */
+.mesh-gradient-bg {
+  background-color: #F8FAFC;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(200, 50, 43, 0.07) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(5, 150, 105, 0.08) 0px, transparent 48%),
+    radial-gradient(at 50% 50%, rgba(234, 168, 56, 0.06) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(75, 123, 113, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(200, 50, 43, 0.05) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+[data-theme="dark"] .mesh-gradient-bg {
+  background-color: #0B1120;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(200, 50, 43, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(5, 150, 105, 0.12) 0px, transparent 48%),
+    radial-gradient(at 50% 50%, rgba(234, 168, 56, 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(30, 41, 59, 0.6) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.8) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+/* Glassmorphic Card Container */
+.glass-card {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 16px 36px -12px rgba(15, 23, 42, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.glass-card:hover {
+  box-shadow: 0 20px 44px -10px rgba(15, 23, 42, 0.09), inset 0 1px 1px rgba(255, 255, 255, 0.95);
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.9) 50%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+}
+
+[data-theme="dark"] .glass-card {
+  background: rgba(17, 24, 39, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 20px 44px -10px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .glass-card::before {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0) 100%);
+}
+
+/* Rice Grid Box (Mễ Tự Cách - 米字格) for Calligraphy & Hanzi Practice */
+.rice-grid-box {
+  background-image: 
+    linear-gradient(to right, rgba(200, 50, 43, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(200, 50, 43, 0.14) 1px, transparent 1px),
+    linear-gradient(45deg, transparent 49.3%, rgba(200, 50, 43, 0.09) 50%, transparent 50.7%),
+    linear-gradient(-45deg, transparent 49.3%, rgba(200, 50, 43, 0.09) 50%, transparent 50.7%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: center;
+}
+
+[data-theme="dark"] .rice-grid-box {
+  background-color: rgba(30, 41, 59, 0.6) !important;
+  background-image: 
+    linear-gradient(to right, rgba(200, 50, 43, 0.25) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(200, 50, 43, 0.25) 1px, transparent 1px),
+    linear-gradient(45deg, transparent 49.3%, rgba(200, 50, 43, 0.18) 50%, transparent 50.7%),
+    linear-gradient(-45deg, transparent 49.3%, rgba(200, 50, 43, 0.18) 50%, transparent 50.7%);
+}
+
+/* Glow animation */
+@keyframes bentoGlow {
+  0%, 100% { opacity: 0.9; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.15); }
+}
+
+.animate-glow {
+  animation: bentoGlow 2.5s infinite ease-in-out;
+}
+
+/* Glass Pill Buttons */
+.shadow-pill {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="dark"] .shadow-pill {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Ensure V2 main canvas has zero left sidebar margin */
+#zx-main {
+  margin-left: 0 !important;
+  max-width: 100% !important;
+}
+
+/* Feature links styling compatible with design tokens and test expectations */
+.zx-feature-links a {
+  background-color: var(--zx-card) !important;
+}
