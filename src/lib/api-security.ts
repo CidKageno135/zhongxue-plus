@@ -5,7 +5,8 @@ import {requestIdentity,requestPolicies,type RequestPolicy} from './request-poli
 export class ApiError extends Error {constructor(message:string,public status=400,public retryAfter?:number){super(message);}}
 export function assertSameOrigin(req:Request){
  const origin=req.headers.get('origin');if(!origin)return;
- if(origin!==(process.env.APP_ORIGIN||new URL(req.url).origin))throw new ApiError('來源不符，請重新開啟本站。 / Hãy mở lại trang web.',403);
+ const allowed=[process.env.APP_ORIGIN,new URL(req.url).origin,'http://127.0.0.1:5173','http://localhost:5173'].filter(Boolean);
+ if(!allowed.includes(origin))throw new ApiError('來源不符，請重新開啟本站。 / Hãy mở lại trang web.',403);
 }
 export async function enforcePolicies(policies:RequestPolicy[],now=Date.now()){
  await ensureDbReady();
