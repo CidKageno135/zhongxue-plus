@@ -285,39 +285,38 @@ export function DictionaryView({
                                             </button>
                                         </div>
 
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '14px 0 8px' }}>
-                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                        <div style={{ margin: '14px 0 10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                                                 {characters.map((char, idx) => (
                                                     <div
                                                         key={idx}
                                                         className="tianzige-box"
-                                                        style={{ width: '44px', height: '44px', borderRadius: '6px' }}
+                                                        style={{ width: '40px', height: '40px', borderRadius: '6px', flexShrink: 0 }}
                                                         onClick={() => speakText(char)}
                                                         title="Nhấn để nghe phát âm"
                                                     >
                                                         <div className="tianzige-crosshair-h" />
                                                         <div className="tianzige-crosshair-v" />
-                                                        <span className="tianzige-glyph" style={{ fontSize: '26px' }}>{char}</span>
+                                                        <span className="tianzige-glyph" style={{ fontSize: '24px' }}>{char}</span>
                                                     </div>
                                                 ))}
                                             </div>
-                                            <div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <h3 lang="zh-TW" className="hanzi" style={{ margin: 0, fontSize: '24px' }}>
-                                                        {entry.traditional}
-                                                    </h3>
-                                                    <button
-                                                        type="button"
-                                                        className="icon-button"
-                                                        aria-label={`Phát âm ${entry.traditional}`}
-                                                        onClick={() => speakText(entry.traditional)}
-                                                    >
-                                                        <Volume2 size={16} />
-                                                    </button>
-                                                </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                                <h3 lang="zh-TW" className="hanzi" style={{ margin: 0, fontSize: '24px', wordBreak: 'break-word' }}>
+                                                    {entry.traditional}
+                                                </h3>
+                                                <button
+                                                    type="button"
+                                                    className="icon-button"
+                                                    aria-label={`Phát âm ${entry.traditional}`}
+                                                    onClick={() => speakText(entry.traditional)}
+                                                    style={{ padding: '4px' }}
+                                                >
+                                                    <Volume2 size={16} />
+                                                </button>
                                                 {entry.simplified !== entry.traditional && (
                                                     <small style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>
-                                                        Giản thể: {entry.simplified}
+                                                        (Giản thể: {entry.simplified})
                                                     </small>
                                                 )}
                                             </div>
@@ -329,7 +328,7 @@ export function DictionaryView({
                                             <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--on-surface)' }}>
                                                 Nghĩa tiếng Việt:
                                             </p>
-                                            <p className="word-meaning" style={{ marginTop: '4px' }}>
+                                            <p className="word-meaning" style={{ marginTop: '4px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                                                 {entry.definitions.slice(0, 3).join('; ')}
                                             </p>
                                         </div>

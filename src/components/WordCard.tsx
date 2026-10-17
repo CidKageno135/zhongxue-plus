@@ -23,22 +23,22 @@ export function WordCard({ word, saved, onSave }: WordCardProps) {
                 </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '14px 0 8px' }}>
-                <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ margin: '14px 0 10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                     {characters.map((char, idx) => (
                         <div
                             key={idx}
                             className="tianzige-box"
-                            style={{ width: '44px', height: '44px', borderRadius: '6px' }}
+                            style={{ width: '40px', height: '40px', borderRadius: '6px', flexShrink: 0 }}
                         >
                             <div className="tianzige-crosshair-h" />
                             <div className="tianzige-crosshair-v" />
-                            <span className="tianzige-glyph" style={{ fontSize: '26px' }}>{char}</span>
+                            <span className="tianzige-glyph" style={{ fontSize: '24px' }}>{char}</span>
                         </div>
                     ))}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <h3 lang="zh-TW" className="hanzi" style={{ margin: 0, fontSize: '24px' }}>{word.hanzi}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <h3 lang="zh-TW" className="hanzi" style={{ margin: 0, fontSize: '24px', wordBreak: 'break-word' }}>{word.hanzi}</h3>
                     <SpeakButton text={word.hanzi} />
                 </div>
             </div>

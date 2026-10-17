@@ -12,10 +12,16 @@ export function AiChatView() {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [isListening, setIsListening] = useState(false);
-    const chatEndRef = useRef<HTMLDivElement>(null);
+    const chatMessagesRef = useRef<HTMLDivElement>(null);
 
+    // Auto-scroll ONLY internal chat message container, never scrolling the main page/window
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (chatMessagesRef.current) {
+            chatMessagesRef.current.scrollTo({
+                top: chatMessagesRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
     }, [messages, loading]);
 
     function speakText(text: string) {
@@ -183,14 +189,17 @@ export function AiChatView() {
             </div>
 
             {/* Chat Message Scroll Area */}
-            <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '20px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px'
-            }}>
+            <div
+                ref={chatMessagesRef}
+                style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px'
+                }}
+            >
                 {messages.map((m, idx) => {
                     const isUser = m.role === 'user';
                     return (
@@ -304,7 +313,6 @@ export function AiChatView() {
                         <span style={{ fontStyle: 'italic' }}>AI đối thoại đang soạn câu trả lời chuẩn Phồn thể... ⏳</span>
                     </div>
                 )}
-                <div ref={chatEndRef} />
             </div>
 
             {/* Quick Prompt Chips */}
