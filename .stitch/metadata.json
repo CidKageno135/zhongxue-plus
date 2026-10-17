@@ -1,0 +1,23 @@
+{
+  "projectId": "2903986656935197250",
+  "title": "ZhongXue — Taiwan Everyday · Fresh Build 2026-10-17",
+  "designSystem": "assets/3654364562696609871",
+  "screens": [
+    {
+      "id": "c99a66d06eac47f68d389f501cef8d4b",
+      "title": "ZhongXue - Dashboard học tiếng Trung phồn thể",
+      "deviceType": "DESKTOP",
+      "html": "designs/dashboard.html",
+      "screenshot": "designs/dashboard.png"
+    },
+    {
+      "id": "3cad9fa38ecf42b4b45d5b1ae13263a4",
+      "title": "ZhongXue - Bài học: Gọi trà sữa (Mobile)",
+      "deviceType": "MOBILE",
+      "html": "designs/lesson-mobile.html",
+      "screenshot": "designs/lesson-mobile.png"
+    }
+  ],
+  "createdAt": "2026-10-17",
+  "provenance": "Fresh Stitch design; no old application source or old screens reused."
+}

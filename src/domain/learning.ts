@@ -1,0 +1,109 @@
+import { allWords, lessons } from '../data/lessons';
+export interface Review {
+    dueDate: string;
+    interval: number;
+    repetitions: number;
+    lastReviewed: string;
+}
+export interface LearningState {
+    version: 1;
+    profile: {
+        name: string;
+        dailyGoal: number;
+    };
+    completedLessonIds: string[];
+    savedWordIds: string[];
+    reviews: Record<string, Review>;
+    activity: Record<string, {
+        xp: number;
+        lessons: number;
+        reviews: number;
+    }>;
+    quizScores: Record<string, {
+        correct: number;
+        total: number;
+    }>;
+}
+export const STORAGE_KEY = 'zhongxue.learning.v1';
+export function localDate(date = new Date()): string { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+function shift(day: string, amount: number) { const [y, m, d] = day.split('-').map(Number); return localDate(new Date(y, m - 1, d + amount)); }
+export function createInitialState(): LearningState { return { version: 1, profile: { name: 'Bạn', dailyGoal: 30 }, completedLessonIds: [], savedWordIds: [], reviews: {}, activity: {}, quizScores: {} }; }
+function word(id: string) { const found = allWords.find(w => w.id === id); if (!found)
+    throw Error('Từ vựng không tồn tại.'); return found; }
+function addActivity(state: LearningState, day: string, xp: number, lesson: number, review: number): LearningState { const old = state.activity[day] ?? { xp: 0, lessons: 0, reviews: 0 }; return { ...state, activity: { ...state.activity, [day]: { xp: old.xp + xp, lessons: old.lessons + lesson, reviews: old.reviews + review } } }; }
+export function completeLesson(state: LearningState, id: string, date = new Date(), score?: {
+    correct: number;
+    total: number;
+}): LearningState { const lesson = lessons.find(l => l.id === id); if (!lesson)
+    throw Error('Bài học không tồn tại.'); if (score && (!Number.isInteger(score.correct) || score.correct < 0 || score.correct > score.total || score.total !== lesson.quiz.length))
+    throw Error('Điểm kiểm tra không hợp lệ.'); const scores = score ? { ...state.quizScores, [id]: { ...score } } : state.quizScores; if (state.completedLessonIds.includes(id))
+    return { ...state, quizScores: scores }; return addActivity({ ...state, completedLessonIds: [...state.completedLessonIds, id], quizScores: scores }, localDate(date), 30, 1, 0); }
+export function toggleSavedWord(state: LearningState, id: string): LearningState { word(id); return { ...state, savedWordIds: state.savedWordIds.includes(id) ? state.savedWordIds.filter(x => x !== id) : [...state.savedWordIds, id] }; }
+export function getDueWords(state: LearningState, date = new Date()) { const day = localDate(date); return allWords.filter(w => state.savedWordIds.includes(w.id) && (!state.reviews[w.id] || state.reviews[w.id].dueDate <= day)); }
+export function reviewWord(state: LearningState, id: string, rating: 'again' | 'good' | 'easy' | boolean, date = new Date()): LearningState { word(id); if (!state.savedWordIds.includes(id))
+    throw Error('Hãy lưu từ trước khi ôn tập.'); const grade = typeof rating === 'boolean' ? (rating ? 'good' : 'again') : rating; if (!['again', 'good', 'easy'].includes(grade))
+    throw Error('Mức ôn tập không hợp lệ.'); const day = localDate(date), old = state.reviews[id]; if (old?.lastReviewed === day && old.interval > 0)
+    return state; const interval = grade === 'again' ? 0 : grade === 'easy' ? Math.max(4, (old?.interval ?? 1) * 3) : Math.max(1, (old?.interval ?? 0) * 2); const next = { ...state, reviews: { ...state.reviews, [id]: { dueDate: shift(day, Math.min(interval, 36500)), interval: Math.min(interval, 36500), repetitions: grade === 'again' ? 0 : (old?.repetitions ?? 0) + 1, lastReviewed: day } } }; return old?.lastReviewed === day ? next : addActivity(next, day, 5, 0, 1); }
+export function getStats(state: LearningState, date = new Date()) { const today = localDate(date); let day = state.activity[today] ? today : shift(today, -1), streak = 0; while (state.activity[day]) {
+    streak++;
+    day = shift(day, -1);
+} return { xp: Object.values(state.activity).reduce((a, b) => a + b.xp, 0), streak, todayXp: state.activity[today]?.xp ?? 0, completedLessons: state.completedLessonIds.length, learnedWords: lessons.filter(l => state.completedLessonIds.includes(l.id)).reduce((n, l) => n + l.words.length, 0), reviewCount: Object.values(state.activity).reduce((n, a) => n + a.reviews, 0) }; }
+export function updateProfile(state: LearningState, profile: Partial<LearningState['profile']>): LearningState { const next = { ...state.profile, ...profile }; if (typeof next.name !== 'string' || !next.name.trim() || next.name.length > 60 || ![10, 20, 30, 50, 100].includes(next.dailyGoal))
+    throw Error('Tên hoặc mục tiêu không hợp lệ.'); return { ...state, profile: { name: next.name.trim(), dailyGoal: next.dailyGoal } }; }
+export function searchWords(query: string) { const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim(); const q = norm(query); return allWords.filter(w => norm(`${w.hanzi} ${w.pinyin} ${w.meaning} ${w.category}`).includes(q) || norm(w.pinyin).replace(/\s/g, '').includes(q.replace(/\s/g, ''))); }
+const object = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+function exact(v: unknown, keys: string[]): asserts v is Record<string, unknown> { if (!object(v) || Object.keys(v).length !== keys.length || !keys.every(k => Object.hasOwn(v, k)))
+    throw Error('Cấu trúc dữ liệu không hợp lệ.'); }
+function integer(v: unknown, max = 1000000): v is number { return Number.isInteger(v) && Number(v) >= 0 && Number(v) <= max; }
+function validDate(v: unknown, today: string): v is string { if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v))
+    return false; const [y, m, d] = v.split('-').map(Number); return localDate(new Date(y, m - 1, d)) === v && v <= today; }
+export function importState(json: string, date = new Date()): LearningState { if (json.length > 200000)
+    throw Error('Tệp dữ liệu quá lớn.'); let s: unknown; try {
+    s = JSON.parse(json);
+}
+catch {
+    throw Error('Tệp JSON không hợp lệ.');
+} exact(s, ['version', 'profile', 'completedLessonIds', 'savedWordIds', 'reviews', 'activity', 'quizScores']); if (s.version !== 1)
+    throw Error('Phiên bản dữ liệu chưa được hỗ trợ.'); exact(s.profile, ['name', 'dailyGoal']); updateProfile(createInitialState(), s.profile as LearningState['profile']); const ids = (value: unknown, allowed: string[]) => { if (!Array.isArray(value) || value.length > allowed.length || new Set(value).size !== value.length || value.some(x => typeof x !== 'string' || !allowed.includes(x)))
+    throw Error('Danh sách ID không hợp lệ.'); }; ids(s.completedLessonIds, lessons.map(l => l.id)); ids(s.savedWordIds, allWords.map(w => w.id)); const today = localDate(date); if (!object(s.reviews) || Object.keys(s.reviews).length > allWords.length)
+    throw Error('Lịch ôn tập không hợp lệ.'); for (const [id, r] of Object.entries(s.reviews)) {
+    word(id);
+    exact(r, ['dueDate', 'interval', 'repetitions', 'lastReviewed']);
+    if (!integer(r.interval, 36500) || !integer(r.repetitions) || !validDate(r.lastReviewed, today) || typeof r.dueDate !== 'string' || r.dueDate !== shift(r.lastReviewed, r.interval))
+        throw Error('Lịch ôn tập không hợp lệ.');
+} if (!object(s.activity) || Object.keys(s.activity).length > 36500)
+    throw Error('Hoạt động không hợp lệ.'); for (const [day, a] of Object.entries(s.activity)) {
+    exact(a, ['xp', 'lessons', 'reviews']);
+    if (!validDate(day, today) || !integer(a.xp) || !integer(a.lessons, lessons.length) || !integer(a.reviews, allWords.length) || a.xp !== a.lessons * 30 + a.reviews * 5 || a.xp === 0)
+        throw Error('Hoạt động không hợp lệ.');
+} if (!object(s.quizScores))
+    throw Error('Điểm kiểm tra không hợp lệ.'); for (const [id, q] of Object.entries(s.quizScores)) {
+    exact(q, ['correct', 'total']);
+    const lesson = lessons.find(l => l.id === id);
+    if (!lesson || !(s.completedLessonIds as string[]).includes(id) || q.total !== lesson.quiz.length || !integer(q.correct, Number(q.total)))
+        throw Error('Điểm kiểm tra không hợp lệ.');
+} const activity = Object.values(s.activity) as {
+    lessons: number;
+}[]; if (activity.reduce((n, a) => n + a.lessons, 0) !== (s.completedLessonIds as string[]).length)
+    throw Error('Tiến độ không khớp hoạt động.'); const reviewTotal = Object.values(s.activity).reduce<number>((n, a) => n + (a as {
+    reviews: number;
+}).reviews, 0); if (reviewTotal < Object.keys(s.reviews).length || (reviewTotal > 0 && Object.keys(s.reviews).length === 0))
+    throw Error('Lượt ôn không khớp lịch sử.'); return s as unknown as LearningState; }
+export function exportState(state: LearningState) { return JSON.stringify(state, null, 2); }
+export function loadState(storage: Pick<Storage, 'getItem'> = localStorage): {
+    state: LearningState;
+    error: string | null;
+} { try {
+    const raw = storage.getItem(STORAGE_KEY);
+    return { state: raw ? importState(raw) : createInitialState(), error: null };
+}
+catch {
+    return { state: createInitialState(), error: 'Không thể đọc tiến độ đã lưu. Dữ liệu trong phiên này vẫn sử dụng được.' };
+} }
+export function saveState(state: LearningState, storage: Pick<Storage, 'setItem'> = localStorage): string | null { try {
+    storage.setItem(STORAGE_KEY, exportState(state));
+    return null;
+}
+catch {
+    return 'Không thể lưu tiến độ trên thiết bị. Hãy xuất bản sao dữ liệu.';
+} }
