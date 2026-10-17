@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Bookmark, Search, X, Database, ArrowRight, Volume2 } from 'lucide-react';
+import { Bookmark, Search, X, Database, ArrowRight, Volume2, Edit3 } from 'lucide-react';
 import type { Word } from '../types';
 import { allWords } from '../data/lessons';
+import { searchWords } from '../domain/learning';
 import { WordCard } from '../components/WordCard';
 import { searchDictionary, type DbDictionaryResult } from '../services/api';
+import { HandwritingPad } from '../components/HandwritingPad';
 
 interface DictionaryViewProps {
     query: string;
@@ -31,8 +33,9 @@ export function DictionaryView({
     const [offset, setOffset] = useState(0);
     const [isDbSource, setIsDbSource] = useState(true);
     const [searchMode, setSearchMode] = useState<'all' | 'hanzi' | 'pinyin' | 'vi'>('all');
+    const [showHandwriting, setShowHandwriting] = useState(false);
 
-    // Debounced query execution against PGlite database
+    // Query execution against PGlite database with instant initial local match
     useEffect(() => {
         const trimmed = query.trim();
         if (!trimmed) {
@@ -42,6 +45,18 @@ export function DictionaryView({
             return;
         }
 
+        // Immediately set initial synchronous matches so no lag or stale items
+        const localMatches = searchWords(trimmed);
+        const initialResults: DbDictionaryResult[] = localMatches.map((w: Word) => ({
+            id: w.id,
+            traditional: w.hanzi,
+            simplified: w.hanzi,
+            pinyin: w.pinyin,
+            definitions: [w.meaning, w.exampleMeaning].filter(Boolean)
+        }));
+        setDbResults(initialResults);
+        setResultTotal(initialResults.length);
+
         let isMounted = true;
         setLoading(true);
 
@@ -49,10 +64,15 @@ export function DictionaryView({
             try {
                 const res = await searchDictionary(trimmed, searchMode, offset);
                 if (isMounted) {
-                    setDbResults(res.results);
-                    setResultTotal(res.total);
-                    setTotalCount(res.count);
-                    setIsDbSource(res.source === 'database');
+                    if (res.results.length > 0) {
+                        setDbResults(res.results);
+                        setResultTotal(res.total);
+                        setTotalCount(res.count);
+                        setIsDbSource(res.source === 'database');
+                    } else if (localMatches.length === 0) {
+                        setDbResults([]);
+                        setResultTotal(0);
+                    }
                     setLoading(false);
                 }
             } catch {
@@ -119,7 +139,7 @@ export function DictionaryView({
                             setOffset(0);
                         }}
                     />
-                    {query && (
+                    {query ? (
                         <button
                             type="button"
                             className="icon-button"
@@ -131,10 +151,30 @@ export function DictionaryView({
                         >
                             <X size={17} />
                         </button>
+                    ) : (
+                        <button
+                            type="button"
+                            className="icon-button"
+                            aria-label="Vẽ chữ viết tay để tra từ"
+                            title="Tra bằng chữ viết tay (giống Hanzii)"
+                            onClick={() => setShowHandwriting(true)}
+                            style={{ color: 'var(--vermilion-cinnabar)' }}
+                        >
+                            <Edit3 size={17} />
+                        </button>
                     )}
                 </label>
 
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                        type="button"
+                        className={`filter-button ${showHandwriting ? 'selected' : ''}`}
+                        onClick={() => setShowHandwriting(true)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        <Edit3 size={15} /> Viết tay (手寫)
+                    </button>
+
                     <select
                         aria-label="Chế độ tra từ"
                         value={searchMode}
@@ -221,7 +261,9 @@ export function DictionaryView({
                     <>
                         <div className="word-grid">
                             {dbResults.map(entry => {
-                                const isSaved = savedWordIds.includes(entry.id);
+                                const lessonWord = allWords.find(w => w.hanzi === entry.traditional || w.hanzi === entry.simplified);
+                                const effectiveId = lessonWord ? lessonWord.id : entry.id;
+                                const isSaved = savedWordIds.includes(effectiveId);
                                 const characters = Array.from(entry.traditional);
                                 return (
                                     <article key={entry.id} className="word-card">
@@ -230,7 +272,7 @@ export function DictionaryView({
                                             <button
                                                 className={`icon-button ${isSaved ? 'saved' : ''}`}
                                                 aria-label={`${isSaved ? 'Bỏ lưu' : 'Lưu'} ${entry.traditional}`}
-                                                onClick={() => onToggleSave(entry.id)}
+                                                onClick={() => onToggleSave(effectiveId)}
                                             >
                                                 <Bookmark size={18} fill={isSaved ? 'currentColor' : 'none'} />
                                             </button>
@@ -345,6 +387,16 @@ export function DictionaryView({
                             : 'Thử từ ngắn hơn, tiếng Việt không dấu hoặc phiên âm.'}
                     </p>
                 </div>
+            )}
+
+            {showHandwriting && (
+                <HandwritingPad
+                    onSelectWord={word => {
+                        setQuery(word);
+                        setOffset(0);
+                    }}
+                    onClose={() => setShowHandwriting(false)}
+                />
             )}
         </>
     );

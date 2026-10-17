@@ -200,3 +200,29 @@ function simulateLocalAiReply(userText: string, unitId: number): ConversationRep
     content: `中文：你好！很高興和你用中文練習。今天過得怎麼樣？\nPinyin: Nǐ hǎo! Hěn gāoxìng hé nǐ yòng zhōngwén liànxí. Jīntiān guò de zěnmeyàng?\nTiếng Việt: Xin chào! Rất vui được luyện tập tiếng Trung cùng bạn. Hôm nay của bạn thế nào?\n練習：Hãy thử dùng câu đơn giản: 我很好，謝謝！(Tôi rất khỏe, cảm ơn!) hoặc chia sẻ điều bạn muốn học hôm nay nhé.`,
   };
 }
+
+export type HandwritingStroke = [number[], number[], number[]];
+
+/** Recognize handwritten Chinese characters from stroke coordinate arrays */
+export async function recognizeHandwriting(
+  strokes: HandwritingStroke[],
+  width = 300,
+  height = 300
+): Promise<string[]> {
+  if (!strokes.length) return [];
+  try {
+    const res = await fetchWithFallback('/api/handwriting', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strokes, width, height }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.candidates || [];
+    }
+  } catch {
+    //
+  }
+  return [];
+}
+

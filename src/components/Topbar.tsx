@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
-import { Menu, Search, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Menu, Search, X, Edit3 } from 'lucide-react';
 import type { Route } from './Sidebar';
 import { navigationItems } from './Sidebar';
+import { HandwritingPad } from './HandwritingPad';
 
 interface TopbarProps {
     route: Route;
@@ -28,6 +29,7 @@ export function Topbar({
 }: TopbarProps) {
     const initial = profileName?.slice(0, 1).toUpperCase() || '中';
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const [showHandwriting, setShowHandwriting] = useState(false);
 
     useEffect(() => {
         function handleKeyDown(e: KeyboardEvent) {
@@ -95,6 +97,23 @@ export function Topbar({
                             }
                         }}
                     />
+                    <button
+                        type="button"
+                        onClick={() => setShowHandwriting(true)}
+                        aria-label="Vẽ chữ viết tay để tra từ"
+                        title="Vẽ chữ viết tay (giống Hanzii)"
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '2px 4px',
+                            color: 'var(--vermilion-cinnabar)'
+                        }}
+                    >
+                        <Edit3 size={15} />
+                    </button>
                     <kbd
                         className="bento-search-kbd"
                         onClick={() => searchInputRef.current?.focus()}
@@ -159,6 +178,16 @@ export function Topbar({
                     </nav>
                 </div>
             </div>
+
+            {showHandwriting && (
+                <HandwritingPad
+                    onSelectWord={char => {
+                        onSearch?.(char);
+                        onNavigate('dictionary');
+                    }}
+                    onClose={() => setShowHandwriting(false)}
+                />
+            )}
         </header>
     );
 }
