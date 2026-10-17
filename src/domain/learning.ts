@@ -1,4 +1,4 @@
-import { allWords, lessons } from '../data/lessons';
+import { allWords, lessons, scenarios } from '../data/lessons';
 export interface Review {
     dueDate: string;
     interval: number;
@@ -107,3 +107,194 @@ export function saveState(state: LearningState, storage: Pick<Storage, 'setItem'
 catch {
     return 'Không thể lưu tiến độ trên thiết bị. Hãy xuất bản sao dữ liệu.';
 } }
+
+export interface DayProgress {
+    date: string;
+    dayLabel: string;
+    xp: number;
+    lessons: number;
+    reviews: number;
+    metGoal: boolean;
+    isToday: boolean;
+}
+
+export interface WeeklyProgress {
+    days: DayProgress[];
+    totalXp: number;
+    activeDays: number;
+    hasActivity: boolean;
+}
+
+export function getWeeklyProgress(state: LearningState, date = new Date()): WeeklyProgress {
+    const today = localDate(date);
+    const dayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    const days: DayProgress[] = [];
+    let totalXp = 0;
+    let activeDays = 0;
+
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(date);
+        d.setDate(d.getDate() - i);
+        const dayStr = localDate(d);
+        const act = state.activity[dayStr] ?? { xp: 0, lessons: 0, reviews: 0 };
+        const metGoal = act.xp >= state.profile.dailyGoal;
+        const isToday = dayStr === today;
+        if (act.xp > 0) activeDays++;
+        totalXp += act.xp;
+        days.push({
+            date: dayStr,
+            dayLabel: dayLabels[d.getDay()],
+            xp: act.xp,
+            lessons: act.lessons,
+            reviews: act.reviews,
+            metGoal,
+            isToday
+        });
+    }
+
+    return {
+        days,
+        totalXp,
+        activeDays,
+        hasActivity: totalXp > 0
+    };
+}
+
+export interface QuizAccuracy {
+    totalCorrect: number;
+    totalQuestions: number;
+    percentage: number | null;
+    completedQuizzes: number;
+}
+
+export function getQuizAccuracy(state: LearningState): QuizAccuracy {
+    const scores = Object.values(state.quizScores);
+    if (scores.length === 0) {
+        return { totalCorrect: 0, totalQuestions: 0, percentage: null, completedQuizzes: 0 };
+    }
+    const totalCorrect = scores.reduce((sum, s) => sum + s.correct, 0);
+    const totalQuestions = scores.reduce((sum, s) => sum + s.total, 0);
+    const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : null;
+    return {
+        totalCorrect,
+        totalQuestions,
+        percentage,
+        completedQuizzes: scores.length
+    };
+}
+
+export interface LessonDraft {
+    lessonId: string;
+    stage: number;
+    question: number;
+    selected: number | null;
+    correct: number;
+}
+
+export interface ScenarioDraft {
+    scenarioId: string;
+    nodeId: string;
+    feedback: string;
+    history: { text: string; meaning: string }[];
+}
+
+export const DRAFT_LESSON_KEY = 'zhongxue.draft.lesson.v1';
+export const DRAFT_SCENARIO_KEY = 'zhongxue.draft.scenario.v1';
+
+export function validateLessonDraft(v: unknown): LessonDraft | null {
+    if (!v || typeof v !== 'object') return null;
+    const d = v as Record<string, unknown>;
+    if (typeof d.lessonId !== 'string') return null;
+    const lesson = lessons.find(l => l.id === d.lessonId);
+    if (!lesson) return null;
+    if (!Number.isInteger(d.stage) || (d.stage as number) < 0 || (d.stage as number) > 3) return null;
+    if (!Number.isInteger(d.question) || (d.question as number) < 0 || (d.question as number) >= lesson.quiz.length) return null;
+    if (!Number.isInteger(d.correct) || (d.correct as number) < 0 || (d.correct as number) > lesson.quiz.length) return null;
+    if (d.selected !== null && (!Number.isInteger(d.selected) || (d.selected as number) < 0 || (d.selected as number) >= (lesson.quiz[d.question as number]?.options.length ?? 0))) return null;
+    return {
+        lessonId: d.lessonId,
+        stage: d.stage as number,
+        question: d.question as number,
+        selected: d.selected as number | null,
+        correct: d.correct as number
+    };
+}
+
+export function validateScenarioDraft(v: unknown): ScenarioDraft | null {
+    if (!v || typeof v !== 'object') return null;
+    const d = v as Record<string, unknown>;
+    if (typeof d.scenarioId !== 'string' || typeof d.nodeId !== 'string' || typeof d.feedback !== 'string') return null;
+    const sc = scenarios.find(s => s.id === d.scenarioId);
+    if (!sc) return null;
+    if (!sc.nodes[d.nodeId]) return null;
+    if (!Array.isArray(d.history)) return null;
+    for (const h of d.history) {
+        if (!h || typeof h !== 'object' || typeof h.text !== 'string' || typeof h.meaning !== 'string') return null;
+    }
+    return {
+        scenarioId: d.scenarioId,
+        nodeId: d.nodeId,
+        feedback: d.feedback,
+        history: d.history as { text: string; meaning: string }[]
+    };
+}
+
+const safeSessionStorage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = typeof window !== 'undefined' && window.sessionStorage ? window.sessionStorage : {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {}
+};
+
+export function saveLessonDraft(draft: LessonDraft | null, storage: Pick<Storage, 'setItem' | 'removeItem'> = safeSessionStorage): void {
+    try {
+        if (draft) {
+            storage.setItem(DRAFT_LESSON_KEY, JSON.stringify(draft));
+        } else {
+            storage.removeItem(DRAFT_LESSON_KEY);
+        }
+    } catch {
+        // quota or storage unavailable
+    }
+}
+
+export function loadLessonDraft(storage: Pick<Storage, 'getItem'> = safeSessionStorage): LessonDraft | null {
+    try {
+        const raw = storage.getItem(DRAFT_LESSON_KEY);
+        if (!raw) return null;
+        return validateLessonDraft(JSON.parse(raw));
+    } catch {
+        return null;
+    }
+}
+
+export function saveScenarioDraft(draft: ScenarioDraft | null, storage: Pick<Storage, 'setItem' | 'removeItem'> = safeSessionStorage): void {
+    try {
+        if (draft) {
+            storage.setItem(DRAFT_SCENARIO_KEY, JSON.stringify(draft));
+        } else {
+            storage.removeItem(DRAFT_SCENARIO_KEY);
+        }
+    } catch {
+        // quota or storage unavailable
+    }
+}
+
+export function loadScenarioDraft(storage: Pick<Storage, 'getItem'> = safeSessionStorage): ScenarioDraft | null {
+    try {
+        const raw = storage.getItem(DRAFT_SCENARIO_KEY);
+        if (!raw) return null;
+        return validateScenarioDraft(JSON.parse(raw));
+    } catch {
+        return null;
+    }
+}
+
+export function clearDrafts(storage: Pick<Storage, 'removeItem'> = safeSessionStorage): void {
+    try {
+        storage.removeItem(DRAFT_LESSON_KEY);
+        storage.removeItem(DRAFT_SCENARIO_KEY);
+    } catch {
+        // ignore
+    }
+}
+
