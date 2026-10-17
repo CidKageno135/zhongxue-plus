@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Menu, Search, X } from 'lucide-react';
 import type { Route } from './Sidebar';
 import { navigationItems } from './Sidebar';
@@ -10,6 +11,7 @@ interface TopbarProps {
     profileName: string;
     onNavigate: (r: Route) => void;
     dueCount?: number;
+    searchValue?: string;
     onSearch?: (query: string) => void;
 }
 
@@ -21,9 +23,22 @@ export function Topbar({
     profileName,
     onNavigate,
     dueCount = 0,
+    searchValue = '',
     onSearch
 }: TopbarProps) {
     const initial = profileName?.slice(0, 1).toUpperCase() || '中';
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        function handleKeyDown(e: KeyboardEvent) {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     return (
         <header className="bento-header">
@@ -67,9 +82,12 @@ export function Topbar({
                 <div className="bento-search-box">
                     <Search size={16} color="var(--on-surface-variant)" />
                     <input
+                        ref={searchInputRef}
                         type="text"
                         className="bento-search-input"
+                        aria-label="Tra cứu Hán tự, Pinyin, Hán-Việt"
                         placeholder="Tra cứu Hán tự, Pinyin, Hán-Việt..."
+                        value={searchValue}
                         onChange={e => onSearch?.(e.target.value)}
                         onKeyDown={e => {
                             if (e.key === 'Enter') {
@@ -77,7 +95,14 @@ export function Topbar({
                             }
                         }}
                     />
-                    <kbd className="bento-search-kbd">⌘K</kbd>
+                    <kbd
+                        className="bento-search-kbd"
+                        onClick={() => searchInputRef.current?.focus()}
+                        style={{ cursor: 'pointer' }}
+                        title="Phím tắt: Ctrl+K hoặc ⌘K"
+                    >
+                        ⌘K
+                    </kbd>
                 </div>
 
                 {/* Profile & Demo stats */}
