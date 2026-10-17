@@ -1,5 +1,5 @@
 "use client";
-import {useRef,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import {Search,Bookmark,History,BookOpen,ArrowRight} from "lucide-react";
@@ -23,6 +23,13 @@ export function DictionaryBrowser({initialQuery=''}:{initialQuery?:string}) {
  const {data:detail,error:detailError,isLoading:detailLoading,mutate:refreshDetail}=useSWR<Detail>(selected?`/api/dictionary?id=${selected}`:null,requestJson);
  const entries=scope==="saved"?(saved?.results ?? []):scope==="history"?(history?.results ?? []):(results?.results ?? []);
  const isSaved=Boolean(detail?.saved || saved?.results.some(entry=>entry.id===selected));
+
+ useEffect(() => {
+  if (initialQuery.trim()) {
+   setQuery(initialQuery.trim());
+   void search(initialQuery.trim(), 0, "all");
+  }
+ }, [initialQuery]);
  async function choose(entry:DictionaryResult) {
   setSelected(entry.id);setNotice("");setShowWriter(false);
   if (window.innerWidth<800) detailRef.current?.scrollIntoView({behavior:"smooth",block:"start"});
