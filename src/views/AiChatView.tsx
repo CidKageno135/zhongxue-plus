@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Volume2, Sparkles, Mic, MicOff, RefreshCw, MessageCircle, Bot } from 'lucide-react';
+import { Send, Volume2, Mic, MicOff, RefreshCw, Bot } from 'lucide-react';
 import { sendAiMessage, type ConversationTurn } from '../services/api';
 
 export function AiChatView() {
@@ -12,7 +12,6 @@ export function AiChatView() {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [isListening, setIsListening] = useState(false);
-    const [selectedTopic, setSelectedTopic] = useState('chung');
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -61,9 +60,28 @@ export function AiChatView() {
 
     function toggleVoiceInput() {
         if (typeof window === 'undefined') return;
-        // Check for Web Speech Recognition API
-        const SpeechRec = (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).SpeechRecognition ||
-                          (window as unknown as { webkitSpeechRecognition?: any }).webkitSpeechRecognition;
+        interface SpeechResult {
+            transcript: string;
+        }
+        interface SpeechEvent {
+            results: Array<Array<SpeechResult>>;
+        }
+        interface SpeechInstance {
+            lang: string;
+            continuous: boolean;
+            interimResults: boolean;
+            onstart: () => void;
+            onend: () => void;
+            onerror: () => void;
+            onresult: (event: SpeechEvent) => void;
+            start: () => void;
+        }
+        type SpeechCtor = new () => SpeechInstance;
+        const win = window as unknown as {
+            SpeechRecognition?: SpeechCtor;
+            webkitSpeechRecognition?: SpeechCtor;
+        };
+        const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition;
 
         if (!SpeechRec) {
             alert('Trình duyệt của bạn chưa hỗ trợ nhận diện giọng nói trực tiếp. Hãy nhập văn bản bằng bàn phím nhé!');
@@ -84,7 +102,7 @@ export function AiChatView() {
             recognition.onstart = () => setIsListening(true);
             recognition.onend = () => setIsListening(false);
             recognition.onerror = () => setIsListening(false);
-            recognition.onresult = (event: any) => {
+            recognition.onresult = (event: SpeechEvent) => {
                 const transcript = event.results[0]?.[0]?.transcript;
                 if (transcript) {
                     setInput(transcript);
@@ -143,22 +161,9 @@ export function AiChatView() {
                         <Bot size={20} />
                     </div>
                     <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--on-surface)' }}>
-                                Trợ lý Đối thoại AI (Hán ngữ Đài Loan)
-                            </h2>
-                            <span style={{
-                                fontSize: '10px',
-                                fontWeight: 600,
-                                padding: '2px 8px',
-                                borderRadius: '999px',
-                                background: 'rgba(5, 150, 105, 0.12)',
-                                color: 'var(--jade-emerald)',
-                                border: '1px solid rgba(5, 150, 105, 0.25)'
-                            }}>
-                                Live OpenRouter AI
-                            </span>
-                        </div>
+                        <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--on-surface)' }}>
+                            Trợ lý Đối thoại AI (Hán ngữ Đài Loan)
+                        </h2>
                         <p style={{ margin: 0, fontSize: '11px', color: 'var(--on-surface-variant)' }}>
                             Tự động phản hồi bằng Phồn thể ‧ Phiên âm Pinyin ‧ Dịch nghĩa tiếng Việt ‧ Sửa lỗi ngữ pháp
                         </p>

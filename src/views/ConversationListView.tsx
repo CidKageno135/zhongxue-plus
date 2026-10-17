@@ -1,4 +1,4 @@
-import { ArrowRight, Bot, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import type { Scenario } from '../types';
 import { scenarios } from '../data/lessons';
 import { Button } from '../components/Button';
@@ -13,21 +13,6 @@ export function ConversationListView({ onSelectScenario }: ConversationListViewP
         <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                 <p className="eyebrow" style={{ margin: 0 }}>ĐỐI THOẠI AI THỰC CHIẾN · PHỒN THỂ ĐÀI LOAN</p>
-                <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    padding: '3px 10px',
-                    borderRadius: '999px',
-                    backgroundColor: 'rgba(5, 150, 105, 0.1)',
-                    color: 'var(--jade-emerald)',
-                    border: '1px solid rgba(5, 150, 105, 0.25)'
-                }}>
-                    <Bot size={13} />
-                    <span>OpenRouter AI Partner</span>
-                </div>
             </div>
 
             <h1>Một câu nói, một kết nối.</h1>

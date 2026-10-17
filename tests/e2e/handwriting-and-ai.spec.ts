@@ -36,7 +36,7 @@ test('ai chat view loads in conversation tab and responds with pinyin/translatio
   await promptChip.click();
 
   // Verify assistant responds with at least 2 messages in conversation (initial + reply)
-  await expect(page.getByText('Live OpenRouter AI')).toBeVisible();
+  await expect(page.getByText('Tự động phản hồi bằng Phồn thể')).toBeVisible();
   // Wait for loading to finish
   await expect(page.getByText('AI đối thoại đang soạn câu trả lời')).not.toBeVisible({ timeout: 15000 });
 });

@@ -1,6 +1,6 @@
 /**
  * ZhongXue+ API Client Service
- * Connects the frontend to the PGlite 122k database and OpenRouter AI conversation backend.
+ * Connects the frontend to the PGlite 122k database and AI conversation backend.
  */
 
 import { searchWords } from '../domain/learning';
@@ -167,11 +167,11 @@ export async function sendAiMessage(
   }
 
   // Intelligent local simulation if server is temporarily unreachable
-  return simulateLocalAiReply(message, unitId);
+  return simulateLocalAiReply(message);
 }
 
 /** Simulated intelligent tutor response following TOCFL A1-A2 Taiwan standards */
-function simulateLocalAiReply(userText: string, unitId: number): ConversationReply {
+function simulateLocalAiReply(userText: string): ConversationReply {
   const lower = userText.toLowerCase();
 
   if (lower.includes('trà sữa') || lower.includes('奶茶')) {

@@ -39,13 +39,16 @@ export function DictionaryView({
     useEffect(() => {
         const trimmed = query.trim();
         if (!trimmed) {
-            setDbResults([]);
-            setResultTotal(0);
-            setOffset(0);
-            return;
+            const timer = setTimeout(() => {
+                setDbResults([]);
+                setResultTotal(0);
+                setOffset(0);
+                setLoading(false);
+            }, 0);
+            return () => clearTimeout(timer);
         }
 
-        // Immediately set initial synchronous matches so no lag or stale items
+        let isMounted = true;
         const localMatches = searchWords(trimmed);
         const initialResults: DbDictionaryResult[] = localMatches.map((w: Word) => ({
             id: w.id,
@@ -54,11 +57,14 @@ export function DictionaryView({
             pinyin: w.pinyin,
             definitions: [w.meaning, w.exampleMeaning].filter(Boolean)
         }));
-        setDbResults(initialResults);
-        setResultTotal(initialResults.length);
 
-        let isMounted = true;
-        setLoading(true);
+        const initialTimer = setTimeout(() => {
+            if (isMounted) {
+                setDbResults(initialResults);
+                setResultTotal(initialResults.length);
+                setLoading(true);
+            }
+        }, 0);
 
         const timer = setTimeout(async () => {
             try {
@@ -84,6 +90,7 @@ export function DictionaryView({
 
         return () => {
             isMounted = false;
+            clearTimeout(initialTimer);
             clearTimeout(timer);
         };
     }, [query, searchMode, offset]);
