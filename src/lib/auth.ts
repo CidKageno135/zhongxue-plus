@@ -42,30 +42,34 @@ export async function setSessionCookie(token: string, expiresAt: Date) {
  * automatically sign in as the demo learner — no login step required.
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
-  await ensureDbReady();
-  const store = await cookies();
-  const token = store.get(COOKIE)?.value;
-  if (token) {
-    try {
-      const rows = await db
-        .select({
-          user: { id: users.id, name: users.name, email: users.email },
-          expiresAt: sessions.expiresAt,
-        })
-        .from(sessions)
-        .innerJoin(users, eq(sessions.userId, users.id))
-        .where(eq(sessions.tokenHash, hashToken(token)))
-        .limit(1);
-      const session = rows[0];
-      if (session && session.expiresAt.getTime() >= Date.now()) {
-        return session.user;
+  try {
+    await ensureDbReady();
+    const store = await cookies();
+    const token = store.get(COOKIE)?.value;
+    if (token) {
+      try {
+        const rows = await db
+          .select({
+            user: { id: users.id, name: users.name, email: users.email },
+            expiresAt: sessions.expiresAt,
+          })
+          .from(sessions)
+          .innerJoin(users, eq(sessions.userId, users.id))
+          .where(eq(sessions.tokenHash, hashToken(token)))
+          .limit(1);
+        const session = rows[0];
+        if (session && session.expiresAt.getTime() >= Date.now()) {
+          return session.user;
+        }
+      } catch(error) {
+        console.error('Session lookup failed',{name:error instanceof Error?error.name:'UnknownError'});
       }
-    } catch(error) {
-      console.error('Session lookup failed',{name:error instanceof Error?error.name:'UnknownError'});
-      return null;
     }
+    return await getDemoUser();
+  } catch (err) {
+    console.error('getSessionUser failed, falling back to demo learner', err);
+    return { id: 1, name: DEMO_USER.name, email: DEMO_USER.email };
   }
-  return getDemoUser();
 }
 
 async function getDemoUser(): Promise<SessionUser | null> {
@@ -84,10 +88,10 @@ async function getDemoUser(): Promise<SessionUser | null> {
         .where(eq(users.email, DEMO_USER.email))
         .limit(1);
     }
-    return rows[0] ?? null;
+    return rows[0] ?? { id: 1, name: DEMO_USER.name, email: DEMO_USER.email };
   } catch(error) {
-    console.error('Demo lookup failed',{name:error instanceof Error?error.name:'UnknownError'});
-    return null;
+    console.error('Demo lookup failed, using memory fallback',{name:error instanceof Error?error.name:'UnknownError'});
+    return { id: 1, name: DEMO_USER.name, email: DEMO_USER.email };
   }
 }
 
