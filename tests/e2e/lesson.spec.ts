@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { lessons } from '../../src/data/lessons';
 import { navigate } from './helpers';
 
-test('all eight lessons can be opened from the curriculum', async ({ page }) => {
+test('all sixteen lessons can be opened from the curriculum', async ({ page }) => {
   await page.goto('/');
   await navigate(page, 'Lộ trình');
   for (const lesson of lessons) {

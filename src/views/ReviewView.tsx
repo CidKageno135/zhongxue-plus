@@ -1,16 +1,20 @@
-import { useState } from 'react';
-import { Clock, Layers } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Clock, Layers, PlusCircle, CheckCircle2 } from 'lucide-react';
 import type { LearningState } from '../domain/learning';
-import { getDueWords } from '../domain/learning';
+import { getDueWords, getSrsBreakdown, computeEaseFactor } from '../domain/learning';
+import { getWordEtymology, STARTER_DECKS } from '../data/etymologyData';
 import { SpeakButton } from '../components/SpeakButton';
+import { speakChinese } from '../services/speech';
 
 interface ReviewViewProps {
     state: LearningState;
-    onReview: (id: string, rating: 'again' | 'good' | 'easy') => void;
+    onReview: (id: string, rating: 'again' | 'hard' | 'good' | 'easy') => void;
     onDictionary: () => void;
+    onSaveWords?: (ids: string[]) => void;
+    onNotice?: (msg: string) => void;
 }
 
-export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
+export function ReviewView({ state, onReview, onDictionary, onSaveWords, onNotice }: ReviewViewProps) {
     const [revealed, setRevealed] = useState(false);
     const [reviewed, setReviewed] = useState(0);
     const [sessionDone, setSessionDone] = useState<string[]>([]);
@@ -18,8 +22,76 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
     const remainingDue = getDueWords(state);
     const due = remainingDue.filter(w => !sessionDone.includes(w.id));
     const word = due[0];
+    const srsStats = getSrsBreakdown(state);
+
+    const [initialDueCount] = useState(() => Math.max(due.length, 1));
+    const totalInSession = Math.max(initialDueCount, sessionDone.length + due.length, reviewed + due.length, 1);
 
     const characters = word ? Array.from(word.hanzi) : [];
+    const etymology = word ? getWordEtymology(word.id, word.hanzi) : null;
+    const currentEase = word ? computeEaseFactor(state.reviews[word.id]) : 2.5;
+
+    const handleRate = useCallback(
+        (rating: 'again' | 'hard' | 'good' | 'easy') => {
+            if (!word) return;
+            onReview(word.id, rating);
+            setSessionDone(ids => [...ids, word.id]);
+            setRevealed(false);
+            setReviewed(n => n + 1);
+        },
+        [word, onReview]
+    );
+
+    useEffect(() => {
+        if (!word) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (
+                target &&
+                (target.tagName === 'INPUT' ||
+                    target.tagName === 'TEXTAREA' ||
+                    target.tagName === 'SELECT' ||
+                    target.isContentEditable)
+            ) {
+                return;
+            }
+
+            if (e.code === 'Space' || e.key === ' ') {
+                e.preventDefault();
+                if (!revealed) {
+                    setRevealed(true);
+                } else {
+                    handleRate('good');
+                }
+                return;
+            }
+
+            if ((e.key === 'r' || e.key === 'R') && word) {
+                e.preventDefault();
+                speakChinese(word.hanzi, { rate: 0.9 });
+                return;
+            }
+
+            if (revealed) {
+                if (e.key === '1') {
+                    e.preventDefault();
+                    handleRate('again');
+                } else if (e.key === '2') {
+                    e.preventDefault();
+                    handleRate('hard');
+                } else if (e.key === '3') {
+                    e.preventDefault();
+                    handleRate('good');
+                } else if (e.key === '4') {
+                    e.preventDefault();
+                    handleRate('easy');
+                }
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [word, revealed, handleRate]);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -62,12 +134,12 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
                                 <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--primary-container)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: '11px', fontWeight: 700 }}>
                                     {reviewed + 1}
                                 </span>
-                                <strong>Tiến độ phiên học: Thẻ {reviewed + 1} / {remainingDue.length || due.length || 1}</strong>
+                                <strong>Tiến độ phiên học: Thẻ {Math.min(reviewed + 1, totalInSession)} / {totalInSession}</strong>
                                 <span className="badge-pill badge-jade">{due.length} từ đến lịch ôn</span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--on-surface-variant)', fontSize: '12px' }}>
                                 <Clock size={14} />
-                                <span>Thời gian ước tính: ~4 phút</span>
+                                <span>Thời gian ước tính: ~{Math.max(1, Math.ceil(due.length * 0.5))} phút</span>
                             </div>
                         </div>
 
@@ -75,7 +147,7 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
                             <div
                                 style={{
                                     height: '100%',
-                                    width: `${Math.min(100, ((reviewed + 1) / (remainingDue.length || due.length || 1)) * 100)}%`,
+                                    width: `${Math.min(100, (reviewed / totalInSession) * 100)}%`,
                                     background: 'linear-gradient(90deg, var(--primary-container), var(--cognate-gold), var(--jade-emerald))',
                                     borderRadius: '9999px',
                                     transition: 'width 0.3s'
@@ -90,11 +162,13 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
                             {/* Card Utility Strip */}
                             <div style={{ padding: '12px 20px', background: 'var(--surface-container-low)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span className="badge-pill badge-vermilion">SRS Stage: Đang củng cố</span>
+                                    <span className="badge-pill badge-vermilion">
+                                        SRS Stage: {(state.reviews[word.id]?.repetitions ?? 0) >= 3 ? 'Đã vững' : 'Đang củng cố'}
+                                    </span>
                                     <span className="badge-pill badge-gold">TOCFL A1-A2</span>
                                 </div>
                                 <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>
-                                    Lần ôn thứ {reviewed + 1}
+                                    Lần ôn thứ {(state.reviews[word.id]?.repetitions ?? 0) + 1}
                                 </span>
                             </div>
 
@@ -113,7 +187,9 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
                                                 </svg>
                                                 <span className="tianzige-glyph" style={{ fontSize: '64px' }}>{char}</span>
                                             </div>
-                                            <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>Bộ thủ phồn thể</span>
+                                            <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>
+                                                {idx === 0 && etymology ? `Bộ ${etymology.radical} (${etymology.strokes} nét)` : 'Chữ Phồn thể'}
+                                            </span>
                                         </div>
                                     ))}
                                 </div>
@@ -133,12 +209,17 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
                                 {/* Back Face Details (Revealed) */}
                                 {revealed ? (
                                     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--surface-container-low)', padding: '20px', borderRadius: '12px', textAlign: 'left', marginTop: '10px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap' }}>
                                                 <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--tone-1)' }}>{word.pinyin}</span>
                                                 <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--primary)', margin: '0 0 0 14px' }}>{word.meaning}</h3>
                                             </div>
-                                            <span className="badge-pill badge-neutral">Phồn thể</span>
+                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                {etymology && (
+                                                    <span className="badge-pill badge-gold">Hán-Việt: {etymology.sinoViet}</span>
+                                                )}
+                                                <span className="badge-pill badge-neutral">Phồn thể</span>
+                                            </div>
                                         </div>
 
                                         {/* Bilingual Context Example */}
@@ -159,7 +240,8 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
 
                                         {/* Cultural / Sino-Vietnamese Tip */}
                                         <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'var(--gold-tint)', border: '1px solid rgba(217, 119, 6, 0.25)', fontSize: '12px', color: 'var(--on-surface)' }}>
-                                            <strong style={{ color: 'var(--cognate-gold)' }}>Mẹo ghi nhớ từ nguyên:</strong> Đối chiếu âm Pinyin với âm Hán-Việt tương ứng giúp bạn phản xạ từ vựng tự nhiên và nhớ lâu hơn gấp 3 lần.
+                                            <strong style={{ color: 'var(--cognate-gold)' }}>Mẹo ghi nhớ từ nguyên:</strong>{' '}
+                                            {etymology ? etymology.cognateTip : 'Đối chiếu âm Pinyin với âm Hán-Việt tương ứng giúp bạn phản xạ từ vựng tự nhiên và nhớ lâu hơn gấp 3 lần.'}
                                         </div>
                                     </div>
                                 ) : (
@@ -176,8 +258,8 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
 
                             {/* Flip Action Hint Strip */}
                             <div style={{ padding: '8px 20px', background: 'var(--surface-container-low)', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--on-surface-variant)' }}>
-                                <span>Nhấp Hiện đáp án hoặc nhấn Space</span>
-                                <span>Hệ số dễ dàng (E-Factor): 2.50</span>
+                                <span>Nhấp Hiện đáp án hoặc nhấn Space (sau đó phím 1-4)</span>
+                                <span>Hệ số dễ dàng (E-Factor): {currentEase.toFixed(2)}</span>
                             </div>
                         </div>
                     ) : (
@@ -193,7 +275,7 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
                             <p style={{ color: 'var(--on-surface-variant)', fontSize: '13px', maxWidth: '420px', margin: '0 0 20px' }}>
                                 {remainingDue.length
                                     ? `${remainingDue.length} từ cần ôn lại hôm nay. Hãy tiếp tục củng cố nhé.`
-                                    : 'Bạn đã ôn xong hôm nay! Lưu thêm từ trong các bài học hoặc từ điển để mở rộng bộ thẻ nhớ.'}
+                                    : 'Bạn đã ôn xong hôm nay! Lưu thêm từ trong các bài học hoặc chọn một bộ thẻ Starter Deck bên dưới để mở rộng bộ thẻ nhớ.'}
                             </p>
                             {remainingDue.length > 0 && (
                                 <button
@@ -223,60 +305,40 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
                         <div className="bento-card" style={{ padding: '18px 20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                 <strong style={{ fontSize: '13px' }}>Đánh giá mức độ ghi nhớ theo thuật toán SM-2:</strong>
-                                <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>Chọn mức độ để lên lịch ôn tiếp</span>
+                                <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>Chọn mức độ hoặc nhấn phím [1] – [4]</span>
                             </div>
                             <div className="sm2-rating-grid">
                                 <button
                                     type="button"
                                     className="sm2-btn sm2-btn-again"
-                                    onClick={() => {
-                                        onReview(word.id, 'again');
-                                        setSessionDone(ids => [...ids, word.id]);
-                                        setRevealed(false);
-                                        setReviewed(n => n + 1);
-                                    }}
+                                    onClick={() => handleRate('again')}
                                 >
                                     <strong>Cần học lại (Quên [1])</strong>
-                                    <span>&lt; 10 phút</span>
+                                    <span>&lt; 10 phút (Hôm nay)</span>
                                 </button>
                                 <button
                                     type="button"
                                     className="sm2-btn sm2-btn-hard"
-                                    onClick={() => {
-                                        onReview(word.id, 'again');
-                                        setSessionDone(ids => [...ids, word.id]);
-                                        setRevealed(false);
-                                        setReviewed(n => n + 1);
-                                    }}
+                                    onClick={() => handleRate('hard')}
                                 >
                                     <strong>Khó khăn (Khó [2])</strong>
-                                    <span>1 ngày</span>
+                                    <span>~1-2 ngày</span>
                                 </button>
                                 <button
                                     type="button"
                                     className="sm2-btn sm2-btn-good"
-                                    onClick={() => {
-                                        onReview(word.id, 'good');
-                                        setSessionDone(ids => [...ids, word.id]);
-                                        setRevealed(false);
-                                        setReviewed(n => n + 1);
-                                    }}
+                                    onClick={() => handleRate('good')}
                                 >
-                                    <strong>Nhớ được (Tốt [3])</strong>
-                                    <span>3 ngày</span>
+                                    <strong>Nhớ được (Tốt [3] / Space)</strong>
+                                    <span>~{Math.max(1, Math.round((state.reviews[word?.id || '']?.interval || 1) * currentEase))} ngày</span>
                                 </button>
                                 <button
                                     type="button"
                                     className="sm2-btn sm2-btn-easy"
-                                    onClick={() => {
-                                        onReview(word.id, 'easy');
-                                        setSessionDone(ids => [...ids, word.id]);
-                                        setRevealed(false);
-                                        setReviewed(n => n + 1);
-                                    }}
+                                    onClick={() => handleRate('easy')}
                                 >
                                     <strong>Rất dễ (Dễ [4])</strong>
-                                    <span>7 ngày</span>
+                                    <span>~{Math.max(4, Math.round((state.reviews[word?.id || '']?.interval || 1) * currentEase * 1.3))} ngày</span>
                                 </button>
                             </div>
                         </div>
@@ -292,21 +354,21 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
                                 <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: '20px' }}>donut_large</span>
                                 <h3 style={{ margin: 0, fontSize: '16px' }}>Thống kê SRS hôm nay</h3>
                             </div>
-                            <span className="badge-pill badge-neutral">{remainingDue.length || 25} Thẻ</span>
+                            <span className="badge-pill badge-neutral">{srsStats.total} Thẻ</span>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center' }}>
                             <div style={{ padding: '10px 6px', borderRadius: '8px', background: 'var(--vermilion-tint)' }}>
-                                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--vermilion-cinnabar)' }}>{remainingDue.length || 25}</div>
+                                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--vermilion-cinnabar)' }}>{due.length}</div>
                                 <div style={{ fontSize: '10px', color: 'var(--on-surface-variant)' }}>Cần ôn</div>
                             </div>
                             <div style={{ padding: '10px 6px', borderRadius: '8px', background: 'var(--jade-tint)' }}>
-                                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--jade-emerald)' }}>180</div>
+                                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--jade-emerald)' }}>{srsStats.review}</div>
                                 <div style={{ fontSize: '10px', color: 'var(--on-surface-variant)' }}>Đã vững</div>
                             </div>
                             <div style={{ padding: '10px 6px', borderRadius: '8px', background: 'var(--gold-tint)' }}>
-                                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--cognate-gold)' }}>6</div>
-                                <div style={{ fontSize: '10px', color: 'var(--on-surface-variant)' }}>Từ khó</div>
+                                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--cognate-gold)' }}>{srsStats.learning + srsStats.newCount}</div>
+                                <div style={{ fontSize: '10px', color: 'var(--on-surface-variant)' }}>Đang học</div>
                             </div>
                         </div>
                     </div>
@@ -374,45 +436,57 @@ export function ReviewView({ state, onReview, onDictionary }: ReviewViewProps) {
                 </div>
 
                 <div className="bento-grid">
-                    <div className="col-span-3 bento-card">
-                        <span className="badge-pill badge-vermilion" style={{ alignSelf: 'flex-start', marginBottom: '8px' }}>Đề xuất cao</span>
-                        <h4 style={{ margin: 0 }}>夜市生存指南</h4>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface)', marginBottom: '4px' }}>Sống sót Chợ đêm Đài Loan</div>
-                        <p style={{ fontSize: '11px', color: 'var(--on-surface-variant)', margin: '0 0 12px' }}>
-                            Gọi độ đường đá (微糖去冰), hỏi giá & thanh toán bằng LinePay/EasyCard.
-                        </p>
-                        <div style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 600 }}>35 thẻ từ • Làm chủ 45%</div>
-                    </div>
-
-                    <div className="col-span-3 bento-card">
-                        <span className="badge-pill badge-jade" style={{ alignSelf: 'flex-start', marginBottom: '8px' }}>Thiết yếu</span>
-                        <h4 style={{ margin: 0 }}>捷運通勤必備</h4>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface)', marginBottom: '4px' }}>Kỹ năng MRT & Xe buýt</div>
-                        <p style={{ fontSize: '11px', color: 'var(--on-surface-variant)', margin: '0 0 12px' }}>
-                            Các biển chỉ dẫn ga MRT, chuyển tuyến (轉乘), thẻ EasyCard (悠遊卡).
-                        </p>
-                        <div style={{ fontSize: '11px', color: 'var(--jade-emerald)', fontWeight: 600 }}>28 thẻ từ • Làm chủ 82%</div>
-                    </div>
-
-                    <div className="col-span-3 bento-card">
-                        <span className="badge-pill badge-gold" style={{ alignSelf: 'flex-start', marginBottom: '8px' }}>Du học sinh</span>
-                        <h4 style={{ margin: 0 }}>租屋與宿舍生活</h4>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface)', marginBottom: '4px' }}>Thuê nhà & KTX Đại học</div>
-                        <p style={{ fontSize: '11px', color: 'var(--on-surface-variant)', margin: '0 0 12px' }}>
-                            Tiền đặt cọc (押金), hợp đồng thuê, quản lý rác thải phân loại (垃圾分類).
-                        </p>
-                        <div style={{ fontSize: '11px', color: 'var(--cognate-gold)', fontWeight: 600 }}>42 thẻ từ • Làm chủ 15%</div>
-                    </div>
-
-                    <div className="col-span-3 bento-card">
-                        <span className="badge-pill badge-neutral" style={{ alignSelf: 'flex-start', marginBottom: '8px' }}>Luyện thi bằng</span>
-                        <h4 style={{ margin: 0 }}>A2 核心詞彙精選</h4>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface)', marginBottom: '4px' }}>Từ vựng Cốt lõi TOCFL A2</div>
-                        <p style={{ fontSize: '11px', color: 'var(--on-surface-variant)', margin: '0 0 12px' }}>
-                            Bộ 120 danh từ, động từ quan trọng nhất cho chứng chỉ Hoa ngữ TOCFL Band A.
-                        </p>
-                        <div style={{ fontSize: '11px', color: 'var(--tone-1)', fontWeight: 600 }}>120 thẻ từ • Làm chủ 60%</div>
-                    </div>
+                    {STARTER_DECKS.map(deck => {
+                        const savedCount = deck.wordIds.filter(id => state.savedWordIds.includes(id)).length;
+                        const isFullyAdded = savedCount === deck.wordIds.length;
+                        const masteryPct = Math.round((savedCount / deck.wordIds.length) * 100);
+                        return (
+                            <div key={deck.id} className="col-span-3 bento-card" style={{ justifyContent: 'space-between' }}>
+                                <div>
+                                    <span className={`badge-pill ${deck.badgeClass}`} style={{ alignSelf: 'flex-start', marginBottom: '8px' }}>
+                                        {deck.badge}
+                                    </span>
+                                    <h4 style={{ margin: 0 }}>{deck.titleZh}</h4>
+                                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface)', marginBottom: '4px' }}>
+                                        {deck.titleVi}
+                                    </div>
+                                    <p style={{ fontSize: '11px', color: 'var(--on-surface-variant)', margin: '0 0 12px' }}>
+                                        {deck.desc}
+                                    </p>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <div style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 600 }}>
+                                        {deck.wordIds.length} thẻ từ • Đã nạp {savedCount}/{deck.wordIds.length} ({masteryPct}%)
+                                    </div>
+                                    {onSaveWords && (
+                                        <button
+                                            type="button"
+                                            className={isFullyAdded ? 'bento-btn-secondary' : 'bento-btn-primary'}
+                                            style={{ width: '100%', justifyContent: 'center', fontSize: '12px', padding: '6px 10px' }}
+                                            disabled={isFullyAdded}
+                                            onClick={() => {
+                                                onSaveWords(deck.wordIds);
+                                                setSessionDone([]);
+                                                onNotice?.(`Đã nạp bộ thẻ "${deck.titleVi}" (${deck.wordIds.length} từ) vào lộ trình SRS!`);
+                                            }}
+                                        >
+                                            {isFullyAdded ? (
+                                                <>
+                                                    <CheckCircle2 size={14} />
+                                                    <span>Đã nạp bộ thẻ</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <PlusCircle size={14} />
+                                                    <span>Nạp bộ thẻ ({deck.wordIds.length} từ)</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>

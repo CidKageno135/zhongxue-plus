@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Bookmark, Search, X, Database, ArrowRight, Volume2, Edit3 } from 'lucide-react';
 import type { Word } from '../types';
-import { allWords } from '../data/lessons';
+import { allWords, lessons } from '../data/lessons';
 import { searchWords } from '../domain/learning';
 import { WordCard } from '../components/WordCard';
-import { searchDictionary, type DbDictionaryResult } from '../services/api';
+import { searchDictionary, checkBackendHealth, type DbDictionaryResult } from '../services/api';
+import { speakChinese } from '../services/speech';
 import { HandwritingPad } from '../components/HandwritingPad';
 
 interface DictionaryViewProps {
@@ -14,8 +15,13 @@ interface DictionaryViewProps {
     setOnlySaved: (s: boolean) => void;
     filteredWords: Word[];
     savedWordIds: string[];
-    onToggleSave: (id: string) => void;
+    onToggleSave: (id: string, customWord?: Word) => void;
 }
+
+const TOPIC_FILTERS = [
+    'Tất cả', 'A1', 'A2', 'B1', 'B2',
+    'Giao tiếp', 'Ăn uống', 'Di chuyển', 'Đời sống', 'Công việc', 'Tài chính', 'Văn hóa', 'Thương mại', 'Công nghệ', 'Pháp lý'
+] as const;
 
 export function DictionaryView({
     query,
@@ -31,9 +37,28 @@ export function DictionaryView({
     const [resultTotal, setResultTotal] = useState<number>(0);
     const [loading, setLoading] = useState(false);
     const [offset, setOffset] = useState(0);
-    const [isDbSource, setIsDbSource] = useState(true);
+    const [isDbSource, setIsDbSource] = useState(false);
     const [searchMode, setSearchMode] = useState<'all' | 'hanzi' | 'pinyin' | 'vi'>('all');
     const [showHandwriting, setShowHandwriting] = useState(false);
+    const [topicFilter, setTopicFilter] = useState<string>('Tất cả');
+
+    useEffect(() => {
+        let active = true;
+        void checkBackendHealth().then(health => {
+            if (!active) return;
+            if (health && health.online) {
+                setIsDbSource(true);
+                if (health.totalEntries > 0) {
+                    setTotalCount(health.totalEntries);
+                }
+            } else {
+                setIsDbSource(false);
+            }
+        });
+        return () => {
+            active = false;
+        };
+    }, []);
 
     // Query execution against PGlite database with instant initial local match
     useEffect(() => {
@@ -95,18 +120,19 @@ export function DictionaryView({
         };
     }, [query, searchMode, offset]);
 
-    function speakText(text: string) {
-        if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'zh-TW';
-        u.rate = 0.9;
-        window.speechSynthesis.speak(u);
-    }
-
     const QUICK_SUGGESTIONS = [
         '學生', 'xuéshēng', 'học sinh', '捷運', '珍珠奶茶', '經濟', '夜市', '咖啡'
     ];
+
+    const displayedWords = filteredWords.filter(w => {
+        if (topicFilter === 'Tất cả') return true;
+        const parentLesson = lessons.find(l => l.words.some(lw => lw.id === w.id));
+        if (!parentLesson) return true;
+        if (topicFilter === 'A1' || topicFilter === 'A2' || topicFilter === 'B1' || topicFilter === 'B2') {
+            return parentLesson.level === topicFilter;
+        }
+        return parentLesson.category === topicFilter;
+    });
 
     return (
         <>
@@ -218,7 +244,7 @@ export function DictionaryView({
 
             {/* Quick search suggestion pills */}
             {!query && !onlySaved && (
-                <div style={{ margin: '12px 0 16px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ margin: '12px 0 8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)', fontWeight: 500 }}>Gợi ý tra nhanh:</span>
                     {QUICK_SUGGESTIONS.map(s => (
                         <button
@@ -246,14 +272,43 @@ export function DictionaryView({
                 </div>
             )}
 
+            {/* Topic / Level filter bar when browsing default vocabulary */}
+            {!query.trim() && (
+                <div style={{ margin: '8px 0 14px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)', fontWeight: 500 }}>Chủ đề:</span>
+                    {TOPIC_FILTERS.map(topic => {
+                        const active = topicFilter === topic;
+                        return (
+                            <button
+                                key={topic}
+                                type="button"
+                                onClick={() => setTopicFilter(topic)}
+                                style={{
+                                    padding: '4px 10px',
+                                    borderRadius: '999px',
+                                    border: `1px solid ${active ? 'var(--vermilion-cinnabar)' : 'var(--border-subtle)'}`,
+                                    background: active ? 'var(--vermilion-tint)' : 'var(--surface-container-low)',
+                                    color: active ? 'var(--vermilion-cinnabar)' : 'var(--on-surface-variant)',
+                                    fontSize: '11px',
+                                    fontWeight: active ? 700 : 500,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {topic}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
             {/* Results metadata bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 16px' }}>
                 <p className="result-count" style={{ margin: 0 }}>
                     {query.trim()
                         ? `${resultTotal.toLocaleString('vi-VN')} kết quả cho “${query}” (từ ${totalCount.toLocaleString('vi-VN')} mục từ)`
                         : onlySaved
-                        ? `${filteredWords.length} từ đã lưu trong sổ tay`
-                        : `${filteredWords.length} / ${allWords.length} từ vựng bài học cơ bản`}
+                        ? `${displayedWords.length} từ đã lưu trong sổ tay`
+                        : `${displayedWords.length} / ${allWords.length} từ vựng bài học cơ bản`}
                 </p>
                 {loading && (
                     <span style={{ fontSize: '12px', color: 'var(--vermilion-cinnabar)', fontWeight: 600 }}>
@@ -269,17 +324,40 @@ export function DictionaryView({
                         <div className="word-grid">
                             {dbResults.map(entry => {
                                 const lessonWord = allWords.find(w => w.hanzi === entry.traditional || w.hanzi === entry.simplified);
-                                const effectiveId = lessonWord ? lessonWord.id : entry.id;
+                                const effectiveId = lessonWord
+                                    ? lessonWord.id
+                                    : entry.id.startsWith('dict-')
+                                    ? entry.id
+                                    : `dict-${entry.id}`;
                                 const isSaved = savedWordIds.includes(effectiveId);
                                 const characters = Array.from(entry.traditional);
                                 return (
                                     <article key={entry.id} className="word-card">
                                         <div className="row between">
-                                            <span className="badge-pill badge-neutral">Phồn thể Đài Loan</span>
+                                            <span className="badge-pill badge-neutral">
+                                                Phồn thể Đài Loan {entry.simplified && entry.simplified !== entry.traditional ? `· Giản: ${entry.simplified}` : ''}
+                                            </span>
                                             <button
                                                 className={`icon-button ${isSaved ? 'saved' : ''}`}
                                                 aria-label={`${isSaved ? 'Bỏ lưu' : 'Lưu'} ${entry.traditional}`}
-                                                onClick={() => onToggleSave(effectiveId)}
+                                                onClick={() => {
+                                                    if (lessonWord) {
+                                                        onToggleSave(lessonWord.id);
+                                                    } else {
+                                                        const customWord: Word = {
+                                                            id: effectiveId,
+                                                            hanzi: entry.traditional,
+                                                            pinyin: entry.pinyin,
+                                                            meaning: entry.definitions.slice(0, 2).join('; ') || entry.traditional,
+                                                            example: `${entry.traditional}（臺灣繁體詞彙）`,
+                                                            examplePinyin: entry.pinyin,
+                                                            exampleMeaning: entry.definitions[0] || entry.traditional,
+                                                            category: 'Từ điển mở rộng',
+                                                            lessonId: 'custom-dictionary'
+                                                        };
+                                                        onToggleSave(effectiveId, customWord);
+                                                    }
+                                                }}
                                             >
                                                 <Bookmark size={18} fill={isSaved ? 'currentColor' : 'none'} />
                                             </button>
@@ -292,7 +370,7 @@ export function DictionaryView({
                                                         key={idx}
                                                         className="tianzige-box"
                                                         style={{ width: '40px', height: '40px', borderRadius: '6px', flexShrink: 0 }}
-                                                        onClick={() => speakText(char)}
+                                                        onClick={() => speakChinese(char, 0.9)}
                                                         title="Nhấn để nghe phát âm"
                                                     >
                                                         <div className="tianzige-crosshair-h" />
@@ -309,7 +387,7 @@ export function DictionaryView({
                                                     type="button"
                                                     className="icon-button"
                                                     aria-label={`Phát âm ${entry.traditional}`}
-                                                    onClick={() => speakText(entry.traditional)}
+                                                    onClick={() => speakChinese(entry.traditional, 0.9)}
                                                     style={{ padding: '4px' }}
                                                 >
                                                     <Volume2 size={16} />
@@ -371,10 +449,10 @@ export function DictionaryView({
                         </p>
                     </div>
                 )
-            ) : filteredWords.length ? (
+            ) : displayedWords.length ? (
                 /* Default view when no search query: render standard course words */
                 <div className="word-grid">
-                    {filteredWords.map(w => (
+                    {displayedWords.map(w => (
                         <WordCard
                             key={w.id}
                             word={w}

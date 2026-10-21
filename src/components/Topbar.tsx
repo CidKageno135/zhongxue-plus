@@ -8,6 +8,7 @@ interface TopbarProps {
     menuOpen: boolean;
     setMenuOpen: (open: boolean) => void;
     streak: number;
+    xp?: number;
     profileName: string;
     onNavigate: (r: Route) => void;
     dueCount?: number;
@@ -18,6 +19,7 @@ export function Topbar({
     menuOpen,
     setMenuOpen,
     streak = 0,
+    xp = 0,
     profileName,
     onNavigate,
     dueCount = 0
@@ -78,7 +80,7 @@ export function Topbar({
                     </div>
                 </div>
 
-                {/* Profile & Demo stats */}
+                {/* Profile & Real XP / Streak stats */}
                 <div className="bento-header-actions">
                     {streak > 0 && (
                         <div className="bento-gem-pill" style={{ color: 'var(--vermilion-cinnabar)', borderColor: 'rgba(200, 50, 43, 0.25)' }}>
@@ -87,10 +89,10 @@ export function Topbar({
                             <span style={{ color: 'var(--on-surface-variant)', fontSize: '11px' }}>ngày</span>
                         </div>
                     )}
-                    <div className="bento-gem-pill">
+                    <div className="bento-gem-pill" title={`Tổng điểm tích lũy: ${xp} XP`}>
                         <span>💎</span>
-                        <span style={{ color: 'var(--on-surface)' }}>1,420</span>
-                        <span style={{ color: 'var(--on-surface-variant)', fontSize: '11px' }}>Demo</span>
+                        <span style={{ color: 'var(--on-surface)', fontWeight: 700 }}>{xp.toLocaleString('vi-VN')}</span>
+                        <span style={{ color: 'var(--on-surface-variant)', fontSize: '11px' }}>XP</span>
                     </div>
 
                     <button
@@ -100,8 +102,8 @@ export function Topbar({
                         onClick={() => onNavigate('settings')}
                     >
                         <div style={{ textAlign: 'right', display: 'none' }} className="profile-text-desktop">
-                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--on-surface)' }}>示範學習者</div>
-                            <div style={{ fontSize: '10px', color: 'var(--on-surface-variant)' }}>({profileName || 'Tài khoản mẫu'})</div>
+                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--on-surface)' }}>{profileName || 'Người học'}</div>
+                            <div style={{ fontSize: '10px', color: 'var(--on-surface-variant)' }}>TOCFL A1–A2</div>
                         </div>
                         <div className="bento-avatar">
                             {initial}

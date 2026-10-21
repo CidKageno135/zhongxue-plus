@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, ArrowRight, Check, RotateCcw } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowLeft, ArrowRight, Bookmark, Check, RotateCcw } from 'lucide-react';
 import type { Lesson } from '../types';
 import { WordCard } from '../components/WordCard';
 import { SpeakButton } from '../components/SpeakButton';
@@ -11,6 +11,7 @@ interface LessonFlowProps {
     onClose: () => void;
     onComplete: (correct: number, total: number) => void;
     onSave: (id: string) => void;
+    onSaveAll?: () => void;
     saved: string[];
 }
 
@@ -19,6 +20,7 @@ export function LessonFlow({
     onClose,
     onComplete,
     onSave,
+    onSaveAll,
     saved
 }: LessonFlowProps) {
     // Check if there is an in-progress draft for this lesson
@@ -34,6 +36,7 @@ export function LessonFlow({
     const stepHeadingRef = useRef<HTMLHeadingElement>(null);
     const stageNames = ['Từ vựng', 'Hội thoại', 'Ngữ pháp', 'Thử sức'];
     const current = lesson.quiz[question];
+    const allLessonWordsSaved = lesson.words.every(w => saved.includes(w.id));
 
     // Save draft automatically as learner progresses
     useEffect(() => {
@@ -65,11 +68,57 @@ export function LessonFlow({
         saveLessonDraft(null);
     }
 
-    function handleFinish() {
+    const handleFinish = useCallback(() => {
         onComplete(correct, lesson.quiz.length);
         setDone(true);
         saveLessonDraft(null);
-    }
+    }, [correct, lesson.quiz.length, onComplete]);
+
+    // Keyboard support for Quiz options (1-4, A-D) and advance (Enter/Space)
+    useEffect(() => {
+        if (stage !== 3 || done || !current) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (
+                target &&
+                (target.tagName === 'INPUT' ||
+                    target.tagName === 'TEXTAREA' ||
+                    target.tagName === 'SELECT' ||
+                    target.isContentEditable)
+            ) {
+                return;
+            }
+
+            if (selected === null) {
+                let choiceIdx = -1;
+                if (e.key === '1' || e.key === 'a' || e.key === 'A') choiceIdx = 0;
+                else if (e.key === '2' || e.key === 'b' || e.key === 'B') choiceIdx = 1;
+                else if (e.key === '3' || e.key === 'c' || e.key === 'C') choiceIdx = 2;
+                else if (e.key === '4' || e.key === 'd' || e.key === 'D') choiceIdx = 3;
+
+                if (choiceIdx >= 0 && choiceIdx < current.options.length) {
+                    e.preventDefault();
+                    setSelected(choiceIdx);
+                    if (choiceIdx === current.answer) {
+                        setCorrect(c => c + 1);
+                    }
+                }
+            } else {
+                if (e.key === 'Enter' || e.code === 'Space' || e.key === ' ') {
+                    e.preventDefault();
+                    if (question < lesson.quiz.length - 1) {
+                        setQuestion(q => q + 1);
+                        setSelected(null);
+                    } else {
+                        handleFinish();
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [stage, done, current, selected, question, lesson.quiz.length, handleFinish]);
 
     return (
         <div className="lesson-view">
@@ -116,15 +165,36 @@ export function LessonFlow({
                     <h2>Bạn đã hoàn thành bài học!</h2>
                     <p>Đúng {correct}/{lesson.quiz.length} câu. Mỗi lần thực hành đều giúp bạn tự tin hơn.</p>
                     <p className="muted">Tiến độ chỉ được cộng một lần cho mỗi bài. Bạn luôn có thể học lại.</p>
-                    <Button onClick={onClose}>Về lộ trình <ArrowRight size={17} /></Button>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '12px' }}>
+                        {onSaveAll && !allLessonWordsSaved && (
+                            <Button secondary onClick={onSaveAll}>
+                                <Bookmark size={16} /> Lưu toàn bộ từ bài học
+                            </Button>
+                        )}
+                        <Button onClick={onClose}>Về lộ trình <ArrowRight size={17} /></Button>
+                    </div>
                 </div>
             ) : (
                 <>
                     {stage === 0 && (
                         <>
-                            <div className="section-heading">
+                            <div className="section-heading" style={{ flexWrap: 'wrap', gap: '10px' }}>
                                 <h2 tabIndex={-1} ref={stepHeadingRef}>Những từ bạn sẽ dùng hôm nay</h2>
-                                <span>{lesson.words.length} từ mới</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span>{lesson.words.length} từ mới</span>
+                                    {onSaveAll && (
+                                        <button
+                                            type="button"
+                                            className={`filter-button ${allLessonWordsSaved ? 'selected' : ''}`}
+                                            disabled={allLessonWordsSaved}
+                                            onClick={onSaveAll}
+                                            style={{ fontSize: '12px', padding: '5px 10px', height: 'auto', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                        >
+                                            <Bookmark size={14} fill={allLessonWordsSaved ? 'currentColor' : 'none'} />
+                                            <span>{allLessonWordsSaved ? 'Đã lưu cả bài' : 'Lưu toàn bộ từ bài học'}</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="word-grid">
                                 {lesson.words.map(w => (

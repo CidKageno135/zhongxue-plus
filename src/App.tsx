@@ -6,12 +6,14 @@ import {
     getStats,
     loadState,
     reviewWord,
+    saveLessonWords,
     saveState,
+    saveWordsBatch,
     searchWords,
     toggleSavedWord,
     type LearningState
 } from './domain/learning';
-import type { Lesson, Scenario } from './types';
+import type { Lesson, Scenario, Word } from './types';
 import { Sidebar, type Route } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { TodayView } from './views/TodayView';
@@ -59,17 +61,23 @@ export default function App() {
     }, [notice]);
 
     function navigate(next: Route) {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
         setRoute(next);
         setLesson(null);
         setScenario(null);
         setMenu(false);
     }
 
-    function saveWord(id: string) {
-        setState(s => toggleSavedWord(s, id));
+    function saveWord(id: string, customWord?: Word) {
+        setState(s => toggleSavedWord(s, id, customWord));
     }
 
     function launch(l: Lesson) {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
         setLesson(l);
         setScenario(null);
     }
@@ -99,6 +107,7 @@ export default function App() {
                     menuOpen={menu}
                     setMenuOpen={setMenu}
                     streak={stats.streak}
+                    xp={stats.xp}
                     profileName={state.profile.name}
                     onNavigate={navigate}
                     dueCount={due.length}
@@ -111,6 +120,10 @@ export default function App() {
                             lesson={lesson}
                             saved={state.savedWordIds}
                             onSave={saveWord}
+                            onSaveAll={() => {
+                                setState(s => saveLessonWords(s, lesson.id));
+                                setNotice(`Đã lưu toàn bộ ${lesson.words.length} từ của bài học vào sổ tay ôn tập.`);
+                            }}
                             onClose={() => {
                                 setLesson(null);
                                 setRoute('path');
@@ -137,6 +150,10 @@ export default function App() {
                                     onLaunch={launch}
                                     onNavigate={navigate}
                                     onSelectWord={word => setQuery(word)}
+                                    onToggleSave={saveWord}
+                                    onReviewWord={(id, rating) =>
+                                        setState(s => reviewWord(s, id, rating))
+                                    }
                                 />
                             )}
 
@@ -151,6 +168,8 @@ export default function App() {
                                         setState(s => reviewWord(s, id, rating))
                                     }
                                     onDictionary={() => navigate('dictionary')}
+                                    onSaveWords={ids => setState(s => saveWordsBatch(s, ids))}
+                                    onNotice={setNotice}
                                 />
                             )}
 

@@ -14,11 +14,21 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
     const [candidates, setCandidates] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
 
-    // Current stroke being drawn
     const currentStroke = useRef<{ x: number[]; y: number[]; t: number[] }>({ x: [], y: [], t: [] });
     const startTimeRef = useRef<number>(0);
 
     const CANVAS_SIZE = 300;
+
+    // Close modal via Escape key
+    useEffect(() => {
+        function handleKeyDown(e: KeyboardEvent) {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
 
     /** Redraw all strokes on the canvas */
     const redrawCanvas = useCallback(() => {
@@ -27,11 +37,9 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Reset transform and clear
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Handle high DPI
         const dpr = window.devicePixelRatio || 1;
         ctx.scale(dpr, dpr);
 
@@ -41,19 +49,16 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
 
-        // Horizontal midline
         ctx.beginPath();
         ctx.moveTo(0, CANVAS_SIZE / 2);
         ctx.lineTo(CANVAS_SIZE, CANVAS_SIZE / 2);
         ctx.stroke();
 
-        // Vertical midline
         ctx.beginPath();
         ctx.moveTo(CANVAS_SIZE / 2, 0);
         ctx.lineTo(CANVAS_SIZE / 2, CANVAS_SIZE);
         ctx.stroke();
 
-        // Diagonals
         ctx.strokeStyle = 'rgba(200, 50, 43, 0.08)';
         ctx.beginPath();
         ctx.moveTo(0, 0);
@@ -85,7 +90,6 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         ctx.restore();
     }, [strokes]);
 
-    // Setup high-DPI canvas once on mount and on stroke changes
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -99,7 +103,6 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         redrawCanvas();
     }, [redrawCanvas]);
 
-    // Perform handwriting recognition
     const triggerRecognition = useCallback(async (currentStrokes: HandwritingStroke[]) => {
         if (!currentStrokes.length) {
             setCandidates([]);
@@ -188,14 +191,18 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
     function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
         if (!isDrawing) return;
         setIsDrawing(false);
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+        try {
+            (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+        } catch {
+            // ignore if pointer was not captured
+        }
 
         const s = currentStroke.current;
         if (s.x.length > 0) {
             const newStroke: HandwritingStroke = [s.x, s.y, s.t];
             const updatedStrokes = [...strokes, newStroke];
             setStrokes(updatedStrokes);
-            triggerRecognition(updatedStrokes);
+            void triggerRecognition(updatedStrokes);
         }
     }
 
@@ -203,7 +210,7 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         if (!strokes.length) return;
         const updated = strokes.slice(0, -1);
         setStrokes(updated);
-        triggerRecognition(updated);
+        void triggerRecognition(updated);
     }
 
     function handleClear() {
@@ -213,17 +220,27 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
     }
 
     return (
-        <div style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(19, 27, 46, 0.55)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '16px'
-        }}>
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="handwriting-pad-title"
+            onClick={e => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
+            style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(19, 27, 46, 0.55)',
+                backdropFilter: 'blur(6px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+                padding: '16px'
+            }}
+        >
             <div style={{
                 width: '100%',
                 maxWidth: '420px',
@@ -258,11 +275,11 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                             <Edit3 size={16} />
                         </div>
                         <div>
-                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)' }}>
+                            <h3 id="handwriting-pad-title" style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)' }}>
                                 Tra bằng chữ viết tay (手寫輸入)
                             </h3>
                             <small style={{ color: 'var(--on-surface-variant)', fontSize: '11px' }}>
-                                Vẽ chữ Hán bằng chuột hoặc ngón tay
+                                Vẽ chữ Hán bằng chuột hoặc ngón tay (Nhấn Esc để đóng)
                             </small>
                         </div>
                     </div>

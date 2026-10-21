@@ -64,6 +64,32 @@ export function ScenarioFlow({ scenario, onClose }: ScenarioFlowProps) {
             <h1>{scenario.title}</h1>
             <p className="muted">Hội thoại có hướng dẫn · Chọn câu phù hợp để tiếp tục</p>
 
+            <div style={{
+                margin: '10px 0 16px',
+                padding: '10px 16px',
+                borderRadius: '10px',
+                background: 'var(--vermilion-tint)',
+                border: '1px solid rgba(200, 50, 43, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                flexWrap: 'wrap'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--on-surface)' }}>
+                    <span>🤖</span>
+                    <span>Bạn muốn luyện nói tự do với AI theo chủ đề <strong>{scenario.title}</strong>?</span>
+                </div>
+                <button
+                    type="button"
+                    className="button button-primary"
+                    style={{ padding: '5px 12px', fontSize: '12px', borderRadius: '999px' }}
+                    onClick={onClose}
+                >
+                    💬 Chat tự do cùng AI
+                </button>
+            </div>
+
             <div className="conversation-panel panel">
                 {history.map((line, i) => (
                     <div className="chat-history" key={i}>

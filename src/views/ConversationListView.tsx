@@ -1,4 +1,5 @@
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, Sparkles, MessageSquare } from 'lucide-react';
 import type { Scenario } from '../types';
 import { scenarios } from '../data/lessons';
 import { Button } from '../components/Button';
@@ -8,7 +9,23 @@ interface ConversationListViewProps {
     onSelectScenario: (s: Scenario) => void;
 }
 
+const SCENARIO_AI_PROMPTS: Record<string, string> = {
+    tea: '老闆你好！我想點一杯珍珠奶茶，請問甜度和冰塊可以怎麼選？',
+    mrt: '不好意思，請問最近的捷運站在哪裡？可以用悠遊卡搭乘嗎？',
+    store: '你好！我買這些東西，不用袋子，請問可以刷卡嗎？'
+};
+
 export function ConversationListView({ onSelectScenario }: ConversationListViewProps) {
+    const [activePrompt, setActivePrompt] = useState<string | undefined>(undefined);
+
+    function startAiPractice(s: Scenario) {
+        const prompt = SCENARIO_AI_PROMPTS[s.id] || `你好！我想練習「${s.title}」的情境對話。`;
+        setActivePrompt(prompt);
+        if (typeof document !== 'undefined') {
+            document.querySelector('.ai-chat-container')?.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
     return (
         <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
@@ -22,7 +39,7 @@ export function ConversationListView({ onSelectScenario }: ConversationListViewP
 
             {/* Section 1: Live Interactive AI Conversational Partner */}
             <div style={{ margin: '20px 0 36px' }}>
-                <AiChatView />
+                <AiChatView initialPrompt={activePrompt} onResetPrompt={() => setActivePrompt(undefined)} />
             </div>
 
             {/* Section 2: Structured Life Scenarios */}
@@ -35,7 +52,7 @@ export function ConversationListView({ onSelectScenario }: ConversationListViewP
                         </h2>
                     </div>
                     <p className="muted" style={{ margin: '4px 0 0', fontSize: '13px' }}>
-                        Luyện các cuộc trò chuyện theo kịch bản. Chọn câu trả lời và nhận giải thích chi tiết ngay lập tức.
+                        Luyện các cuộc trò chuyện theo kịch bản hoặc bấm "Luyện cùng AI" để đối thoại tự do theo tình huống.
                     </p>
                 </div>
 
@@ -46,15 +63,20 @@ export function ConversationListView({ onSelectScenario }: ConversationListViewP
                             <span className="tag">{s.level} · CÓ HƯỚNG DẪN</span>
                             <h2>{s.title}</h2>
                             <p>{s.description}</p>
-                            <Button onClick={() => onSelectScenario(s)}>
-                                Bắt đầu hội thoại <ArrowRight size={17} />
-                            </Button>
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px' }}>
+                                <Button onClick={() => onSelectScenario(s)}>
+                                    Bắt đầu hội thoại <ArrowRight size={17} />
+                                </Button>
+                                <Button secondary onClick={() => startAiPractice(s)}>
+                                    <MessageSquare size={16} /> Luyện cùng AI
+                                </Button>
+                            </div>
                         </article>
                     ))}
                 </div>
 
                 <p className="privacy-note" style={{ marginTop: '20px' }}>
-                    <Sparkles size={16} color="var(--vermilion-cinnabar)" /> Các lựa chọn được biên soạn sẵn theo tình huống thực tế tại Đài Loan giúp bạn củng cố phản xạ trước khi trò chuyện tự do.
+                    <Sparkles size={16} color="var(--vermilion-cinnabar)" /> Bạn có thể chọn luyện theo kịch bản có giải thích ngữ pháp hoặc trò chuyện trực tiếp không giới hạn với AI.
                 </p>
             </div>
         </>

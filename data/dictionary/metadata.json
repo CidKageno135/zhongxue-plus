@@ -1,0 +1,15 @@
+{
+  "name": "CVDICT",
+  "author": "Phong Phan",
+  "repository": "https://github.com/ph0ngp/CVDICT",
+  "revision": "c379d909e308343a247e51619f7839a2060a271c",
+  "sourceUrl": "https://raw.githubusercontent.com/ph0ngp/CVDICT/c379d909e308343a247e51619f7839a2060a271c/CVDICT.u8",
+  "sourceSha256": "4dde4b204193efa9c192d7f7daeab1bb579c8ccd7c41ed90d1b6caee22ba0948",
+  "entries": 122595,
+  "license": "CC BY-SA 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "basedOn": "CC-CEDICT",
+  "dataDate": "2024-12-02",
+  "transformation": "Original UTF-8 data unchanged; gzip compression only. Runtime parser extracts entries and adds separate ZhongXue course annotations.",
+  "rawRecords": 122596
+}

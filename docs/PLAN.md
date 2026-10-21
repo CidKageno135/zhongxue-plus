@@ -1,29 +1,24 @@
-# Kế hoạch ZhongXue v1 — 17/10/2026
+# Kế hoạch ZhongXue V2 (Gói Tối Ưu Toàn Diện) — 20/10/2026
 
-## Mục tiêu và quyết định
+## Mục tiêu và quyết định kiến trúc
 
-Xây dựng ứng dụng mới có thể chạy trên máy và học được trọn luồng: chọn bài → học → kiểm tra → lưu tiến độ → ôn tập. Người dùng đã giao quyền quyết định về sản phẩm, thiết kế và triển khai; kế hoạch được thảo luận và phân công cho các subagent Codex trực tiếp.
+Nâng cấp toàn diện ứng dụng `projects/zhongxue-new` từ bản mẫu giao diện Bento Sinology lên hệ thống học tập **100% dữ liệu động (Zero Mock Data)**, kết hợp hội thảo kiến trúc 10 chuyên gia (10 Gemini Flash Subagents) phụ trách từng phân hệ chuyên sâu:
 
-Ứng dụng React/Vite/TypeScript lưu dữ liệu trên trình duyệt. Nội dung gồm tám bài tiếng Hoa phồn thể theo đời sống Đài Loan, giải thích tiếng Việt ở mức nhập môn A1–A2, từ điển theo bài và ba hội thoại có kịch bản. Đọc mẫu dùng TTS trình duyệt nếu có giọng phù hợp. Chưa đưa máy chủ, đăng nhập, đồng bộ hoặc chấm điểm phát âm AI vào v1.
-
-## Các giai đoạn
-
-1. Chốt luồng học và mô hình trạng thái; lập dự án Stitch mới, chọn ngôn ngữ thiết kế.
-2. Viết nội dung và kiểm thử phần tiến độ, XP không cộng lặp, lịch ôn và nhập/xuất dữ liệu.
-3. Xây dựng dashboard, bài học, quiz, ôn tập, từ điển, hội thoại và trang dữ liệu.
-4. Tích hợp; chạy kiểm tra kiểu, lint, unit test, build và kiểm tra trình duyệt trên desktop/mobile.
-5. Sửa lỗi phát hiện, chạy bản hoàn chỉnh và bàn giao hướng dẫn cùng bằng chứng xác minh.
+1. **Subagent #1 (Domain & SM-2 Architect):** Nâng cấp thuật toán SM-2 hỗ trợ 4 mức (`again`, `hard`, `good`, `easy`), tính `computeEaseFactor`, hỗ trợ lưu từ mở rộng PGlite (`dict-...`) và bảo toàn tương thích ngược 100% với `importState`/`exportState` v1.
+2. **Subagent #2 (Curriculum & Sinology Lead):** Xây dựng cơ sở dữ liệu Hán học `src/data/etymologyData.ts` cho toàn bộ 40 từ vựng cốt lõi (âm Hán-Việt, bộ thủ Khang Hy, số nét, phân rã chiết tự, mẹo chuyển âm Pinyin ↔ Hán-Việt), 4 bộ `STARTER_DECKS` và 7 `DAILY_RADICALS`.
+3. **Subagent #3 (Dashboard Bento Specialist):** Đồng bộ hóa toàn bộ thẻ Hero Flashcard, chuỗi Streak, Topbar XP và các chỉ số trên `TodayView.tsx` với trạng thái thực của học viên.
+4. **Subagent #4 (Audio & Pitch Engineer):** Hợp nhất bộ phát âm `zh-TW` (`speakChinese` chống lỗi GC trên Chromium) và thuật toán tự tương quan `detectPitchF0` qua Web Audio API.
+5. **Subagent #5 (SRS & Hotkeys Specialist):** Trang bị phím tắt `Space` / `1-4`, sửa nút `Khó [2]` gọi đúng mức `'hard'`, và kích hoạt nạp bộ thẻ Starter Decks trên `ReviewView.tsx`.
+6. **Subagent #6 (Dictionary & PGlite Specialist):** Cho phép lưu và ôn tập bất kỳ mục từ PGlite 122k nào trong `DictionaryView.tsx`, kiểm tra `checkBackendHealth()` thực tế và thêm bộ lọc chủ đề/cấp độ.
+7. **Subagent #7 (Handwriting Engine Lead):** Xây dựng thuật toán nhận diện nét vẽ ngoại tuyến (`fallbackClientHandwriting`) trong `src/services/api.ts` và nâng cấp khả năng truy cập (`Escape`, click backdrop, `role="dialog"`) cho `HandwritingPad.tsx`.
+8. **Subagent #8 (AI Tutor & Lesson UX Lead):** Lưu lịch sử `AiChatView.tsx` vào `sessionStorage`, nâng cấp `simulateLocalAiReply` bao phủ 8 chủ đề bài học, và bổ sung nút "Lưu toàn bộ từ bài học" trong `LessonFlow.tsx`.
+9. **Subagent #9 (Analytics & Settings Lead):** Kết nối Radar 6 trục, Heatmap 84 ngày và 4 huy hiệu Sinology trong `SettingsView.tsx` với dữ liệu học tập thực tế.
+10. **Subagent #10 (QA & Documentation Lead):** Mở rộng bộ kiểm thử đơn vị (`tests/domain.test.ts`) và kiểm thử đầu-cuối Playwright (`tests/e2e/handwriting-and-ai.spec.ts`), đồng bộ hóa tài liệu dự án và `Vault/`.
 
 ## Tiêu chí hoàn thành
 
-- Bắt đầu và hoàn thành một bài học; tiến độ giữ nguyên sau tải lại trang.
-- Quiz phản hồi có ý nghĩa; XP không bị nhân lên khi hoàn thành lại bài.
-- Lịch ôn thay đổi theo kết quả và có trạng thái khi chưa đến hạn.
-- Từ điển tìm được nội dung bài học; hội thoại đi đến kết thúc rõ ràng.
-- Nhập dữ liệu sai bị từ chối; dữ liệu hợp lệ có thể xuất rồi nhập lại.
-- Các màn hình chính sử dụng được trên desktop và mobile; không có lỗi nghiêm trọng trên console.
-- Các bước xác minh được ghi bằng kết quả thực tế trong `PROGRESS.md`.
-
-## Phân công và ranh giới
-
-Codex điều phối và các subagent xây dựng nội dung, logic, UI, kiểm thử và tài liệu trong `projects/zhongxue-new`. Antigravity có bridge hiện gắn với dự án cũ, nên chưa được dùng để thực thi bản mới; không ghi nhận một lượt chạy Antigravity chưa diễn ra. Ứng dụng cũ không phải nền tảng triển khai.
+- Mọi con số thống kê trên `Topbar`, `TodayView`, `ReviewView`, `SettingsView` phản ánh trung thực tiến độ của người dùng.
+- Thuật toán SM-2 xử lý chính xác cả 4 mức đánh giá và phím tắt bàn phím (`Space`, `1-4`).
+- Từ điển lưu được cả từ trong bài học lẫn từ PGlite 122k mà không làm gãy kiểm định `importState`.
+- Bảng viết tay nhận diện được chữ Hán ngay cả khi offline; trợ lý AI trả lời thông minh cho cả 8 chủ đề và giữ nguyên lịch sử khi chuyển tab.
+- Toàn bộ cổng kiểm định chất lượng (`typecheck`, `lint`, `test`, `build`, `test:e2e`) đạt PASS 100%.

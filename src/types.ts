@@ -26,7 +26,7 @@ export interface Lesson {
     title: string;
     subtitle: string;
     category: string;
-    level: 'A1' | 'A2';
+    level: 'A1' | 'A2' | 'B1' | 'B2';
     duration: number;
     icon: string;
     color: string;
