@@ -200,6 +200,23 @@ test.describe('ReviewView & SRS Regression Suite (Subagent A12)', () => {
     // In Review Ahead mode, card re-opens with ahead badge
     await expect(page.getByText('Chế độ ôn trước lịch')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Hiện đáp án' })).toBeVisible();
+
+    // Rate the card in Review Ahead mode (second review on the same day)
+    await page.getByRole('button', { name: 'Hiện đáp án' }).click();
+    await page.getByRole('button', { name: /Nhớ được/ }).click();
+
+    // Verify completion screen
+    await expect(page.getByRole('main')).toContainText('Bạn đã ôn xong hôm nay!');
+
+    // INVARIANT: Second review must actually update repetitions in saved storage
+    // On baseline: line 337 in learning.ts discarded the review because lastReviewed === today
+    const rawStorage = await page.evaluate(() => localStorage.getItem('zhongxue.learning.v1'));
+    expect(rawStorage).not.toBeNull();
+    const parsedStorage = JSON.parse(rawStorage!);
+    const savedId = parsedStorage.savedWordIds[0];
+    const reviewRecord = parsedStorage.reviews[savedId];
+    expect(reviewRecord).toBeDefined();
+    expect(reviewRecord.repetitions).toBeGreaterThanOrEqual(2);
   });
 
   test('responsive layout on 375px mobile viewport has no horizontal overflow', async ({ page }) => {

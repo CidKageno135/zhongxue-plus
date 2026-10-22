@@ -56,6 +56,30 @@ describe('learning progress', () => {
         expect(getDueWords(s, new Date(2026, 9, 17))).toHaveLength(0);
         expect(getStats(reviewWord(s, allWords[0].id, true, new Date(2026, 9, 17))).xp).toBe(5);
     });
+    it('records second review on same day or review-ahead without duplicate XP and updates review state (REPRODUCES SRS Review Bug)', () => {
+        const today = new Date(2026, 9, 17);
+        let s = toggleSavedWord(createInitialState(), allWords[0].id);
+        // First review today:
+        s = reviewWord(s, allWords[0].id, 'good', today);
+        const firstReview = s.reviews[allWords[0].id];
+        expect(firstReview.lastReviewed).toBe('2026-10-17');
+        expect(firstReview.repetitions).toBe(1);
+        expect(firstReview.interval).toBe(1);
+        expect(getStats(s, today).xp).toBe(5);
+
+        // Second review on the same day (user reviews ahead or re-reviews):
+        const s2 = reviewWord(s, allWords[0].id, 'easy', today);
+
+        // INVARIANT: Review record MUST be updated according to rating, not silently discarded!
+        // On baseline: line 337 returns old state unchanged (`if (old?.lastReviewed === day && old.interval > 0) return state;`),
+        // so s2 === s and interval/repetitions are NOT updated even though UI reported success.
+        expect(s2).not.toBe(s);
+        expect(s2.reviews[allWords[0].id].interval).toBeGreaterThan(firstReview.interval);
+        expect(s2.reviews[allWords[0].id].repetitions).toBeGreaterThanOrEqual(1);
+
+        // Anti-XP farming: XP should not increase for second review on the same day
+        expect(getStats(s2, today).xp).toBe(5);
+    });
     it('rejects unknown IDs', () => expect(() => completeLesson(createInitialState(), 'fake')).toThrow());
     it('roundtrips and rejects corrupted nested imports', () => {
         const s = createInitialState();
