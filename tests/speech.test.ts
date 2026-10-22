@@ -72,8 +72,7 @@ describe('A14 — Best Voice Selection (zh-TW preference & fallbacks)', () => {
     });
 
     it('returns null if window or speechSynthesis is unavailable', () => {
-        // @ts-expect-error Mocking window absence in Node
-        delete globalThis.window;
+        Reflect.deleteProperty(globalThis, 'window');
         expect(getBestChineseVoice()).toBeNull();
     });
 
@@ -85,13 +84,12 @@ describe('A14 — Best Voice Selection (zh-TW preference & fallbacks)', () => {
             createMockVoice({ name: 'Microsoft HiuMaan', lang: 'zh-HK' })
         ];
 
-        // @ts-expect-error Mocking browser window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             speechSynthesis: {
                 getVoices: () => mockVoices,
                 onvoiceschanged: null
             }
-        };
+        });
 
         const best = getBestChineseVoice();
         expect(best?.name).toContain('HsiaoChen');
@@ -105,13 +103,12 @@ describe('A14 — Best Voice Selection (zh-TW preference & fallbacks)', () => {
             createMockVoice({ name: 'Microsoft HiuMaan Online (Natural)', lang: 'zh-HK' })
         ];
 
-        // @ts-expect-error Mocking browser window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             speechSynthesis: {
                 getVoices: () => mockVoices,
                 onvoiceschanged: null
             }
-        };
+        });
 
         const best = getBestChineseVoice();
         expect(best?.name).toContain('HiuMaan');
@@ -124,13 +121,12 @@ describe('A14 — Best Voice Selection (zh-TW preference & fallbacks)', () => {
             createMockVoice({ name: 'Microsoft Xiaoxiao Online (Natural)', lang: 'zh-CN' })
         ];
 
-        // @ts-expect-error Mocking browser window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             speechSynthesis: {
                 getVoices: () => mockVoices,
                 onvoiceschanged: null
             }
-        };
+        });
 
         const best = getBestChineseVoice();
         expect(best?.name).toContain('Xiaoxiao');
@@ -144,13 +140,12 @@ describe('A14 — Best Voice Selection (zh-TW preference & fallbacks)', () => {
             createMockVoice({ name: 'Microsoft Xiaoxiao Online (Natural)', lang: 'zh-CN' })
         ];
 
-        // @ts-expect-error Mocking browser window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             speechSynthesis: {
                 getVoices: () => mockVoices,
                 onvoiceschanged: null
             }
-        };
+        });
 
         const preferredCN = getBestChineseVoice('zh-CN');
         expect(preferredCN?.lang).toBe('zh-CN');
@@ -165,8 +160,7 @@ describe('A14 — Best Voice Selection (zh-TW preference & fallbacks)', () => {
         ];
 
         let onVoicesChangedCb: (() => void) | null = null;
-        // @ts-expect-error Mocking browser window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             speechSynthesis: {
                 getVoices: () => mockVoices,
                 get onvoiceschanged() {
@@ -176,7 +170,7 @@ describe('A14 — Best Voice Selection (zh-TW preference & fallbacks)', () => {
                     onVoicesChangedCb = fn;
                 }
             }
-        };
+        });
 
         // Trigger onvoiceschanged callback if set
         if (typeof onVoicesChangedCb === 'function') {
@@ -220,8 +214,7 @@ describe('A14 — Speech Synthesis Execution & Chromium GC retention', () => {
             createMockVoice({ name: 'Microsoft HsiaoChen Online (Natural)', lang: 'zh-TW' })
         ]);
 
-        // @ts-expect-error Global window mock
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             speechSynthesis: {
                 cancel: mockCancel,
@@ -234,30 +227,26 @@ describe('A14 — Speech Synthesis Execution & Chromium GC retention', () => {
             SpeechSynthesisUtterance: MockUtterance,
             __zhongxue_active_utterance: null,
             __zhongxue_utterance_retains: new Set()
-        };
+        });
 
-        // @ts-expect-error Global constructor mock
-        globalThis.SpeechSynthesisUtterance = MockUtterance;
+        vi.stubGlobal('SpeechSynthesisUtterance', MockUtterance);
     });
 
     afterEach(() => {
         stopSpeaking();
         globalThis.window = originalWindow;
-        // @ts-expect-error Cleanup
-        delete globalThis.SpeechSynthesisUtterance;
+        Reflect.deleteProperty(globalThis, 'SpeechSynthesisUtterance');
     });
 
     it('detects Web Speech API support correctly', () => {
         expect(isSpeechSynthesisSupported()).toBe(true);
 
-        // @ts-expect-error Test unsupported window
-        delete globalThis.window.speechSynthesis;
+        Reflect.deleteProperty(globalThis.window, 'speechSynthesis');
         expect(isSpeechSynthesisSupported()).toBe(false);
     });
 
     it('returns false and triggers onError if Web Speech is unsupported', () => {
-        // @ts-expect-error Test unsupported window
-        delete globalThis.window.speechSynthesis;
+        Reflect.deleteProperty(globalThis.window, 'speechSynthesis');
         const onError = vi.fn();
 
         const result = speakChinese('你好', { onError });
@@ -280,7 +269,7 @@ describe('A14 — Speech Synthesis Execution & Chromium GC retention', () => {
     });
 
     it('resumes speech synthesis if paused', () => {
-        window.speechSynthesis.paused = true;
+        Object.defineProperty(window.speechSynthesis, 'paused', { value: true, configurable: true });
         speakChinese('謝謝');
         expect(mockResume).toHaveBeenCalled();
     });
@@ -493,10 +482,9 @@ describe('A14 — captureMicrophonePitch UX Transparency & Error Handling', () =
     });
 
     it('returns unsecure_context when window.isSecureContext is false', async () => {
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: false
-        };
+        });
 
         const result = await captureMicrophonePitch();
         expect(result.isRealMeasurement).toBe(false);
@@ -505,10 +493,9 @@ describe('A14 — captureMicrophonePitch UX Transparency & Error Handling', () =
     });
 
     it('returns unsupported when getUserMedia is missing', async () => {
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true
-        };
+        });
         setMockNavigator({
             mediaDevices: undefined
         });
@@ -519,11 +506,10 @@ describe('A14 — captureMicrophonePitch UX Transparency & Error Handling', () =
     });
 
     it('handles permission denied (NotAllowedError) gracefully without throwing', async () => {
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             AudioContext: vi.fn()
-        };
+        });
         setMockNavigator({
             mediaDevices: {
                 getUserMedia: vi.fn().mockRejectedValue({ name: 'NotAllowedError' })
@@ -537,11 +523,10 @@ describe('A14 — captureMicrophonePitch UX Transparency & Error Handling', () =
     });
 
     it('handles missing microphone device (NotFoundError) gracefully', async () => {
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             AudioContext: vi.fn()
-        };
+        });
         setMockNavigator({
             mediaDevices: {
                 getUserMedia: vi.fn().mockRejectedValue({ name: 'NotFoundError' })
@@ -564,11 +549,10 @@ describe('A14 — captureMicrophonePitch UX Transparency & Error Handling', () =
     });
 
     it('returns unsupported when AudioContext is missing', async () => {
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             AudioContext: undefined
-        };
+        });
         setMockNavigator({
             mediaDevices: { getUserMedia: vi.fn() }
         });
@@ -605,11 +589,10 @@ describe('A14 — captureMicrophonePitch UX Transparency & Error Handling', () =
             close = closeCtx;
         }
 
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             AudioContext: MockAudioContext
-        };
+        });
         setMockNavigator({
             mediaDevices: {
                 getUserMedia: vi.fn().mockResolvedValue(mockStream)
@@ -625,11 +608,10 @@ describe('A14 — captureMicrophonePitch UX Transparency & Error Handling', () =
     });
 
     it('handles unexpected generic error in getUserMedia gracefully', async () => {
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             AudioContext: vi.fn()
-        };
+        });
         setMockNavigator({
             mediaDevices: {
                 getUserMedia: vi.fn().mockRejectedValue(new Error('Hardware boom'))
@@ -664,11 +646,10 @@ describe('A14 — captureMicrophonePitch UX Transparency & Error Handling', () =
             close = closeCtx;
         }
 
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             AudioContext: MockAudioContext
-        };
+        });
         setMockNavigator({
             mediaDevices: {
                 getUserMedia: vi.fn().mockResolvedValue(mockStream)
@@ -717,11 +698,10 @@ describe('A14 — captureMicrophonePitch UX Transparency & Error Handling', () =
             close = closeCtx;
         }
 
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             AudioContext: MockAudioContext
-        };
+        });
         setMockNavigator({
             mediaDevices: {
                 getUserMedia: vi.fn().mockResolvedValue(mockStream)
@@ -772,8 +752,7 @@ describe('G7 / T15 Acceptance — Speech Synthesis Interruption & Multi-Button S
             createMockVoice({ name: 'Microsoft HsiaoChen Online (Natural)', lang: 'zh-TW' })
         ]);
 
-        // @ts-expect-error Global window mock
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             speechSynthesis: {
                 cancel: mockCancel,
@@ -786,17 +765,41 @@ describe('G7 / T15 Acceptance — Speech Synthesis Interruption & Multi-Button S
             SpeechSynthesisUtterance: MockUtterance,
             __zhongxue_active_utterance: null,
             __zhongxue_utterance_retains: new Set()
-        };
+        });
 
-        // @ts-expect-error Global constructor mock
-        globalThis.SpeechSynthesisUtterance = MockUtterance;
+        vi.stubGlobal('SpeechSynthesisUtterance', MockUtterance);
     });
 
     afterEach(() => {
         stopSpeaking();
         globalThis.window = originalWindow;
-        // @ts-expect-error Cleanup
-        delete globalThis.SpeechSynthesisUtterance;
+        Reflect.deleteProperty(globalThis, 'SpeechSynthesisUtterance');
+    });
+
+    it('synchronizes playback without relying on browser cancellation events', () => {
+        const firstEnd = vi.fn();
+        const secondEnd = vi.fn();
+        speakChinese('學生', { onEnd: firstEnd });
+        speakChinese('我是學生', { onEnd: secondEnd });
+        expect(firstEnd).toHaveBeenCalledTimes(1);
+        expect(secondEnd).not.toHaveBeenCalled();
+        stopSpeaking();
+        expect(secondEnd).toHaveBeenCalledTimes(1);
+        // Late browser cancellation events must not notify twice.
+        createdUtterances[0].onerror?.({ error: 'interrupted' });
+        createdUtterances[1].onend?.();
+        expect(firstEnd).toHaveBeenCalledTimes(1);
+        expect(secondEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores late errors from an explicitly stopped utterance', () => {
+        const onEnd = vi.fn();
+        const onError = vi.fn();
+        speakChinese('你好', { onEnd, onError });
+        stopSpeaking();
+        createdUtterances[0].onerror?.({ error: 'network' });
+        expect(onEnd).toHaveBeenCalledTimes(1);
+        expect(onError).not.toHaveBeenCalled();
     });
 
     it('invokes onEnd on previous utterance when interrupted by subsequent speakChinese (multi-button sync)', () => {
@@ -916,11 +919,10 @@ describe('G7 / T15 Acceptance — Chao Tone Visualization & Acoustic Measurement
     });
 
     it('never synthesizes fake user pitch Hz when mic permission is denied (truth in measurement)', async () => {
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             AudioContext: vi.fn()
-        };
+        });
         setMockNavigator({
             mediaDevices: {
                 getUserMedia: vi.fn().mockRejectedValue({ name: 'NotAllowedError' })
@@ -961,11 +963,10 @@ describe('G7 / T15 Acceptance — Chao Tone Visualization & Acoustic Measurement
             close = closeCtx;
         }
 
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             AudioContext: MockAudioContext
-        };
+        });
         setMockNavigator({
             mediaDevices: {
                 getUserMedia: vi.fn().mockResolvedValue(mockStream)
@@ -1007,11 +1008,10 @@ describe('G7 / T15 Acceptance — Chao Tone Visualization & Acoustic Measurement
             close = closeCtx;
         }
 
-        // @ts-expect-error Mock window
-        globalThis.window = {
+        vi.stubGlobal('window', {
             isSecureContext: true,
             AudioContext: MockAudioContext
-        };
+        });
         setMockNavigator({
             mediaDevices: {
                 getUserMedia: vi.fn().mockResolvedValue(mockStream)

@@ -48,6 +48,7 @@ import {
   searchLocalLessons,
   sendAiMessage,
   recognizeHandwriting,
+  recognizeHandwritingDetailed,
   checkAiHealth,
   fallbackClientHandwriting,
   type HandwritingStroke,
@@ -602,6 +603,24 @@ describe('A08: Client API Adapter (src/services/api.ts)', () => {
     const sampleStrokes: HandwritingStroke[] = [
       [[50, 100, 150, 200], [100, 100, 100, 100], [0, 50, 100, 150]]
     ];
+
+    it('exposes local fallback provenance after HTTP failure instead of claiming online recognition', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response('{}', { status: 502 }));
+      const result = await recognizeHandwritingDetailed(sampleStrokes);
+      expect(result.source).toBe('local_fallback');
+      expect(result.candidates[0]).toBe('一');
+    });
+
+    it('preserves backend local fallback provenance and distinguishes online candidates', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        candidates: ['一'], source: 'local_fallback'
+      }), { headers: { 'Content-Type': 'application/json' } }));
+      expect((await recognizeHandwritingDetailed(sampleStrokes)).source).toBe('local_fallback');
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        candidates: ['一'], source: 'google'
+      }), { headers: { 'Content-Type': 'application/json' } }));
+      expect((await recognizeHandwritingDetailed(sampleStrokes)).source).toBe('online');
+    });
 
     it('returns candidate characters when /api/handwriting succeeds', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
