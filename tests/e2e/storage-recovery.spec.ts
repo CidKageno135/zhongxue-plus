@@ -43,7 +43,7 @@ test.describe('E2E Storage Recovery & Large Dataset Invariants (T09)', () => {
     await expect(page.getByText('Không thể đọc tiến độ đã lưu')).not.toBeVisible();
 
     // Verify user profile loaded correctly
-    const profileText = page.getByText('Người học Đài Loan 600');
+    const profileText = page.getByRole('button', { name: 'Mở hồ sơ & cài đặt' }).getByText('Người học Đài Loan 600');
     await expect(profileText).toBeVisible();
   });
 
