@@ -738,3 +738,290 @@ describe('A14 — captureMicrophonePitch UX Transparency & Error Handling', () =
         expect(closeCtx).toHaveBeenCalled();
     });
 });
+
+describe('G7 / T15 Acceptance — Speech Synthesis Interruption & Multi-Button Synchronization', () => {
+    let mockCancel: ReturnType<typeof vi.fn>;
+    let mockSpeak: ReturnType<typeof vi.fn>;
+    let mockResume: ReturnType<typeof vi.fn>;
+    let mockGetVoices: ReturnType<typeof vi.fn>;
+    let originalWindow: typeof globalThis.window;
+    let createdUtterances: MockUtterance[];
+
+    class MockUtterance {
+        text: string;
+        lang = 'zh-TW';
+        voice: SpeechSynthesisVoice | null = null;
+        rate = 1;
+        pitch = 1;
+        onend: (() => void) | null = null;
+        onerror: ((e: { error?: string }) => void) | null = null;
+
+        constructor(text: string) {
+            this.text = text;
+            createdUtterances.push(this);
+        }
+    }
+
+    beforeEach(() => {
+        originalWindow = globalThis.window;
+        createdUtterances = [];
+        mockCancel = vi.fn();
+        mockSpeak = vi.fn();
+        mockResume = vi.fn();
+        mockGetVoices = vi.fn().mockReturnValue([
+            createMockVoice({ name: 'Microsoft HsiaoChen Online (Natural)', lang: 'zh-TW' })
+        ]);
+
+        // @ts-expect-error Global window mock
+        globalThis.window = {
+            isSecureContext: true,
+            speechSynthesis: {
+                cancel: mockCancel,
+                speak: mockSpeak,
+                resume: mockResume,
+                paused: false,
+                getVoices: mockGetVoices,
+                onvoiceschanged: null
+            },
+            SpeechSynthesisUtterance: MockUtterance,
+            __zhongxue_active_utterance: null,
+            __zhongxue_utterance_retains: new Set()
+        };
+
+        // @ts-expect-error Global constructor mock
+        globalThis.SpeechSynthesisUtterance = MockUtterance;
+    });
+
+    afterEach(() => {
+        stopSpeaking();
+        globalThis.window = originalWindow;
+        // @ts-expect-error Cleanup
+        delete globalThis.SpeechSynthesisUtterance;
+    });
+
+    it('invokes onEnd on previous utterance when interrupted by subsequent speakChinese (multi-button sync)', () => {
+        const onEndWord = vi.fn();
+        const onEndSentence = vi.fn();
+
+        // 1. User clicks word pronunciation button
+        const wordStarted = speakChinese('學生', { onEnd: onEndWord });
+        expect(wordStarted).toBe(true);
+        expect(createdUtterances.length).toBe(1);
+        const wordUtt = createdUtterances[0];
+
+        // 2. User immediately clicks example sentence pronunciation button
+        // speech service calls window.speechSynthesis.cancel() before starting sentence
+        const sentenceStarted = speakChinese('我是學生', { onEnd: onEndSentence });
+        expect(sentenceStarted).toBe(true);
+        expect(mockCancel).toHaveBeenCalled();
+        expect(createdUtterances.length).toBe(2);
+
+        // In Chromium, cancel triggers onerror with error: 'interrupted' on the previous utterance
+        wordUtt.onerror?.({ error: 'interrupted' });
+
+        // Invariant: The interrupted utterance MUST invoke onEnd so its SpeakButton resets isPlaying to false
+        expect(onEndWord).toHaveBeenCalledTimes(1);
+    });
+
+    it('invokes onEnd on active utterance when stopped via stopSpeaking or cancelSpeech', () => {
+        const onEnd = vi.fn();
+        const onError = vi.fn();
+
+        speakChinese('謝謝', { onEnd, onError });
+        expect(createdUtterances.length).toBe(1);
+        const utt = createdUtterances[0];
+
+        // Explicit stop by user or cleanup hook
+        stopSpeaking();
+        expect(mockCancel).toHaveBeenCalled();
+
+        // Simulate browser cancel event
+        utt.onerror?.({ error: 'interrupted' });
+
+        // Invariant: onEnd must be notified, but onError must NOT be triggered
+        expect(onEnd).toHaveBeenCalledTimes(1);
+        expect(onError).not.toHaveBeenCalled();
+    });
+
+    it('invokes onEnd on active utterance when browser cancels speech with error: canceled', () => {
+        const onEnd = vi.fn();
+        const onError = vi.fn();
+
+        speakChinese('你好', { onEnd, onError });
+        expect(createdUtterances.length).toBe(1);
+        const utt = createdUtterances[0];
+
+        // Simulate browser cancel event
+        utt.onerror?.({ error: 'canceled' });
+
+        // Invariant: onEnd must be notified, but onError must NOT be triggered
+        expect(onEnd).toHaveBeenCalledTimes(1);
+        expect(onError).not.toHaveBeenCalled();
+    });
+
+    it('maintains exactly one active utterance in retention during rapid alternating speech switches', () => {
+        const onEndA = vi.fn();
+        const onEndB = vi.fn();
+        const onEndC = vi.fn();
+
+        speakChinese('詞彙', { onEnd: onEndA });
+        const uttA = createdUtterances[0];
+
+        speakChinese('例句一', { onEnd: onEndB });
+        uttA.onerror?.({ error: 'interrupted' });
+        const uttB = createdUtterances[1];
+
+        speakChinese('例句二', { onEnd: onEndC });
+        uttB.onerror?.({ error: 'interrupted' });
+        const uttC = createdUtterances[2];
+
+        // All prior utterances must have received onEnd
+        expect(onEndA).toHaveBeenCalledTimes(1);
+        expect(onEndB).toHaveBeenCalledTimes(1);
+        expect(onEndC).not.toHaveBeenCalled();
+
+        // Only the latest utterance is retained
+        expect(window.__zhongxue_active_utterance).toBe(uttC);
+        expect(window.__zhongxue_utterance_retains?.has(uttA as unknown as SpeechSynthesisUtterance)).toBe(false);
+        expect(window.__zhongxue_utterance_retains?.has(uttB as unknown as SpeechSynthesisUtterance)).toBe(false);
+        expect(window.__zhongxue_utterance_retains?.has(uttC as unknown as SpeechSynthesisUtterance)).toBe(true);
+    });
+});
+
+describe('G7 / T15 Acceptance — Chao Tone Visualization & Acoustic Measurement Truthfulness', () => {
+    let originalWindow: typeof globalThis.window;
+    const originalNavigatorDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+
+    function setMockNavigator(mockNav: unknown) {
+        Object.defineProperty(globalThis, 'navigator', {
+            value: mockNav,
+            configurable: true,
+            writable: true
+        });
+    }
+
+    function restoreNavigator() {
+        if (originalNavigatorDesc) {
+            Object.defineProperty(globalThis, 'navigator', originalNavigatorDesc);
+        }
+    }
+
+    beforeEach(() => {
+        originalWindow = globalThis.window;
+    });
+
+    afterEach(() => {
+        globalThis.window = originalWindow;
+        restoreNavigator();
+    });
+
+    it('never synthesizes fake user pitch Hz when mic permission is denied (truth in measurement)', async () => {
+        // @ts-expect-error Mock window
+        globalThis.window = {
+            isSecureContext: true,
+            AudioContext: vi.fn()
+        };
+        setMockNavigator({
+            mediaDevices: {
+                getUserMedia: vi.fn().mockRejectedValue({ name: 'NotAllowedError' })
+            }
+        });
+
+        const result = await captureMicrophonePitch();
+        expect(result.isRealMeasurement).toBe(false);
+        expect(result.hz).toBeNull();
+        expect(result.errorType).toBe('permission_denied');
+        // UI must not claim this is measured voice
+        expect(result.message).toContain('Chưa cấp quyền micro');
+    });
+
+    it('never synthesizes fake user pitch Hz when audio signal is silence', async () => {
+        const stopTrack = vi.fn();
+        const closeCtx = vi.fn().mockResolvedValue(undefined);
+        const mockStream = {
+            getTracks: () => [{ stop: stopTrack }]
+        };
+
+        class MockSilentAnalyser {
+            fftSize = 1024;
+            getFloatTimeDomainData(buf: Float32Array) {
+                buf.fill(0);
+            }
+        }
+
+        class MockAudioContext {
+            sampleRate = 44100;
+            state = 'running';
+            createMediaStreamSource() {
+                return { connect: vi.fn() };
+            }
+            createAnalyser() {
+                return new MockSilentAnalyser();
+            }
+            close = closeCtx;
+        }
+
+        // @ts-expect-error Mock window
+        globalThis.window = {
+            isSecureContext: true,
+            AudioContext: MockAudioContext
+        };
+        setMockNavigator({
+            mediaDevices: {
+                getUserMedia: vi.fn().mockResolvedValue(mockStream)
+            }
+        });
+
+        const result = await captureMicrophonePitch({ durationMs: 20 });
+        expect(result.isRealMeasurement).toBe(false);
+        expect(result.hz).toBeNull();
+        expect(result.errorType).toBe('silence');
+    });
+
+    it('distinguishes real acoustic measurement from simulation fallback', async () => {
+        const stopTrack = vi.fn();
+        const closeCtx = vi.fn().mockResolvedValue(undefined);
+        const mockStream = {
+            getTracks: () => [{ stop: stopTrack }]
+        };
+
+        class MockToneAnalyser {
+            fftSize = 1024;
+            getFloatTimeDomainData(buf: Float32Array) {
+                // Synthesize 330Hz wave (Tone 1 / High flat ~330Hz)
+                for (let i = 0; i < buf.length; i++) {
+                    buf[i] = 0.5 * Math.sin((2 * Math.PI * 330 * i) / 44100);
+                }
+            }
+        }
+
+        class MockAudioContext {
+            sampleRate = 44100;
+            state = 'running';
+            createMediaStreamSource() {
+                return { connect: vi.fn() };
+            }
+            createAnalyser() {
+                return new MockToneAnalyser();
+            }
+            close = closeCtx;
+        }
+
+        // @ts-expect-error Mock window
+        globalThis.window = {
+            isSecureContext: true,
+            AudioContext: MockAudioContext
+        };
+        setMockNavigator({
+            mediaDevices: {
+                getUserMedia: vi.fn().mockResolvedValue(mockStream)
+            }
+        });
+
+        const result = await captureMicrophonePitch({ durationMs: 20 });
+        expect(result.isRealMeasurement).toBe(true);
+        expect(result.hz).not.toBeNull();
+        expect(result.hz).toBeGreaterThan(325);
+        expect(result.hz).toBeLessThan(335);
+    });
+});

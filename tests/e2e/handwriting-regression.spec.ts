@@ -149,8 +149,8 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
 
     // Verify client fallback recognizer seamlessly delivers '一' despite backend failure
     await expect(dialog.getByRole('button', { name: '一' })).toBeVisible({ timeout: 6000 });
-    // Verify offline transparency notice is presented
-    await expect(dialog.getByText(/Chế độ ngoại tuyến/)).toBeVisible();
+    // Verify offline transparency notice is presented with exact label
+    await expect(dialog.getByText(/Chế độ ngoại tuyến: Nhận diện theo hình học nét/)).toBeVisible({ timeout: 6000 });
 
     // Selecting candidate populates dictionary query and closes modal cleanly
     const candidateBtn = dialog.getByRole('button', { name: '一' });
@@ -160,6 +160,163 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
     // Verify query input received the character
     const searchInput = page.getByPlaceholder(/Tra cứu Hán tự, Pinyin, hoặc Tiếng Việt/);
     await expect(searchInput).toHaveValue('一');
+  });
+
+  test('clearing canvas (Clear / Xóa hết) aborts in-flight recognition and prevents stale results from appearing', async ({ page }) => {
+    await page.route('**/api/handwriting', async route => {
+      // Simulate delayed recognition request (1200ms)
+      await new Promise(r => setTimeout(r, 1200));
+      try {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ candidates: ['一', '二'] })
+        });
+      } catch {
+        // Aborted by client AbortSignal
+      }
+    });
+
+    const triggerBtn = page.getByRole('button', { name: 'Viết tay (手寫)', exact: true });
+    await triggerBtn.click();
+
+    const dialog = page.getByRole('dialog', { name: 'Tra bằng chữ viết tay' });
+    await expect(dialog).toBeVisible();
+
+    const canvas = page.locator('canvas');
+    const box = await canvas.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + 40, box.y + 120);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 220, box.y + 120, { steps: 5 });
+      await page.mouse.up();
+    }
+
+    const clearBtn = page.getByRole('button', { name: 'Xóa hết' });
+    await expect(clearBtn).toBeEnabled();
+
+    // Click Clear while recognition is still in-flight
+    await clearBtn.click();
+    await expect(dialog.getByText('0 nét đã vẽ')).toBeVisible();
+
+    // Wait longer than the 1200ms API response to verify stale response does not populate candidates
+    await page.waitForTimeout(1600);
+
+    // Invariant: Canvas must remain cleared and candidate buttons must NOT appear
+    await expect(dialog.getByRole('button', { name: '一' })).not.toBeVisible();
+    await expect(dialog.getByText('0 nét đã vẽ')).toBeVisible();
+    await expect(clearBtn).toBeDisabled();
+
+    await page.keyboard.press('Escape');
+  });
+
+  test('undoing stroke (Undo / Lùi 1 nét) aborts in-flight recognition request and maintains accurate stroke state', async ({ page }) => {
+    await page.route('**/api/handwriting', async route => {
+      const req = route.request();
+      const postData = req.postDataJSON();
+      const strokeCount = postData?.strokes?.length || 1;
+
+      if (strokeCount >= 2) {
+        // Second stroke recognition delayed to test cancellation
+        await new Promise(r => setTimeout(r, 1200));
+        try {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ candidates: ['二', '三'] })
+          });
+        } catch {
+          // Aborted by client
+        }
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ candidates: ['一'] })
+        });
+      }
+    });
+
+    const triggerBtn = page.getByRole('button', { name: 'Viết tay (手寫)', exact: true });
+    await triggerBtn.click();
+
+    const dialog = page.getByRole('dialog', { name: 'Tra bằng chữ viết tay' });
+    await expect(dialog).toBeVisible();
+
+    const canvas = page.locator('canvas');
+    const box = await canvas.boundingBox();
+    if (box) {
+      // Draw stroke 1
+      await page.mouse.move(box.x + 40, box.y + 100);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 220, box.y + 100, { steps: 5 });
+      await page.mouse.up();
+    }
+
+    await expect(dialog.getByRole('button', { name: '一' })).toBeVisible({ timeout: 5000 });
+
+    if (box) {
+      // Draw stroke 2
+      await page.mouse.move(box.x + 40, box.y + 180);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 220, box.y + 180, { steps: 5 });
+      await page.mouse.up();
+    }
+
+    // Immediately click Undo before delayed response for 2 strokes arrives
+    const undoBtn = page.getByRole('button', { name: 'Lùi 1 nét' });
+    await undoBtn.click();
+
+    // Wait past the delay
+    await page.waitForTimeout(1600);
+
+    // Invariant: Stale candidate '二' from stroke 2 must NOT appear; '1 nét đã vẽ' must remain
+    await expect(dialog.getByText('1 nét đã vẽ')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: '二' })).not.toBeVisible();
+
+    await page.keyboard.press('Escape');
+  });
+
+  test('closing handwriting modal aborts in-flight recognition request', async ({ page }) => {
+    await page.route('**/api/handwriting', async route => {
+      await new Promise(r => setTimeout(r, 1500));
+      try {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ candidates: ['一'] })
+        });
+      } catch {
+        // Aborted by client
+      }
+    });
+
+    const triggerBtn = page.getByRole('button', { name: 'Viết tay (手寫)', exact: true });
+    await triggerBtn.click();
+
+    const dialog = page.getByRole('dialog', { name: 'Tra bằng chữ viết tay' });
+    await expect(dialog).toBeVisible();
+
+    const canvas = page.locator('canvas');
+    const box = await canvas.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + 40, box.y + 120);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 220, box.y + 120, { steps: 5 });
+      await page.mouse.up();
+    }
+
+    // Immediately close modal via close button
+    await page.getByRole('button', { name: 'Đóng bảng viết tay' }).click();
+    await expect(dialog).not.toBeVisible();
+
+    // Reopen modal: verify it opens cleanly in idle state without stale previous results
+    await triggerBtn.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('0 nét đã vẽ')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: '一' })).not.toBeVisible();
+
+    await page.keyboard.press('Escape');
   });
 
   test('tab loop focus trap when candidates and control buttons are active', async ({ page }) => {

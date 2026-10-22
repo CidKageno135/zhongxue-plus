@@ -43,7 +43,7 @@ test.describe('API Resilience & Fault Tolerance Suite (Subagent A17)', () => {
     await expect(page.getByText('AI đối thoại đang soạn câu trả lời')).not.toBeVisible();
 
     // Verify transparent guided fallback badge
-    await expect(page.getByText('[Gia sư hướng dẫn cục bộ]')).toBeVisible();
+    await expect(page.getByText('[Gia sư hướng dẫn cục bộ]', { exact: true })).toBeVisible();
 
     // Verify pedagogical timeout notice
     await expect(page.getByText(/Yêu cầu AI trực tuyến quá thời gian quy định \(12000ms\)/)).toBeVisible();
@@ -85,7 +85,7 @@ test.describe('API Resilience & Fault Tolerance Suite (Subagent A17)', () => {
     await expect(page.getByText('AI đối thoại đang soạn câu trả lời')).not.toBeVisible();
 
     // Client resilience catches HTTP error and activates local tutor with guided badge
-    await expect(page.getByText('[Gia sư hướng dẫn cục bộ]')).toBeVisible();
+    await expect(page.getByText('[Gia sư hướng dẫn cục bộ]', { exact: true })).toBeVisible();
 
     // Verify guidance banner explaining offline / interrupted connection fallback
     await expect(page.getByText(/Đã tự động kích hoạt Gia sư Cục bộ chuẩn TOCFL Đài Loan/)).toBeVisible();
@@ -138,7 +138,7 @@ test.describe('API Resilience & Fault Tolerance Suite (Subagent A17)', () => {
     await expect(candidateBtn).toBeVisible({ timeout: 6000 });
 
     // Verify offline transparency badge / notice
-    await expect(dialog.getByText(/Chế độ ngoại tuyến: Nhận diện theo hình học nét/)).toBeVisible();
+    await expect(dialog.getByText(/Chế độ ngoại tuyến: Nhận diện theo hình học nét/)).toBeVisible({ timeout: 6000 });
 
     // Select candidate and verify dictionary search receives it
     await candidateBtn.click();
@@ -147,5 +147,43 @@ test.describe('API Resilience & Fault Tolerance Suite (Subagent A17)', () => {
     const searchInput = page.getByLabel('Tìm từ vựng');
     await expect(searchInput).toHaveValue('一');
     await expect(page.getByRole('main')).toContainText('一');
+  });
+
+  test('speech synthesis cancels previous playback and synchronizes UI state when switching between pronunciation buttons', async ({ page }) => {
+    await page.goto('/');
+    await navigate(page, 'Từ vựng hôm nay');
+
+    const speakButtons = page.locator('.speech-control button.icon-button');
+    const count = await speakButtons.count();
+    if (count >= 2) {
+      const wordBtn = speakButtons.nth(0);
+      const sentenceBtn = speakButtons.nth(1);
+
+      // Click word pronunciation button
+      await wordBtn.click();
+      await expect(wordBtn).toHaveClass(/is-playing/);
+
+      // Immediately click sentence pronunciation button
+      await sentenceBtn.click();
+      await expect(sentenceBtn).toHaveClass(/is-playing/);
+
+      // Invariant: Word button MUST NOT remain in playing state
+      await expect(wordBtn).not.toHaveClass(/is-playing/);
+    }
+  });
+
+  test('tone visualization clearly distinguishes simulated model curve from verified acoustic measurement', async ({ page }) => {
+    await page.goto('/');
+    await navigate(page, 'Từ vựng hôm nay');
+
+    const pitchBox = page.locator('.pitch-curve-box');
+    await expect(pitchBox).toBeVisible();
+
+    // Invariant: Before microphone recording or in simulation mode, the label must state "Đường mô phỏng mẫu"
+    await expect(page.getByText(/Đường mô phỏng mẫu/)).toBeVisible();
+    // Invariant: Must NOT claim to be real voice pitch
+    await expect(page.getByText(/Giọng bạn \(\d+ Hz\)/)).not.toBeVisible();
+    // Descriptive text must clearly state it is a simulation of standard Taipei pitch contour
+    await expect(page.getByText(/Mô phỏng hướng đi cao độ/)).toBeVisible();
   });
 });
