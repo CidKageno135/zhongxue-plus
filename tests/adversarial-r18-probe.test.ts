@@ -21,22 +21,14 @@ import { FakeUpstreamServer } from './fixtures/ai-http/fake-upstream.ts';
 import { MockUpstreamServer } from './fixtures/api/mock-upstream-server.ts';
 import {
   validateUpstreamUrl,
-  isTrustedHost,
-  isLoopbackOrLocalhost,
-  isPrivateOrInternalIp,
-  getProviderForHostname,
-  getServerKeyForProvider,
   resolveUpstreamCredentials,
   redactSecret,
-  isAllowedOrigin,
   getCorsHeaders
 } from '../server/security.ts';
 import {
   SENTINEL_AGENTROUTER_KEY,
   SENTINEL_OPENROUTER_KEY,
-  SENTINEL_CLIENT_KEY,
-  PROVIDER_URLS,
-  ATTACK_VECTORS
+  SENTINEL_CLIENT_KEY
 } from './fixtures/security/index.js';
 
 describe('R18 Adversarial Security & HTTP Probe Suite', () => {

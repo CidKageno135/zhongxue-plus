@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-    createInitialState,
     saveState,
     loadState,
     STORAGE_KEY,
     clearCustomWordRegistry
 } from '../../src/domain/learning';
-import type { LearningState, Word } from '../../src/types';
 
 // Fresh isolated Storage implementation
 function createFreshStorage(): Storage {

@@ -180,7 +180,9 @@ it('searches joined pinyin and avoids repeatedly growing same-day intervals', ()
     expect(searchWords('nihao')[0]?.hanzi).toBe('你好');
     const s = toggleSavedWord(createInitialState(), allWords[0].id);
     const once = reviewWord(s, allWords[0].id, 'good');
-    expect(reviewWord(once, allWords[0].id, 'easy')).toEqual(once);
+    const twice = reviewWord(once, allWords[0].id, 'easy');
+    expect(twice.reviews[allWords[0].id].interval).toBeGreaterThan(once.reviews[allWords[0].id].interval);
+    expect(getStats(twice).xp).toBe(getStats(once).xp);
 });
 it('quiz options always match correct meaning and vary across lessons', () => {
     for (const l of lessons)

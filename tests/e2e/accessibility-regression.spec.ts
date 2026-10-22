@@ -1,5 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
-import { navigate, assertNoHorizontalScroll, checkHorizontalOverflow } from './helpers';
+import { test, expect } from '@playwright/test';
+import { navigate, assertNoHorizontalScroll } from './helpers';
 
 test.describe('Accessibility & UI Regression Suite (Subagent A18 & T16 Acceptance)', () => {
   test.beforeEach(async ({ page }) => {

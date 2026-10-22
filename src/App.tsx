@@ -34,7 +34,7 @@ export default function App() {
     const [scenario, setScenario] = useState<Scenario | null>(null);
     const [query, setQuery] = useState('');
     const [onlySaved, setOnlySaved] = useState(false);
-    const [notice, setNotice] = useState(loaded.error ?? '');
+    const [notice, setNotice] = useState(loaded.error ?? (loaded.isCorrupt ? 'Không thể đọc tiến độ đã lưu. Dữ liệu trong phiên này vẫn sử dụng được.' : ''));
     const [menu, setMenu] = useState(false);
 
     const heading = useRef<HTMLElement>(null);
@@ -42,7 +42,7 @@ export default function App() {
     const due = getDueWords(state);
 
     useEffect(() => {
-        if (loaded.error && state === loaded.state) return;
+        if ((loaded.error || loaded.isCorrupt) && state === loaded.state) return;
         const error = saveState(state);
         if (error) {
             queueMicrotask(() => setNotice(error));

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { lessons } from '../../src/data/lessons';
-import { navigate, assertNoHorizontalScroll, checkHorizontalOverflow } from './helpers';
+import { navigate, assertNoHorizontalScroll } from './helpers';
 
 test.describe('Lesson & Curriculum Suite (Subagent A18 & T16 Acceptance)', () => {
   test.beforeEach(async ({ page }) => {

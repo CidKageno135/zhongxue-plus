@@ -86,6 +86,9 @@ export interface DictionarySearchResponse {
     results: DbDictionaryResult[];
     total: number;
     count: number;
+    dictionaryTotal?: number;
+    totalMatches?: number;
+    pageCount?: number;
     offset: number;
     limit: number;
     query: string;

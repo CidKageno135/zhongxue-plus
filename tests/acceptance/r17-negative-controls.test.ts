@@ -9,14 +9,11 @@ import {
   STORAGE_KEY,
   STORAGE_BACKUP_KEY,
   MAX_STATE_JSON_LENGTH,
-  MAX_VOCAB_SIZE,
   clearCustomWordRegistry,
   findWord,
   reviewWord,
   updateProfile,
   getStats,
-  getDueWords,
-  computeEaseFactor,
   localDate,
 } from '../../src/domain/learning';
 import { allWords } from '../../src/data/lessons';
@@ -298,14 +295,14 @@ describe('R17 Data Reviewer Negative Controls & Falsification Suite', () => {
       };
 
       // Must catch backup write quota error and return fallback initial state safely
-      let loaded: any = null;
+      let loaded: ReturnType<typeof loadState> | null = null;
       expect(() => {
         loaded = loadState(storageQuotaBackup);
       }).not.toThrow();
 
-      expect(loaded.error).toBeTruthy();
-      expect(loaded.isCorrupt).toBe(true);
-      expect(loaded.state.savedWordIds).toHaveLength(0);
+      expect(loaded?.error).toBeTruthy();
+      expect(loaded?.isCorrupt).toBe(true);
+      expect(loaded?.state.savedWordIds).toHaveLength(0);
     });
   });
 

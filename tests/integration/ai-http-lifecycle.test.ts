@@ -10,7 +10,7 @@
  * - Deadline timeout & listener cleanup over real loopback TCP sockets
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { RealTcpAppServer } from '../fixtures/ai-http/real-tcp-server.ts';
 import { FakeUpstreamServer } from '../fixtures/ai-http/fake-upstream.ts';
 

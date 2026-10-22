@@ -39,10 +39,8 @@ import {
 } from '../fixtures/api/sentinel-secrets.ts';
 import {
   SENTINEL_AGENTROUTER_KEY,
-  SENTINEL_OPENROUTER_KEY,
   SENTINEL_CLIENT_KEY as T10_SENTINEL_CLIENT_KEY,
-  PROVIDER_URLS,
-  ATTACK_VECTORS
+  PROVIDER_URLS
 } from '../fixtures/security/index.js';
 
 describe('API Security Integration Tests (A16 Independent QA)', () => {
@@ -705,7 +703,8 @@ describe('API Security Integration Tests (A16 Independent QA)', () => {
       });
 
       await new Promise<void>(resolve => sinkServer.listen(0, '127.0.0.1', () => resolve()));
-      const sinkPort = (sinkServer.address() as any).port;
+      const sinkAddr = sinkServer.address();
+      const sinkPort = sinkAddr && typeof sinkAddr === 'object' ? sinkAddr.port : 0;
 
       const redirectHopServer = http.createServer((req, res) => {
         res.writeHead(302, {
@@ -716,7 +715,8 @@ describe('API Security Integration Tests (A16 Independent QA)', () => {
       });
 
       await new Promise<void>(resolve => redirectHopServer.listen(0, '127.0.0.1', () => resolve()));
-      const hopPort = (redirectHopServer.address() as any).port;
+      const hopAddr = redirectHopServer.address();
+      const hopPort = hopAddr && typeof hopAddr === 'object' ? hopAddr.port : 0;
 
       try {
         await testServer.fetch('/api/conversation', {

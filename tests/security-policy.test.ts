@@ -19,8 +19,7 @@ import {
   SENTINEL_AGENTROUTER_KEY,
   SENTINEL_OPENROUTER_KEY,
   SENTINEL_CLIENT_KEY as T10_SENTINEL_CLIENT_KEY,
-  PROVIDER_URLS,
-  ATTACK_VECTORS
+  PROVIDER_URLS
 } from './fixtures/security/index.js';
 import {
   validateUpstreamUrl,

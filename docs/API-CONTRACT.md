@@ -210,15 +210,24 @@ export interface DbDictionaryResult {
 ```typescript
 export interface DictionarySearchResponse {
   results: DbDictionaryResult[];
-  total: number; // Tổng số bản ghi khớp TRÊN TOÀN BỘ CƠ SỞ DỮ LIỆU (KHÔNG DỪNG SỚM)
-  count: number; // Số lượng bản ghi trong mảng results hiện tại (results.length)
-  offset: number; // Offset đã yêu cầu
-  limit: number; // Limit đã áp dụng
-  query: string; // Từ khóa tìm kiếm gốc đã trim
+  dictionaryTotal: number; // [F06] Tổng kho toàn bộ cơ sở dữ liệu từ điển (~122.596 mục), không đổi khi tìm kiếm
+  totalMatches: number;    // [F06] Tổng số bản ghi khớp truy vấn trên toàn bộ từ điển (tương đương total)
+  pageCount: number;       // [F06] Số lượng bản ghi trong mảng results của trang hiện tại (tương đương count, results.length)
+  total: number;           // Giữ tương thích ngược = totalMatches
+  count: number;           // Giữ tương thích ngược = pageCount
+  offset: number;          // Offset đã yêu cầu
+  limit: number;           // Limit đã áp dụng
+  query: string;           // Từ khóa tìm kiếm gốc đã trim
   mode: 'all' | 'hanzi' | 'pinyin' | 'vi';
   source: 'database';
 }
 ```
+
+#### Hợp đồng F06: Phân định rõ 3 con số (Three-Number Separation Contract)
+Để khắc phục hoàn toàn sự nhầm lẫn giữa dung lượng kho từ điển, số lượng kết quả tìm kiếm và số lượng bản ghi hiển thị trên một trang (lỗi F06), hợp đồng chuẩn hóa 3 con số độc lập:
+1. `dictionaryTotal`: Số lượng mục từ vựng có trong toàn bộ cơ sở dữ liệu từ điển gốc (ví dụ: `122.596`). Con số này là **bất biến**, không bao giờ bị thay đổi bởi từ khóa tìm kiếm `q` hay phân trang `offset/limit`. Badge tổng kho trên giao diện bắt buộc dùng trường này.
+2. `totalMatches`: Tổng số lượng bản ghi trong từ điển thực sự khớp với điều kiện tìm kiếm `q` và `mode` (tương thích ngược với trường `total`).
+3. `pageCount`: Số lượng bản ghi thực tế được trả về trong mảng `results` của trang hiện tại (`results.length`, tương thích ngược với trường `count`). Phân trang giao diện (`Trang X / Y`) tính dựa trên `Math.ceil(totalMatches / limit)`.
 
 - **Quy tắc xếp hạng kết quả (A06 & A07):**
   1. **Hạng 1 (Exact Hanzi):** Khớp chính xác 100% với `traditional` hoặc `simplified`.
@@ -260,18 +269,20 @@ export interface ConversationRequestBody {
 }
 ```
 
-#### Quy tắc bảo mật upstream & ranh giới ủy quyền khóa (Subagent A03):
-1. **Cô lập khóa môi trường máy chủ (Server Key Isolation):**  
-   Khóa API được cấu hình trong biến môi trường máy chủ (`AI_SOL_KEY`, `AI_DEEPSEEK_KEY`, `AI_API_KEY`) **CHỈ ĐƯỢC PHÉP GỬI** tới các endpoint thuộc danh sách tin cậy được cấu hình cứng trên server:
-   - `https://agentrouter.org/v1`
-   - `https://openrouter.ai/api/v1`
-2. **Chặn tấn công chiếm dụng khóa qua baseUrl (Credential Hijacking Defense):**  
-   Nếu request từ client chỉ định một `baseUrl` không thuộc danh sách tin cậy (ví dụ: `https://attacker.evil.com/v1`), máy chủ **TUYỆT ĐỐI KHÔNG** chèn khóa API của server vào request.  
-   - Nếu client có cung cấp `apiKey` riêng trong payload, máy chủ chỉ dùng `apiKey` đó gửi tới `baseUrl`.
-   - Nếu client không cung cấp `apiKey`, máy chủ lập tức từ chối với HTTP `400 Bad Request` (`UNAUTHORIZED_BASE_URL`) hoặc chuyển sang chế độ `guided` fallback cục bộ.
-3. **Phân tích URL nghiêm ngặt:**  
-   Dùng `new URL(baseUrl)` để kiểm tra protocol (`https:` bắt buộc trong production, cho phép `http:` trên `127.0.0.1` khi test), cấm userinfo (`user:pass@`), chặn bypass kiểm tra bằng hostname giả mạo hoặc redirect không an toàn.
-4. **Kiểm soát Origin/CORS:**  
+#### Quy tắc bảo mật upstream & ranh giới ủy quyền khóa (Subagent A03 / B02):
+1. **F02 — Gắn khóa đúng nhà cung cấp (Strict Provider Binding):**  
+   - Khóa API được cấu hình trong biến môi trường máy chủ (`AI_SOL_KEY`, `AI_DEEPSEEK_KEY`, `AI_API_KEY`) **CHỈ ĐƯỢC PHÉP GỬI** tới đúng nhà cung cấp tương ứng:
+     - `AI_SOL_KEY` gắn chặt với `https://agentrouter.org/v1`.
+     - `AI_DEEPSEEK_KEY` gắn chặt với `https://openrouter.ai/api/v1` hoặc `https://api.deepseek.com`.
+   - **Chặn chuyển hướng khóa máy chủ (Credential Hijacking Defense):** Máy chủ **TUYỆT ĐỐI KHÔNG** lấy khóa của provider này gửi cho provider khác. Nếu client gửi `baseUrl` tùy biến hoặc thay đổi provider, server không bao giờ dùng khóa server. Client bắt buộc phải cung cấp `apiKey` tương thích trong payload; nếu thiếu `apiKey`, server từ chối ngay với HTTP `400 Bad Request` (`UNAUTHORIZED_BASE_URL`) hoặc kích hoạt `guided` fallback cục bộ.
+2. **F03 — Giới hạn URL nghiêm ngặt & Phòng vệ SSRF (SSRF & Strict URL Restrictions):**  
+   - **Chặn Fragment (`#`):** Nghiêm cấm hoàn toàn ký tự `#` hoặc URL fragment trong `baseUrl` (ngăn chặn bypass kiểm tra định tuyến). Bất kỳ URL nào chứa `#` sẽ bị từ chối ngay lập tức với lỗi `400 Bad Request`.
+   - **Chặn Query Parameters (`?`):** `baseUrl` phải là endpoint gốc, cấm chứa query parameters hoặc dấu `?`.
+   - **Chặn Userinfo:** Cấm tuyệt đối `username` và `password` trong URL (`user:pass@host`).
+   - **Chặn SSRF Mạng nội bộ & Cloud Metadata:** Chặn triệt để mọi địa chỉ IP private (RFC 1918: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`, `::1`), zero-network (`0.0.0.0/8`), IPv6 link-local/unique-local (`fe80::/10`, `fc00::/7`), và endpoint metadata đám mây (`169.254.169.254`, `metadata.google.internal`).
+   - **Chính sách Loopback mặc định an toàn (Local Dev Default False):** Mặc định ở môi trường production và runtime thông thường, mọi kết nối tới `localhost` / `127.0.0.1` đều bị **CHẶN**. Chỉ khi cờ kiểm thử được bật tường minh (`allowLocalDev === true` hoặc `ALLOW_LOCAL_TEST_UPSTREAM === 'true'`), test harness mới được phép kết nối tới upstream giả lập nội bộ.
+   - **Giao thức:** Bắt buộc `https:` cho mọi máy chủ từ xa. Giao thức `http:` chỉ được phép trên localhost khi `allowLocalDev` được kích hoạt.
+3. **Kiểm soát Origin/CORS:**  
    Chỉ chấp nhận các yêu cầu đến từ cùng origin hoặc origin được cấu hình cho ứng dụng. Không cấu hình wildcard `Access-Control-Allow-Origin: *`.
 
 #### Quy tắc thời gian chờ (Timeout) & Hủy yêu cầu (Cancellation) (Subagent A05):

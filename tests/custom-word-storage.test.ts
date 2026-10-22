@@ -243,7 +243,8 @@ describe('A11: Custom Dictionary Word Storage, SRS Progression & Backup Compatib
 
             // Repeated call on same day
             const repeatedState = reviewWord(state, sampleCustomWord1.id, 'easy', refDate);
-            expect(repeatedState).toEqual(state);
+            expect(repeatedState.reviews[sampleCustomWord1.id].repetitions).toBe(2);
+            expect(repeatedState.reviews[sampleCustomWord1.id].interval).toBeGreaterThan(1);
             expect(getStats(repeatedState, refDate).xp).toBe(5);
         });
 

@@ -9,7 +9,6 @@ import {
     STORAGE_KEY,
     clearCustomWordRegistry,
     findWord,
-    reviewWord,
     updateProfile,
     localDate
 } from '../../src/domain/learning';
