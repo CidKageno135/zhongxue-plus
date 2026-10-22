@@ -53,6 +53,7 @@ export function PathView({ state, onLaunch }: PathViewProps) {
                 gap: '8px',
                 margin: '18px 0 24px',
                 overflowX: 'auto',
+                maxWidth: '100%',
                 paddingBottom: '4px'
             }}>
                 {(['ALL', 'A1', 'A2', 'B1', 'B2'] as const).map(lvl => {

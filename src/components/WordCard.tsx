@@ -46,12 +46,12 @@ export function WordCard({ word, saved, onSave }: WordCardProps) {
             <p className="pinyin">{word.pinyin}</p>
             <p className="word-meaning">{word.meaning}</p>
             <div className="word-example">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <p lang="zh-TW" style={{ margin: 0, fontWeight: 600 }}>{word.example}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <p lang="zh-TW" style={{ margin: 0, fontWeight: 600, wordBreak: 'break-word', minWidth: 0 }}>{word.example}</p>
                     <SpeakButton text={word.example} />
                 </div>
-                <small style={{ color: 'var(--tone-1)', marginTop: '2px', display: 'block' }}>{word.examplePinyin}</small>
-                <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--on-surface-variant)' }}>{word.exampleMeaning}</p>
+                <small style={{ color: 'var(--tone-1)', marginTop: '2px', display: 'block', wordBreak: 'break-word' }}>{word.examplePinyin}</small>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--on-surface-variant)', wordBreak: 'break-word' }}>{word.exampleMeaning}</p>
             </div>
         </article>
     );

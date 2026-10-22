@@ -68,6 +68,7 @@ export function Sidebar({
                     bottom: 0,
                     left: 0,
                     width: '280px',
+                    maxWidth: 'calc(100vw - 48px)',
                     background: '#ffffff',
                     borderRight: '1px solid var(--border-strong)',
                     zIndex: 100,

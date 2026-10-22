@@ -183,6 +183,14 @@ main {
   gap: 16px;
 }
 
+.bento-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
 .bento-brand {
   display: flex;
   align-items: center;
@@ -783,6 +791,51 @@ main {
   }
   .bento-header-top {
     padding: 0 16px;
+    gap: 8px;
+  }
+  .bento-header-left {
+    gap: 8px;
+    min-width: 0;
+  }
+  .bento-brand {
+    gap: 8px;
+    min-width: 0;
+  }
+  .bento-brand-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .bento-brand-title {
+    font-size: 15px;
+  }
+  .bento-brand-badge {
+    display: none;
+  }
+  .bento-brand-subtitle {
+    display: none;
+  }
+  .bento-tocfl-chip {
+    display: none;
+  }
+  .bento-header-actions {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .bento-gem-pill {
+    padding: 4px 10px;
+    gap: 4px;
+    font-size: 11px;
+  }
+  .bento-profile-pill {
+    padding: 2px 4px;
+    gap: 4px;
+  }
+  .bento-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
   }
   .bento-search-box {
     display: none;
@@ -805,6 +858,152 @@ main {
   }
   .sm2-rating-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .path-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+  }
+  .path-number {
+    font-size: 16px;
+    width: 24px;
+    flex-shrink: 0;
+  }
+  .path-emoji {
+    width: 42px;
+    height: 42px;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .path-description {
+    flex: 1 1 calc(100% - 90px);
+    min-width: 0;
+  }
+  .path-description h2 {
+    font-size: 17px;
+    margin: 2px 0 4px;
+    word-break: break-word;
+  }
+  .path-description p {
+    font-size: 13px;
+    margin-bottom: 4px;
+    word-break: break-word;
+  }
+  .path-description small {
+    font-size: 11px;
+  }
+  .path-card > .button {
+    width: 100%;
+    margin-top: 6px;
+    justify-content: center;
+  }
+  .path-overview {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px;
+    margin: 16px 0;
+  }
+  .path-overview progress {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  main {
+    padding: 12px 12px 36px;
+  }
+  .panel {
+    padding: 16px;
+  }
+  .row.between {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .word-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .word-card {
+    padding: 14px 16px;
+  }
+  .dialogue-line {
+    max-width: 100%;
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .dialogue-line > div {
+    padding: 12px 14px;
+    min-width: 0;
+  }
+  .speaker {
+    width: 36px;
+    height: 36px;
+    font-size: 10px;
+  }
+  .grammar-pattern {
+    font-size: 20px;
+    padding: 12px 14px;
+    word-break: break-word;
+  }
+  .lesson-actions {
+    gap: 8px;
+  }
+  .lesson-actions > .button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .lesson-steps > span {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .quiz-option {
+    padding: 12px 16px;
+    gap: 12px;
+    font-size: 14px;
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 400px) {
+  .bento-header-top {
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .bento-header-left {
+    gap: 6px;
+  }
+  .bento-brand {
+    gap: 6px;
+  }
+  .bento-brand-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+  .bento-brand-title {
+    font-size: 14px;
+  }
+  .bento-header-actions {
+    gap: 4px;
+  }
+  .bento-gem-pill {
+    padding: 3px 6px;
+    font-size: 11px;
+    gap: 3px;
+  }
+  .bento-streak-pill .bento-pill-unit {
+    display: none;
+  }
+  .bento-avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
   }
 }
 
@@ -955,6 +1154,7 @@ main {
   align-items: center;
   gap: 20px;
   padding: 20px 24px;
+  max-width: 100%;
 }
 
 .path-number {
@@ -963,6 +1163,7 @@ main {
   font-weight: 700;
   color: var(--on-surface-variant);
   width: 28px;
+  flex-shrink: 0;
 }
 
 .path-number.finished {
@@ -982,6 +1183,7 @@ main {
 
 .path-description {
   flex: 1;
+  min-width: 0;
 }
 
 .path-description h2 {
@@ -1213,6 +1415,7 @@ main {
   border-bottom: 1px solid var(--border-strong);
   margin: 24px 0 20px;
   overflow-x: auto;
+  max-width: 100%;
 }
 
 .lesson-steps > span {
@@ -1352,6 +1555,12 @@ main {
   margin: 0 0 6px;
 }
 
+.grammar-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .grammar-pattern {
   font-family: var(--font-serif);
   font-size: 26px;
@@ -1359,6 +1568,16 @@ main {
   border-radius: 10px;
   padding: 16px 20px;
   margin: 12px 0;
+  word-break: break-word;
+}
+
+.lesson-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
 }
 
 /* Toast */

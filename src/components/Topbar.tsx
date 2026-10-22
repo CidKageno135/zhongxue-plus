@@ -46,7 +46,7 @@ export function Topbar({
         <header className="bento-header">
             {/* Top row */}
             <div className="bento-header-top">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div className="bento-header-left">
                     <button
                         type="button"
                         className="mobile-menu-btn"
@@ -83,10 +83,10 @@ export function Topbar({
                 {/* Profile & Real XP / Streak stats */}
                 <div className="bento-header-actions">
                     {streak > 0 && (
-                        <div className="bento-gem-pill" style={{ color: 'var(--vermilion-cinnabar)', borderColor: 'rgba(200, 50, 43, 0.25)' }}>
+                        <div className="bento-gem-pill bento-streak-pill" style={{ color: 'var(--vermilion-cinnabar)', borderColor: 'rgba(200, 50, 43, 0.25)' }}>
                             <span>🔥</span>
                             <span style={{ color: 'var(--vermilion-cinnabar)', fontWeight: 700 }}>{streak}</span>
-                            <span style={{ color: 'var(--on-surface-variant)', fontSize: '11px' }}>ngày</span>
+                            <span className="bento-pill-unit" style={{ color: 'var(--on-surface-variant)', fontSize: '11px' }}>ngày</span>
                         </div>
                     )}
                     <div className="bento-gem-pill" title={`Tổng điểm tích lũy: ${xp} XP`}>
