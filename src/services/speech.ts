@@ -256,17 +256,26 @@ export function speakChinese(text: string, options?: number | SpeakOptions): boo
         utterance.rate = opts.rate ?? 0.92;
         utterance.pitch = opts.pitch ?? 1.02;
 
-        utterance.onend = () => {
+        let isDone = false;
+        const markDone = () => {
+            if (isDone) return;
+            isDone = true;
             releaseUtterance(utterance);
             opts.onEnd?.();
         };
 
+        utterance.onend = () => {
+            markDone();
+        };
+
         utterance.onerror = (e) => {
-            releaseUtterance(utterance);
             // In Chromium, canceling an utterance triggers error event with error === 'interrupted' or 'canceled'.
-            // Do not display a user error for deliberate stops.
+            // Do not display a user error for deliberate stops; notify onEnd so caller/SpeakButton resets state.
             const errType = (e as unknown as { error?: string })?.error;
-            if (errType !== 'interrupted' && errType !== 'canceled') {
+            if (errType === 'interrupted' || errType === 'canceled') {
+                markDone();
+            } else {
+                releaseUtterance(utterance);
                 opts.onError?.('Chưa thể phát âm thanh trên thiết bị này. Hãy thử lại.');
             }
         };

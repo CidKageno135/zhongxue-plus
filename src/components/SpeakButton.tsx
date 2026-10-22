@@ -12,16 +12,21 @@ export function SpeakButton({ text, label = 'Nghe phát âm', rate = 0.82 }: Spe
     const [isPlaying, setIsPlaying] = useState(false);
     const [message, setMessage] = useState('');
     const mountedRef = useRef(true);
+    const isPlayingRef = useRef(isPlaying);
+
+    useEffect(() => {
+        isPlayingRef.current = isPlaying;
+    }, [isPlaying]);
 
     useEffect(() => {
         mountedRef.current = true;
         return () => {
             mountedRef.current = false;
-            if (isPlaying) {
+            if (isPlayingRef.current) {
                 stopSpeaking();
             }
         };
-    }, [isPlaying]);
+    }, []);
 
     function handleClick() {
         if (isPlaying) {

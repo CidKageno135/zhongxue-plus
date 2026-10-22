@@ -456,13 +456,13 @@ export function TodayView({
                             {realMeasurement ? (
                                 <span className="badge-pill badge-jade">Đo thực tế: {realMeasurement.hz} Hz</span>
                             ) : (
-                                <span className="badge-pill badge-neutral">Mô phỏng hướng dẫn</span>
+                                <span className="badge-pill badge-neutral">Đường cao độ mẫu (Mô phỏng thanh điệu)</span>
                             )}
                         </div>
                         <p style={{ fontSize: '12px', color: 'var(--on-surface-variant)', margin: '0 0 10px' }}>
                             {realMeasurement
                                 ? `Đã đo tần số F0 (${realMeasurement.hz} Hz) qua micro đối chiếu với thang cao độ ${etymology.toneClass} chuẩn Đài Bắc của từ ${heroWord.hanzi}.`
-                                : `Mô phỏng hướng đi cao độ ${etymology.toneClass} của từ ${heroWord.hanzi} chuẩn ngữ âm Đài Bắc. Nhấn nút bên dưới để cấp quyền micro và đo cao độ thực tế.`}
+                                : `Đường cao độ mẫu (Mô phỏng thanh điệu) ${etymology.toneClass} của từ ${heroWord.hanzi} chuẩn ngữ âm Đài Bắc. Nhấn nút bên dưới để cấp quyền micro và đo cao độ thực tế.`}
                         </p>
 
                         {/* Vector Pitch Visualizer SVG Box */}
@@ -472,7 +472,7 @@ export function TodayView({
                                 <span style={{ display: 'flex', gap: '10px' }}>
                                     <span style={{ color: 'var(--tone-5)' }}>● {chaoCurve.label}</span>
                                     <span style={{ color: 'var(--primary-container)' }}>
-                                        ● {realMeasurement ? `Giọng bạn (${realMeasurement.hz} Hz)` : 'Đường mô phỏng mẫu'}
+                                        ● {realMeasurement ? `Giọng bạn (${realMeasurement.hz} Hz)` : 'Đường cao độ mẫu (Mô phỏng thanh điệu)'}
                                     </span>
                                 </span>
                             </div>

@@ -13,6 +13,7 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
     const triggerElementRef = useRef<HTMLElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const requestIdRef = useRef<number>(0);
 
     const [isDrawing, setIsDrawing] = useState(false);
     const [strokes, setStrokes] = useState<HandwritingStroke[]>([]);
@@ -24,6 +25,15 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
     const startTimeRef = useRef<number>(0);
 
     const CANVAS_SIZE = 300;
+
+    const handleClose = useCallback(() => {
+        requestIdRef.current++;
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        onClose();
+    }, [onClose]);
 
     // Accessibility: Focus management (save trigger, focus close button, restore on unmount)
     useEffect(() => {
@@ -37,6 +47,7 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
             clearTimeout(timer);
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
+                abortControllerRef.current = null;
             }
             if (triggerElementRef.current && typeof triggerElementRef.current.focus === 'function') {
                 triggerElementRef.current.focus();
@@ -49,7 +60,7 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         function handleKeyDown(e: KeyboardEvent) {
             if (e.key === 'Escape') {
                 e.preventDefault();
-                onClose();
+                handleClose();
                 return;
             }
 
@@ -87,7 +98,7 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
+    }, [handleClose]);
 
     /** Redraw all strokes on the canvas */
     const redrawCanvas = useCallback(() => {
@@ -168,8 +179,11 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         redrawCanvas();
     }, [redrawCanvas]);
 
-    /** Trigger handwriting recognition with timeout cancellation and offline fallback */
+    /** Trigger handwriting recognition with timeout cancellation, request ID guard, and offline fallback */
     const triggerRecognition = useCallback(async (currentStrokes: HandwritingStroke[]) => {
+        requestIdRef.current++;
+        const thisRequestId = requestIdRef.current;
+
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
@@ -191,7 +205,7 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         // If explicitly offline, use client fallback directly without network delay
         if (isBrowserOffline) {
             const fallback = fallbackClientHandwriting(currentStrokes);
-            if (!controller.signal.aborted) {
+            if (!controller.signal.aborted && requestIdRef.current === thisRequestId) {
                 setCandidates(fallback);
                 setRecognitionMode(fallback.length > 0 ? 'offline_fallback' : 'no_candidates');
                 setLoading(false);
@@ -212,11 +226,11 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
 
         try {
             const results = await Promise.race([
-                recognizeHandwriting(currentStrokes, CANVAS_SIZE, CANVAS_SIZE),
+                recognizeHandwriting(currentStrokes, CANVAS_SIZE, CANVAS_SIZE, controller.signal),
                 timeoutPromise
             ]);
 
-            if (controller.signal.aborted) return;
+            if (controller.signal.aborted || requestIdRef.current !== thisRequestId) return;
 
             if (Array.isArray(results) && results.length > 0) {
                 setCandidates(results);
@@ -227,18 +241,18 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                 setRecognitionMode(fallback.length > 0 ? 'offline_fallback' : 'no_candidates');
             }
         } catch {
-            if (controller.signal.aborted && abortControllerRef.current !== controller) {
+            if (controller.signal.aborted || requestIdRef.current !== thisRequestId) {
                 return;
             }
 
             // Timeout, network or server error -> seamlessly switch to client fallback
             const fallback = fallbackClientHandwriting(currentStrokes);
-            if (!controller.signal.aborted) {
+            if (!controller.signal.aborted && requestIdRef.current === thisRequestId) {
                 setCandidates(fallback);
                 setRecognitionMode(fallback.length > 0 ? 'offline_fallback' : 'no_candidates');
             }
         } finally {
-            if (abortControllerRef.current === controller) {
+            if (abortControllerRef.current === controller && requestIdRef.current === thisRequestId) {
                 setLoading(false);
             }
         }
@@ -352,11 +366,13 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
 
     function handleUndo() {
         if (!strokes.length) return;
+        requestIdRef.current++;
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
         }
 
+        currentStroke.current = { x: [], y: [], t: [] };
         const updated = strokes.slice(0, -1);
         setStrokes(updated);
         if (updated.length === 0) {
@@ -370,11 +386,13 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
 
     function handleClear() {
         if (!strokes.length && !candidates.length) return;
+        requestIdRef.current++;
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
         }
 
+        currentStroke.current = { x: [], y: [], t: [] };
         setStrokes([]);
         setCandidates([]);
         setRecognitionMode('idle');
@@ -390,7 +408,7 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
             aria-describedby="handwriting-pad-desc"
             onClick={e => {
                 if (e.target === e.currentTarget) {
-                    onClose();
+                    handleClose();
                 }
             }}
             style={{
@@ -475,7 +493,7 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                     <button
                         ref={closeBtnRef}
                         type="button"
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="icon-button"
                         aria-label="Đóng bảng viết tay"
                         style={{ padding: '6px' }}
@@ -522,6 +540,11 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                             key={idx}
                             type="button"
                             onClick={() => {
+                                requestIdRef.current++;
+                                if (abortControllerRef.current) {
+                                    abortControllerRef.current.abort();
+                                    abortControllerRef.current = null;
+                                }
                                 onSelectWord(char);
                                 onClose();
                             }}
