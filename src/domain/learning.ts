@@ -28,6 +28,7 @@ export interface LearningState {
         correct: number;
         total: number;
     }>;
+    customWords?: Word[];
 }
 
 export const STORAGE_KEY = 'zhongxue.learning.v1';
@@ -66,15 +67,41 @@ function persistCustomRegistry(): void {
 
 loadCustomRegistry();
 
+export function clearCustomWordRegistry(): void {
+    customWordRegistry.clear();
+    if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+            window.localStorage.removeItem(CUSTOM_WORDS_KEY);
+        } catch {
+            // ignore
+        }
+    }
+}
+
 export function registerCustomWord(w: Word): void {
-    customWordRegistry.set(w.id, w);
+    if (
+        !w ||
+        typeof w !== 'object' ||
+        typeof w.id !== 'string' ||
+        !w.id.trim() ||
+        typeof w.hanzi !== 'string' ||
+        !w.hanzi.trim()
+    ) {
+        throw Error('Từ vựng mở rộng không hợp lệ.');
+    }
+    customWordRegistry.set(w.id, { ...w });
     persistCustomRegistry();
 }
 
+export function getCustomWordRegistry(): Map<string, Word> {
+    return new Map(customWordRegistry);
+}
+
 export function isValidWordId(id: string): boolean {
+    if (typeof id !== 'string' || !id) return false;
     if (allWords.some(w => w.id === id)) return true;
     if (customWordRegistry.has(id)) return true;
-    return /^dict-[a-zA-Z0-9_#-]+$/.test(id);
+    return /^(dict-[a-zA-Z0-9_#-]+|cv_[a-zA-Z0-9_#-]+|custom-[a-zA-Z0-9_#-]+)$/.test(id);
 }
 
 export function findWord(id: string): Word | undefined {
@@ -82,8 +109,8 @@ export function findWord(id: string): Word | undefined {
     if (lessonMatch) return lessonMatch;
     const customMatch = customWordRegistry.get(id);
     if (customMatch) return customMatch;
-    if (/^dict-[a-zA-Z0-9_#-]+$/.test(id)) {
-        const label = id.replace(/^dict-/, '');
+    if (/^(dict-[a-zA-Z0-9_#-]+|cv_[a-zA-Z0-9_#-]+|custom-[a-zA-Z0-9_#-]+)$/.test(id)) {
+        const label = id.replace(/^(dict-|cv_|custom-)/, '');
         return {
             id,
             hanzi: label,
@@ -91,7 +118,7 @@ export function findWord(id: string): Word | undefined {
             meaning: 'Từ vựng sổ tay mở rộng',
             example: label,
             examplePinyin: '',
-            exampleMeaning: 'Từ đã lưu từ từ điển PGlite',
+            exampleMeaning: 'Từ đã lưu từ từ điển',
             category: 'Từ điển mở rộng',
             lessonId: 'custom-dictionary'
         };
@@ -121,12 +148,15 @@ export function getAllKnownWords(savedIds: string[] = []): Word[] {
 }
 
 export function localDate(date = new Date()): string {
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+        throw Error('Ngày không hợp lệ.');
+    }
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function shift(day: string, amount: number) {
     const [y, m, d] = day.split('-').map(Number);
-    return localDate(new Date(y, m - 1, d + amount));
+    return localDate(new Date(y, m - 1, d + amount, 12, 0, 0));
 }
 
 export function createInitialState(): LearningState {
@@ -197,20 +227,56 @@ export function toggleSavedWord(state: LearningState, id: string, customWord?: W
         registerCustomWord(customWord);
     }
     word(id);
+    const isRemoving = state.savedWordIds.includes(id);
+    const nextSavedWordIds = isRemoving
+        ? state.savedWordIds.filter(x => x !== id)
+        : [...state.savedWordIds, id];
+
+    let nextCustomWords = state.customWords;
+    const resolvedCustomWord =
+        customWord ??
+        (customWordRegistry.has(id) && !allWords.some(w => w.id === id)
+            ? customWordRegistry.get(id)
+            : undefined);
+
+    if (isRemoving) {
+        if (nextCustomWords) {
+            nextCustomWords = nextCustomWords.filter(w => w.id !== id);
+        }
+    } else if (resolvedCustomWord) {
+        const currentList = nextCustomWords ?? [];
+        nextCustomWords = currentList.some(w => w.id === id)
+            ? currentList.map(w => (w.id === id ? resolvedCustomWord : w))
+            : [...currentList, resolvedCustomWord];
+    }
+
     return {
         ...state,
-        savedWordIds: state.savedWordIds.includes(id)
-            ? state.savedWordIds.filter(x => x !== id)
-            : [...state.savedWordIds, id]
+        savedWordIds: nextSavedWordIds,
+        ...(nextCustomWords !== undefined ? { customWords: nextCustomWords } : {})
     };
 }
 
 export function saveWordsBatch(state: LearningState, ids: string[]): LearningState {
     const validNewIds = ids.filter(id => isValidWordId(id) && !state.savedWordIds.includes(id));
     if (validNewIds.length === 0) return state;
+
+    const newCustoms = validNewIds
+        .filter(id => !allWords.some(w => w.id === id) && customWordRegistry.has(id))
+        .map(id => customWordRegistry.get(id)!);
+
+    let nextCustomWords = state.customWords;
+    if (newCustoms.length > 0) {
+        const currentList = nextCustomWords ?? [];
+        const existingIds = new Set(currentList.map(w => w.id));
+        const filteredNew = newCustoms.filter(w => !existingIds.has(w.id));
+        nextCustomWords = [...currentList, ...filteredNew];
+    }
+
     return {
         ...state,
-        savedWordIds: [...state.savedWordIds, ...validNewIds]
+        savedWordIds: [...state.savedWordIds, ...validNewIds],
+        ...(nextCustomWords !== undefined ? { customWords: nextCustomWords } : {})
     };
 }
 
@@ -226,6 +292,34 @@ export function getDueWords(state: LearningState, date = new Date()): Word[] {
     return known.filter(
         w => state.savedWordIds.includes(w.id) && (!state.reviews[w.id] || state.reviews[w.id].dueDate <= day)
     );
+}
+
+export interface SrsItem {
+    word: Word;
+    review?: Review;
+    isDue: boolean;
+    dueDate: string;
+}
+
+export function getSavedWords(state: LearningState): Word[] {
+    return state.savedWordIds.map(id => findWord(id)).filter((w): w is Word => Boolean(w));
+}
+
+export function getSrsItems(state: LearningState, date = new Date()): SrsItem[] {
+    const day = localDate(date);
+    const items: SrsItem[] = [];
+    for (const id of state.savedWordIds) {
+        const w = findWord(id);
+        if (!w) continue;
+        const r = state.reviews[id];
+        items.push({
+            word: w,
+            review: r,
+            isDue: !r || r.dueDate <= day,
+            dueDate: r?.dueDate ?? day
+        });
+    }
+    return items;
 }
 
 export function reviewWord(
@@ -387,10 +481,12 @@ function integer(v: unknown, max = 1000000): v is number {
 function validDate(v: unknown, today: string): v is string {
     if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
     const [y, m, d] = v.split('-').map(Number);
-    return localDate(new Date(y, m - 1, d)) === v && v <= today;
+    const date = new Date(y, m - 1, d, 12, 0, 0);
+    return localDate(date) === v && v <= today;
 }
 
 export function importState(json: string, date = new Date()): LearningState {
+    if (typeof json !== 'string') throw Error('Dữ liệu không hợp lệ.');
     if (json.length > 200000) throw Error('Tệp dữ liệu quá lớn.');
     let s: unknown;
     try {
@@ -398,10 +494,31 @@ export function importState(json: string, date = new Date()): LearningState {
     } catch {
         throw Error('Tệp JSON không hợp lệ.');
     }
-    exact(s, ['version', 'profile', 'completedLessonIds', 'savedWordIds', 'reviews', 'activity', 'quizScores']);
+    if (!object(s)) throw Error('Cấu trúc dữ liệu không hợp lệ.');
+
+    const keys = Object.keys(s);
+    const hasCustomWords = Object.hasOwn(s, 'customWords');
+    const expectedKeys = [
+        'version',
+        'profile',
+        'completedLessonIds',
+        'savedWordIds',
+        'reviews',
+        'activity',
+        'quizScores'
+    ];
+    if (hasCustomWords) {
+        expectedKeys.push('customWords');
+    }
+
+    if (keys.length !== expectedKeys.length || !expectedKeys.every(k => Object.hasOwn(s, k))) {
+        throw Error('Cấu trúc dữ liệu không hợp lệ.');
+    }
+
     if (s.version !== 1) throw Error('Phiên bản dữ liệu chưa được hỗ trợ.');
     exact(s.profile, ['name', 'dailyGoal']);
     updateProfile(createInitialState(), s.profile as LearningState['profile']);
+
     const ids = (value: unknown, allowed: string[]) => {
         if (
             !Array.isArray(value) ||
@@ -412,18 +529,65 @@ export function importState(json: string, date = new Date()): LearningState {
             throw Error('Danh sách ID không hợp lệ.');
     };
     ids(s.completedLessonIds, lessons.map(l => l.id));
+
+    // Pre-validate customWords atomically before registering or touching anything
+    const customWordsList: Word[] = [];
+    const customWordIdSet = new Set<string>();
+    if (hasCustomWords) {
+        if (!Array.isArray(s.customWords) || s.customWords.length > MAX_VOCAB_SIZE) {
+            throw Error('Dữ liệu từ vựng mở rộng không hợp lệ.');
+        }
+        for (const item of s.customWords) {
+            if (!object(item)) throw Error('Dữ liệu từ vựng mở rộng không hợp lệ.');
+            exact(item, [
+                'id',
+                'hanzi',
+                'pinyin',
+                'meaning',
+                'example',
+                'examplePinyin',
+                'exampleMeaning',
+                'category',
+                'lessonId'
+            ]);
+            if (
+                typeof item.id !== 'string' ||
+                !item.id.trim() ||
+                typeof item.hanzi !== 'string' ||
+                !item.hanzi.trim() ||
+                typeof item.pinyin !== 'string' ||
+                typeof item.meaning !== 'string' ||
+                typeof item.example !== 'string' ||
+                typeof item.examplePinyin !== 'string' ||
+                typeof item.exampleMeaning !== 'string' ||
+                typeof item.category !== 'string' ||
+                typeof item.lessonId !== 'string'
+            ) {
+                throw Error('Dữ liệu từ vựng mở rộng không hợp lệ.');
+            }
+            if (customWordIdSet.has(item.id)) {
+                throw Error('Dữ liệu từ vựng mở rộng không hợp lệ.');
+            }
+            customWordIdSet.add(item.id);
+            customWordsList.push(item as unknown as Word);
+        }
+    }
+
+    const isRecognizedId = (id: string) => isValidWordId(id) || customWordIdSet.has(id);
+
     if (
         !Array.isArray(s.savedWordIds) ||
         s.savedWordIds.length > MAX_VOCAB_SIZE ||
         new Set(s.savedWordIds).size !== s.savedWordIds.length ||
-        s.savedWordIds.some(x => typeof x !== 'string' || !isValidWordId(x))
+        s.savedWordIds.some(x => typeof x !== 'string' || !isRecognizedId(x))
     )
         throw Error('Danh sách ID không hợp lệ.');
+
     const today = localDate(date);
     if (!object(s.reviews) || Object.keys(s.reviews).length > MAX_VOCAB_SIZE)
         throw Error('Lịch ôn tập không hợp lệ.');
     for (const [id, r] of Object.entries(s.reviews)) {
-        if (!isValidWordId(id)) throw Error('Từ vựng không tồn tại.');
+        if (!isRecognizedId(id)) throw Error('Từ vựng không tồn tại.');
         exact(r, ['dueDate', 'interval', 'repetitions', 'lastReviewed']);
         if (
             !integer(r.interval, 36500) ||
@@ -434,6 +598,7 @@ export function importState(json: string, date = new Date()): LearningState {
         )
             throw Error('Lịch ôn tập không hợp lệ.');
     }
+
     if (!object(s.activity) || Object.keys(s.activity).length > 36500)
         throw Error('Hoạt động không hợp lệ.');
     for (const [day, a] of Object.entries(s.activity)) {
@@ -448,6 +613,7 @@ export function importState(json: string, date = new Date()): LearningState {
         )
             throw Error('Hoạt động không hợp lệ.');
     }
+
     if (!object(s.quizScores)) throw Error('Điểm kiểm tra không hợp lệ.');
     for (const [id, q] of Object.entries(s.quizScores)) {
         exact(q, ['correct', 'total']);
@@ -460,11 +626,13 @@ export function importState(json: string, date = new Date()): LearningState {
         )
             throw Error('Điểm kiểm tra không hợp lệ.');
     }
+
     const activity = Object.values(s.activity) as {
         lessons: number;
     }[];
     if (activity.reduce((n, a) => n + a.lessons, 0) !== (s.completedLessonIds as string[]).length)
         throw Error('Tiến độ không khớp hoạt động.');
+
     const reviewTotal = Object.values(s.activity).reduce<number>(
         (n, a) =>
             n +
@@ -475,11 +643,41 @@ export function importState(json: string, date = new Date()): LearningState {
     );
     if (reviewTotal < Object.keys(s.reviews).length || (reviewTotal > 0 && Object.keys(s.reviews).length === 0))
         throw Error('Lượt ôn không khớp lịch sử.');
+
+    // Commit custom words atomically only after all checks pass
+    for (const w of customWordsList) {
+        customWordRegistry.set(w.id, w);
+    }
+    if (customWordsList.length > 0) {
+        persistCustomRegistry();
+    }
+
     return s as unknown as LearningState;
 }
 
-export function exportState(state: LearningState) {
-    return JSON.stringify(state, null, 2);
+export function exportState(state: LearningState): string {
+    let customWords = state.customWords;
+    if (!customWords || customWords.length === 0) {
+        const nonCurriculumSaved = state.savedWordIds
+            .filter(id => !allWords.some(w => w.id === id) && customWordRegistry.has(id))
+            .map(id => customWordRegistry.get(id)!);
+        if (nonCurriculumSaved.length > 0) {
+            customWords = nonCurriculumSaved;
+        }
+    }
+
+    const payload: LearningState = {
+        version: state.version,
+        profile: { ...state.profile },
+        completedLessonIds: [...state.completedLessonIds],
+        savedWordIds: [...state.savedWordIds],
+        reviews: { ...state.reviews },
+        activity: { ...state.activity },
+        quizScores: { ...state.quizScores },
+        ...(customWords && customWords.length > 0 ? { customWords: [...customWords] } : {})
+    };
+
+    return JSON.stringify(payload, null, 2);
 }
 
 export function loadState(storage: Pick<Storage, 'getItem'> = localStorage): {

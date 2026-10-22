@@ -1,155 +1,422 @@
 /**
- * ZhongXue+ API Client Service
- * Connects the frontend to the PGlite 122k database and AI conversation backend,
- * with resilient local-first fallbacks for Dictionary, AI Tutor, and Handwriting Recognition.
+ * ZhongXue+ API Client Service (V2 Architecture)
+ * Connects the frontend to same-origin /api/* endpoints with resilient,
+ * local-first fallbacks for Dictionary, AI Tutor, and Handwriting Recognition.
+ *
+ * Owned by Subagent A08 (Client API Adapter Lead).
  */
 
-import { searchWords } from '../domain/learning';
-import type { Word } from '../types';
+import { getAllKnownWords, findWord } from '../domain/learning';
+import {
+  matchesQuery,
+  normalizeVietnamese,
+  normalizePinyin,
+  isHanziText
+} from '../domain/searchNormalization';
+import type {
+  Word,
+  DbDictionaryResult,
+  DictionarySearchResponse,
+  SearchResponse,
+  HealthResponse,
+  ConversationTurn,
+  ConversationReply,
+  ConversationReplyMode,
+  AiConnectionStatus,
+  HandwritingStroke,
+  HandwritingResponse
+} from '../types';
 
-export interface DbDictionaryResult {
-  id: string;
-  traditional: string;
-  simplified: string;
-  pinyin: string;
-  definitions: string[];
-}
+export type {
+  DbDictionaryResult,
+  DictionarySearchResponse,
+  SearchResponse,
+  HealthResponse,
+  ConversationTurn,
+  ConversationReply,
+  ConversationReplyMode,
+  AiConnectionStatus,
+  HandwritingStroke,
+  HandwritingResponse
+};
 
-export interface SearchResponse {
-  results: DbDictionaryResult[];
-  total: number;
-  count: number;
-  offset: number;
-  source: 'database' | 'local';
-}
-
-export interface ConversationTurn {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-export interface ConversationReply {
-  mode: 'ai' | 'guided';
-  content: string;
-  thread?: {
-    id: number;
-    messages: ConversationTurn[];
+export interface BackendHealth {
+  online: boolean;
+  totalEntries: number;
+  status?: 'ok' | 'degraded' | 'error' | 'offline';
+  uptime?: number;
+  version?: string;
+  ai?: {
+    configured: boolean;
+    provider: string;
+    model: string;
   };
 }
 
-const BACKEND_BASE = 'http://127.0.0.1:3001';
-
-/** Helper to try proxy URL first, then direct backend port if needed */
-async function fetchWithFallback(urlPath: string, options?: RequestInit): Promise<Response> {
-  try {
-    const res = await fetch(urlPath, options);
-    if (res.ok) return res;
-  } catch {
-    // Ignore and try direct backend port
-  }
-
-  const fullUrl = `${BACKEND_BASE}${urlPath}`;
-  return fetch(fullUrl, options);
+export interface SendAiMessageOptions {
+  unitId?: number;
+  history?: ConversationTurn[];
+  threadId?: number;
+  roleId?: string;
+  model?: string;
+  baseUrl?: string;
+  apiKey?: string;
+  timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
-/** Check if the PGlite backend database is accessible */
-export async function checkBackendHealth(): Promise<{ online: boolean; totalEntries: number }> {
+export interface HandwritingOptions {
+  width?: number;
+  height?: number;
+  language?: string;
+  signal?: AbortSignal;
+}
+
+/**
+ * Standard same-origin API fetch helper.
+ * Enforces JSON accept header and prevents outdated port 3001 fallback.
+ */
+async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
+  const headers = new Headers(options?.headers);
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
+  }
+
+  return fetch(path, {
+    ...options,
+    headers
+  });
+}
+
+/**
+ * Check if the backend database & dictionary engine are accessible.
+ * Strictly verifies HTTP status, application/json Content-Type, and valid JSON schema.
+ * Under NO circumstances treats an HTML 200 response (like SPA fallback) as online!
+ */
+export async function checkBackendHealth(
+  signal?: AbortSignal
+): Promise<BackendHealth> {
   try {
-    const res = await fetchWithFallback('/api/health');
-    if (res.ok) {
-      return { online: true, totalEntries: 122595 };
+    const res = await apiFetch('/api/health', { method: 'GET', signal });
+
+    // Must be HTTP 200..299
+    if (!res.ok) {
+      return { online: false, totalEntries: 40, status: 'error' };
+    }
+
+    // Must strictly be JSON (reject text/html SPA fallback!)
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return { online: false, totalEntries: 40, status: 'offline' };
+    }
+
+    const data: unknown = await res.json();
+    if (
+      typeof data === 'object' &&
+      data !== null &&
+      'status' in data &&
+      'dictionary' in data
+    ) {
+      const typed = data as Partial<HealthResponse>;
+      const isOk = typed.status === 'ok';
+      const isLoaded = Boolean(typed.dictionary?.loaded);
+
+      if (isOk && isLoaded) {
+        const total =
+          typeof typed.dictionary?.totalEntries === 'number' &&
+          typed.dictionary.totalEntries > 0
+            ? typed.dictionary.totalEntries
+            : 122596;
+
+        return {
+          online: true,
+          totalEntries: total,
+          status: 'ok',
+          uptime: typed.uptime,
+          version: typed.version,
+          ai: typed.ai
+        };
+      }
+
+      return {
+        online: false,
+        totalEntries: 40,
+        status: (typed.status as BackendHealth['status']) || 'degraded'
+      };
     }
   } catch {
-    // offline
+    // Offline or network error
   }
-  return { online: false, totalEntries: 40 };
+
+  return { online: false, totalEntries: 40, status: 'offline' };
 }
 
-/** Search the real 122k PGlite Chinese-Vietnamese dictionary */
+/**
+ * Foundational offline dictionary items for instant zero-network lookup.
+ */
+const FOUNDATIONAL_FALLBACK_WORDS: Word[] = [
+  {
+    id: 'dict-fallback-xuesheng',
+    hanzi: '學生',
+    pinyin: 'xuéshēng',
+    meaning: 'Học sinh, sinh viên',
+    example: '我是學生。',
+    examplePinyin: 'Wǒ shì xuésheng.',
+    exampleMeaning: 'Tôi là học sinh.',
+    category: 'Xưng hô',
+    lessonId: 'fallback'
+  },
+  {
+    id: 'dict-fallback-laoshi',
+    hanzi: '老師',
+    pinyin: 'lǎoshī',
+    meaning: 'Thầy giáo, cô giáo, giáo viên',
+    example: '老師好！',
+    examplePinyin: 'Lǎoshī hǎo!',
+    exampleMeaning: 'Chào thầy cô!',
+    category: 'Xưng hô',
+    lessonId: 'fallback'
+  },
+  {
+    id: 'dict-fallback-taiwan',
+    hanzi: '臺灣',
+    pinyin: 'Táiwān',
+    meaning: 'Đài Loan',
+    example: '我住在臺灣。',
+    examplePinyin: 'Wǒ zhù zài Táiwān.',
+    exampleMeaning: 'Tôi sống ở Đài Loan.',
+    category: 'Địa danh',
+    lessonId: 'fallback'
+  },
+  {
+    id: 'dict-fallback-huayu',
+    hanzi: '華語',
+    pinyin: 'Huáyǔ',
+    meaning: 'Tiếng Hoa, tiếng Trung Quốc',
+    example: '我學華語。',
+    examplePinyin: 'Wǒ xué Huáyǔ.',
+    exampleMeaning: 'Tôi học tiếng Hoa.',
+    category: 'Ngôn ngữ',
+    lessonId: 'fallback'
+  }
+];
+
+/**
+ * Search local curriculum lessons & registered words using advanced normalization from A07.
+ * Supports:
+ * - Tone marks Pinyin: 'xuéshēng'
+ * - Tone numbers Pinyin: 'xue2 sheng1'
+ * - Toneless Pinyin: 'xuesheng'
+ * - Unaccented Vietnamese: 'hoc sinh'
+ * - Accented Vietnamese: 'học sinh'
+ * - Hanzi characters: '學生'
+ */
+export function searchLocalLessons(
+  query: string,
+  mode: 'all' | 'hanzi' | 'pinyin' | 'vi' = 'all'
+): DbDictionaryResult[] {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  // Combine curriculum words and foundational offline words
+  const known = getAllKnownWords();
+  const wordMap = new Map<string, Word>();
+
+  for (const w of FOUNDATIONAL_FALLBACK_WORDS) {
+    wordMap.set(w.hanzi, w);
+  }
+  for (const w of known) {
+    wordMap.set(w.hanzi, w);
+  }
+
+  const allCandidateWords = Array.from(wordMap.values());
+  const qPinyin = normalizePinyin(trimmed);
+  const qVi = normalizeVietnamese(trimmed);
+
+  const matchedWords: Array<{ word: Word; score: number }> = [];
+
+  for (const w of allCandidateWords) {
+    let matches = false;
+    let score = 0;
+
+    const wPinyin = normalizePinyin(w.pinyin);
+    const wVi = normalizeVietnamese(w.meaning);
+
+    if (mode === 'hanzi') {
+      if (isHanziText(trimmed)) {
+        matches = w.hanzi.includes(trimmed);
+      } else {
+        matches = matchesQuery(w.hanzi, trimmed);
+      }
+      if (w.hanzi === trimmed) score += 100;
+    } else if (mode === 'pinyin') {
+      matches =
+        matchesQuery(w.pinyin, trimmed) ||
+        (Boolean(w.examplePinyin) && matchesQuery(w.examplePinyin, trimmed));
+      if (wPinyin.clean === qPinyin.clean) score += 90;
+    } else if (mode === 'vi') {
+      matches =
+        matchesQuery(w.meaning, trimmed) ||
+        (Boolean(w.exampleMeaning) && matchesQuery(w.exampleMeaning, trimmed));
+      if (wVi === qVi) score += 80;
+    } else {
+      // mode === 'all'
+      const composite = `${w.hanzi} [${w.pinyin}] /${w.meaning}/ ${w.exampleMeaning || ''}`;
+      matches =
+        matchesQuery(composite, trimmed) ||
+        matchesQuery(w.hanzi, trimmed) ||
+        matchesQuery(w.pinyin, trimmed) ||
+        matchesQuery(w.meaning, trimmed);
+
+      if (w.hanzi === trimmed) score += 100;
+      else if (wPinyin.clean === qPinyin.clean) score += 90;
+      else if (wVi === qVi) score += 80;
+      else if (w.hanzi.startsWith(trimmed)) score += 50;
+      else if (wPinyin.clean.startsWith(qPinyin.clean)) score += 40;
+    }
+
+    if (matches) {
+      matchedWords.push({ word: w, score });
+    }
+  }
+
+  matchedWords.sort((a, b) => b.score - a.score);
+
+  return matchedWords.map(({ word: w }) => ({
+    id: w.id,
+    traditional: w.hanzi,
+    simplified: w.hanzi,
+    pinyin: w.pinyin,
+    definitions: [w.meaning, w.exampleMeaning].filter(Boolean)
+  }));
+}
+
+/**
+ * Search the 122k Chinese-Vietnamese dictionary.
+ * Queries /api/dictionary with fallback to local curriculum search when offline or on failure.
+ */
 export async function searchDictionary(
   query: string,
   mode: 'all' | 'hanzi' | 'pinyin' | 'vi' = 'all',
-  offset = 0
-): Promise<SearchResponse> {
+  offset = 0,
+  limit = 20,
+  signal?: AbortSignal
+): Promise<DictionarySearchResponse> {
   const trimmed = query.trim();
   if (!trimmed) {
     return {
       results: [],
       total: 0,
-      count: 122595,
-      offset: 0,
-      source: 'database',
+      count: 0,
+      offset,
+      limit,
+      query: '',
+      mode,
+      source: 'database'
     };
   }
 
   try {
-    const url = `/api/dictionary?q=${encodeURIComponent(trimmed)}&mode=${mode}&offset=${offset}`;
-    const res = await fetchWithFallback(url);
+    const url = `/api/dictionary?q=${encodeURIComponent(trimmed)}&mode=${mode}&offset=${offset}&limit=${limit}`;
+    const res = await apiFetch(url, { method: 'GET', signal });
+
     if (res.ok) {
-      const data = await res.json();
-      return {
-        results: data.results || [],
-        total: data.total || 0,
-        count: data.count || 122595,
-        offset: data.offset || 0,
-        source: 'database',
-      };
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = (await res.json()) as Partial<DictionarySearchResponse>;
+        if (data && Array.isArray(data.results)) {
+          return {
+            results: data.results,
+            total: typeof data.total === 'number' ? data.total : data.results.length,
+            count: typeof data.count === 'number' ? data.count : data.results.length,
+            offset: typeof data.offset === 'number' ? data.offset : offset,
+            limit: typeof data.limit === 'number' ? data.limit : limit,
+            query: trimmed,
+            mode,
+            source: 'database'
+          };
+        }
+      }
     }
-  } catch {
-    // Fallback to local
+  } catch (err: unknown) {
+    // If request was actively cancelled by client AbortSignal, rethrow
+    if (
+      signal?.aborted ||
+      (err instanceof Error && err.name === 'AbortError')
+    ) {
+      throw err;
+    }
+    // Network failure: gracefully fall back to local search
   }
 
-  const localMatches = searchWords(trimmed);
-  const results: DbDictionaryResult[] = localMatches.map((w: Word) => ({
-    id: w.id,
-    traditional: w.hanzi,
-    simplified: w.hanzi,
-    pinyin: w.pinyin,
-    definitions: [w.meaning, w.exampleMeaning].filter(Boolean),
-  }));
+  // Local offline search fallback
+  const localMatches = searchLocalLessons(trimmed, mode);
+  const paginated = localMatches.slice(offset, offset + limit);
 
   return {
-    results,
-    total: results.length,
-    count: 40,
-    offset: 0,
-    source: 'local',
+    results: paginated,
+    total: localMatches.length,
+    count: paginated.length,
+    offset,
+    limit,
+    query: trimmed,
+    mode,
+    source: 'local'
   };
 }
 
-/** Get details of a single dictionary entry */
-export async function getDictionaryDetail(id: string): Promise<DbDictionaryResult | null> {
+/**
+ * Get details of a single dictionary entry.
+ * Calls /api/dictionary?id=... with local curriculum fallback.
+ */
+export async function getDictionaryDetail(
+  id: string,
+  signal?: AbortSignal
+): Promise<DbDictionaryResult | null> {
   try {
-    const res = await fetchWithFallback(`/api/dictionary?id=${encodeURIComponent(id)}`);
+    const res = await apiFetch(`/api/dictionary?id=${encodeURIComponent(id)}`, {
+      method: 'GET',
+      signal
+    });
+
     if (res.ok) {
-      return await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return (await res.json()) as DbDictionaryResult;
+      }
     }
   } catch {
-    //
+    // Fall back to local word lookup
   }
-  return null;
-}
 
-/** Status of external AI backend connection (AgentRouter / OpenRouter) */
-export interface AiConnectionStatus {
-  ok: boolean;
-  provider: string;
-  model: string;
-  baseUrl: string;
-  latencyMs?: number;
-  statusCode?: number;
-  error?: string;
+  const localWord =
+    FOUNDATIONAL_FALLBACK_WORDS.find(w => w.id === id || w.hanzi === id) ||
+    findWord(id);
+  if (localWord) {
+    return {
+      id: localWord.id,
+      traditional: localWord.hanzi,
+      simplified: localWord.hanzi,
+      pinyin: localWord.pinyin,
+      definitions: [localWord.meaning, localWord.exampleMeaning].filter(Boolean)
+    };
+  }
+
+  return null;
 }
 
 export function resolveApiKeyForModel(_model?: string, explicitKey?: string): string {
   return (explicitKey || '').trim();
 }
 
-/** Check health and connectivity to AI Agent Router */
+/**
+ * Check health and connectivity to AI Agent Router.
+ */
 export async function checkAiHealth(
   modelCandidate?: string,
   apiKeyCandidate?: string,
-  baseUrlCandidate?: string
+  baseUrlCandidate?: string,
+  signal?: AbortSignal
 ): Promise<AiConnectionStatus> {
   let apiKey = apiKeyCandidate;
   let baseUrl = baseUrlCandidate;
@@ -165,7 +432,7 @@ export async function checkAiHealth(
         if (!model && parsed?.model) model = parsed.model;
       }
     } catch {
-      //
+      // Ignore localStorage errors
     }
   }
 
@@ -174,21 +441,29 @@ export async function checkAiHealth(
   apiKey = resolveApiKeyForModel(model, apiKey);
 
   try {
-    const res = await fetchWithFallback('/api/conversation', {
+    const res = await apiFetch('/api/conversation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'ping', apiKey, baseUrl, model }),
+      signal
     });
+
     if (res.ok) {
-      return await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return (await res.json()) as AiConnectionStatus;
+      }
     }
   } catch (err) {
+    if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      throw err;
+    }
     return {
       ok: false,
       provider: 'AgentRouter / Offline',
       model,
       baseUrl,
-      error: err instanceof Error ? err.message : 'Không thể kết nối máy chủ',
+      error: err instanceof Error ? err.message : 'Không thể kết nối máy chủ'
     };
   }
 
@@ -197,76 +472,171 @@ export async function checkAiHealth(
     provider: 'AgentRouter',
     model,
     baseUrl,
-    error: 'Máy chủ phản hồi mã lỗi',
+    error: 'Máy chủ phản hồi mã lỗi'
   };
 }
 
-/** Send message to AI Conversation partner (AgentRouter DeepSeek V4 Flash, OpenRouter, or smart Sinology Guided Tutor) */
+/**
+ * Send message to AI Conversation partner.
+ * Supports AbortSignal for UI cancellation, live AI / guided response handling,
+ * and robust local guided fallback when offline.
+ *
+ * Overloads support both options-object and positional arguments.
+ */
+export async function sendAiMessage(
+  input: string | ConversationTurn[],
+  options?: SendAiMessageOptions,
+  signal?: AbortSignal
+): Promise<ConversationReply>;
+
 export async function sendAiMessage(
   message: string,
-  unitId = 1,
-  history: ConversationTurn[] = [],
+  unitId?: number,
+  history?: ConversationTurn[],
   threadId?: number,
   roleId?: string,
-  modelCandidate?: string
-): Promise<ConversationReply> {
-  const userMsg: ConversationTurn = { role: 'user', content: message.trim() };
-  const allMessages = [...history, userMsg];
+  modelCandidate?: string,
+  signal?: AbortSignal
+): Promise<ConversationReply>;
 
-  let apiKey: string | undefined;
-  let baseUrl: string | undefined;
-  let model: string | undefined = modelCandidate;
+export async function sendAiMessage(
+  input: string | ConversationTurn[],
+  optionsOrUnitId?: number | SendAiMessageOptions,
+  historyOrSignal?: ConversationTurn[] | AbortSignal,
+  threadId?: number,
+  roleId?: string,
+  modelCandidate?: string,
+  explicitSignal?: AbortSignal
+): Promise<ConversationReply> {
+  let allMessages: ConversationTurn[] = [];
+  let lastUserMessage = '';
+  let unitId = 1;
+  let activeThreadId: number | undefined;
+  let activeRoleId: string | undefined;
+  let activeModel: string | undefined;
+  let activeBaseUrl: string | undefined;
+  let activeApiKey: string | undefined;
+  let activeTimeoutMs: number | undefined;
+  let signal: AbortSignal | undefined;
+
+  if (typeof optionsOrUnitId === 'object' && optionsOrUnitId !== null) {
+    const opts = optionsOrUnitId;
+    signal = opts.signal || (historyOrSignal instanceof AbortSignal ? historyOrSignal : undefined);
+
+    if (Array.isArray(input)) {
+      allMessages = [...input];
+      const last = [...input].reverse().find(m => m.role === 'user');
+      lastUserMessage = last ? last.content : '';
+    } else {
+      lastUserMessage = input.trim();
+      allMessages = [
+        ...(opts.history || []),
+        { role: 'user', content: lastUserMessage }
+      ];
+    }
+
+    unitId = opts.unitId ?? 1;
+    activeThreadId = opts.threadId;
+    activeRoleId = opts.roleId;
+    activeModel = opts.model;
+    activeBaseUrl = opts.baseUrl;
+    activeApiKey = opts.apiKey;
+    activeTimeoutMs = opts.timeoutMs;
+  } else {
+    // Positional signature
+    const messageStr = typeof input === 'string' ? input : '';
+    lastUserMessage = messageStr.trim();
+    unitId = typeof optionsOrUnitId === 'number' ? optionsOrUnitId : 1;
+    const history = Array.isArray(historyOrSignal) ? historyOrSignal : [];
+    signal = explicitSignal || (historyOrSignal instanceof AbortSignal ? historyOrSignal : undefined);
+
+    allMessages = [...history, { role: 'user', content: lastUserMessage }];
+    activeThreadId = threadId;
+    activeRoleId = roleId;
+    activeModel = modelCandidate;
+  }
+
+  if (signal?.aborted) {
+    throw new DOMException('The operation was aborted', 'AbortError');
+  }
+
+  // Retrieve stored configuration if available in browser
   if (typeof window !== 'undefined') {
     try {
       const stored = window.localStorage.getItem('zhongxue.ai.config');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed?.apiKey) apiKey = parsed.apiKey;
-        if (parsed?.baseUrl) baseUrl = parsed.baseUrl;
-        if (!model && parsed?.model) model = parsed.model;
+        if (!activeApiKey && parsed?.apiKey) activeApiKey = parsed.apiKey;
+        if (!activeBaseUrl && parsed?.baseUrl) activeBaseUrl = parsed.baseUrl;
+        if (!activeModel && parsed?.model) activeModel = parsed.model;
       }
     } catch {
-      //
+      // Ignore localStorage errors
     }
   }
 
-  model = (model || 'deepseek-v4-flash').trim();
-  baseUrl = (baseUrl || 'https://agentrouter.org/v1').trim();
-  apiKey = resolveApiKeyForModel(model, apiKey);
+  const model = (activeModel || 'deepseek-v4-flash').trim();
+  const baseUrl = (activeBaseUrl || 'https://agentrouter.org/v1').trim();
+  const apiKey = resolveApiKeyForModel(model, activeApiKey);
 
   try {
-    const res = await fetchWithFallback('/api/conversation', {
+    const res = await apiFetch('/api/conversation', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        action: 'chat',
         unitId,
-        threadId,
-        roleId,
-        messages: allMessages.slice(-10),
+        threadId: activeThreadId,
+        roleId: activeRoleId,
+        messages: allMessages.slice(-20),
         apiKey,
         baseUrl,
-        model
+        model,
+        timeoutMs: activeTimeoutMs
       }),
+      signal
     });
 
     if (res.ok) {
-      const data = await res.json();
-      return {
-        mode: data.mode || 'ai',
-        content: data.content,
-        thread: data.thread,
-      };
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = (await res.json()) as Partial<ConversationReply>;
+        if (data && typeof data.content === 'string') {
+          return {
+            mode: data.mode === 'guided' ? 'guided' : 'ai',
+            content: data.content,
+            model: data.model,
+            provider: data.provider,
+            thread: data.thread,
+            meta: data.meta
+          };
+        }
+      }
     }
-  } catch {
-    // Fall back to local Sinology engine
+  } catch (err: unknown) {
+    if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      throw err;
+    }
+    // Upstream or network failed: seamlessly fall back to local guided tutor
   }
 
-  return simulateLocalAiReply(message, roleId);
+  const fallback = simulateLocalAiReply(lastUserMessage, activeRoleId);
+  return {
+    mode: 'guided',
+    content: fallback.content,
+    thread: fallback.thread,
+    meta: {
+      fallbackReason: 'offline',
+      guidanceNote: 'Gia sư hướng dẫn cục bộ (Ngoại tuyến)'
+    }
+  };
 }
 
-/** Simulated intelligent tutor response following TOCFL Taiwan standards across life and professional scenarios */
+/**
+ * Simulated intelligent tutor response following TOCFL Taiwan standards across life and professional scenarios.
+ */
 export function simulateLocalAiReply(userText: string, roleId?: string): ConversationReply {
   const lower = userText.toLowerCase();
 
@@ -379,7 +749,7 @@ export function simulateLocalAiReply(userText: string, roleId?: string): Convers
     };
   }
 
-  // Topic: Bubble tea / Drinks (avoid greedy 'đường' matching 'đường phố')
+  // Topic: Bubble tea / Drinks
   if (
     lower.includes('trà sữa') ||
     lower.includes('奶茶') ||
@@ -397,7 +767,7 @@ export function simulateLocalAiReply(userText: string, roleId?: string): Convers
   ) {
     return {
       mode: 'guided',
-      content: `中文：你要喝珍珠奶茶還是四季春茶？甜度和冰塊要怎麼調整？\nPinyin: Nǐ yào hē zhēnzhū nǎichá háishì sìjìchūnchá? Tiándù hé bīngkuài yào zěnme tiáozhěng?\nTiếng Việt: Bạn muốn uống trà sữa trân châu hay trà Tứ Quý Xuân? Độ ngọt và độ đá điều chỉnh thế nào?\n練習：Rất tốt! Ở Đài Loan người ta thường chọn "半糖少冰" (bàn táng shǎo bīng - nửa đường ít đá) hoặc "微糖微冰" (ít đường ít đá). Hãy thử trả lời: 我要一杯波霸奶茶，半糖少冰，外帶。`,
+      content: `中文：你要喝珍珠奶茶還是四季春茶？甜度和冰塊要怎麼調整？\nPinyin: Nǐ yào hē zhēnzhū nǎichá háishì sìjìchūnchá? Tiándù hé bīngkuài yào zěnme tiáozhěng?\nTiếng Việt: Bạn muốn uống trà sữa trân châu hay trà Tứ Quý Xuân? Độ ngọt và độ đá điều chỉnh thế nào?\n練習：Rất tốt! Ở Đài Loan người ta thường chọn "半糖少冰" (bàn táng shǎo bīng - nửa đường ít đá) hoặc "微糖微冰" (ít đường ít đá). Hãy thử trả lời: 我要一杯波霸奶茶，半糖少冰，外帶。`
     };
   }
 
@@ -413,7 +783,7 @@ export function simulateLocalAiReply(userText: string, roleId?: string): Convers
   ) {
     return {
       mode: 'guided',
-      content: `中文：最近的捷運站就在前面直走右轉，進站請刷悠遊卡。\nPinyin: Zuìjìn de jiéyùn zhàn jiù zài qiánmiàn zhízǒu yòuzhuǎn, jìn zhàn qǐng shuā yōuyóukǎ.\nTiếng Việt: Ga MRT gần nhất ở ngay phía trước đi thẳng rồi rẽ phải, khi vào ga vui lòng quẹt thẻ EasyCard.\n練習：Từ "捷運" (jiéyùn - Tiệp vận) và "悠遊卡" (Yōuyóukǎ - Du du tạp) là từ vựng thiết yếu ở Đài Bắc. Hãy thử hỏi: 請問二號出口在哪裡？`,
+      content: `中文：最近的捷運站就在前面直走右轉，進站請刷悠遊卡。\nPinyin: Zuìjìn de jiéyùn zhàn jiù zài qiánmiàn zhízǒu yòuzhuǎn, jìn zhàn qǐng shuā yōuyóukǎ.\nTiếng Việt: Ga MRT gần nhất ở ngay phía trước đi thẳng rồi rẽ phải, khi vào ga vui lòng quẹt thẻ EasyCard.\n練習：Từ "捷運" (jiéyùn - Tiệp vận) và "悠遊卡" (Yōuyóukǎ - Du du tạp) là từ vựng thiết yếu ở Đài Bắc. Hãy thử hỏi: 請問二號出口在哪裡？`
     };
   }
 
@@ -431,7 +801,7 @@ export function simulateLocalAiReply(userText: string, roleId?: string): Convers
   ) {
     return {
       mode: 'guided',
-      content: `中文：這碗招牌牛肉麵一百五十元，請問要不要加辣？\nPinyin: Zhè wǎn zhāopái niúròu miàn yìbǎi wǔshí yuán, qǐngwèn yào bú yào jiā là?\nTiếng Việt: Tô mì bò đặc biệt này giá 150 Đài tệ, xin hỏi bạn có muốn thêm cay không?\n練習：Khi ăn ở chợ đêm (夜市 - yèshì), nếu không ăn cay bạn hãy nói: "我要一碗牛肉麵，不要辣，謝謝！"`,
+      content: `中文：這碗招牌牛肉麵一百五十元，請問要不要加辣？\nPinyin: Zhè wǎn zhāopái niúròu miàn yìbǎi wǔshí yuán, qǐngwèn yào bú yào jiā là?\nTiếng Việt: Tô mì bò đặc biệt này giá 150 Đài tệ, xin hỏi bạn có muốn thêm cay không?\n練習：Khi ăn ở chợ đêm (夜市 - yèshì), nếu không ăn cay bạn hãy nói: "我要一碗牛肉麵，不要辣，謝謝！"`
     };
   }
 
@@ -449,7 +819,7 @@ export function simulateLocalAiReply(userText: string, roleId?: string): Convers
   ) {
     return {
       mode: 'guided',
-      content: `中文：一共八十五元，請問需要袋子嗎？要付現金還是刷卡？\nPinyin: Yígòng bāshíwǔ yuán, qǐngwèn xūyào dàizi ma? Yào fù xiànjīn háishì shuā kǎ?\nTiếng Việt: Tổng cộng 85 tệ, xin hỏi bạn cần túi không? Thanh toán tiền mặt hay quẹt thẻ?\n練習：Hóa đơn ở Đài Loan ("發票" - fāpiào) có mã số dự thưởng xổ số mỗi 2 tháng! Hãy thử đáp: 不用袋子，請給我發票。`,
+      content: `中文：一共八十五元，請問需要袋子嗎？要付現金還是刷卡？\nPinyin: Yígòng bāshíwǔ yuán, qǐngwèn xūyào dàizi ma? Yào fù xiànjīn háishì shuā kǎ?\nTiếng Việt: Tổng cộng 85 tệ, xin hỏi bạn cần túi không? Thanh toán tiền mặt hay quẹt thẻ?\n練習：Hóa đơn ở Đài Loan ("發票" - fāpiào) có mã số dự thưởng xổ số mỗi 2 tháng! Hãy thử đáp: 不用袋子，請給我發票。`
     };
   }
 
@@ -465,7 +835,7 @@ export function simulateLocalAiReply(userText: string, roleId?: string): Convers
   ) {
     return {
       mode: 'guided',
-      content: `中文：這間房間靠近捷運站，一個月房租八千元，押金兩個月。\nPinyin: Zhè jiān fángjiān kàojìn jiéyùn zhàn, yí ge yuè fángzū bā qiān yuán, yājīn liǎng ge yuè.\nTiếng Việt: Căn phòng này gần ga MRT, tiền thuê mỗi tháng 8.000 tệ, tiền đặt cọc 2 tháng.\n練習：Khi thuê nhà ở Đài Loan, hãy luôn hỏi kỹ tiền điện nước: "請問房租包含水電費嗎？"`,
+      content: `中文：這間房間靠近捷運站，一個月房租八千元，押金兩個月。\nPinyin: Zhè jiān fángjiān kàojìn jiéyùn zhàn, yí ge yuè fángzū bā qiān yuán, yājīn liǎng ge yuè.\nTiếng Việt: Căn phòng này gần ga MRT, tiền thuê mỗi tháng 8.000 tệ, tiền đặt cọc 2 tháng.\n練習：Khi thuê nhà ở Đài Loan, hãy luôn hỏi kỹ tiền điện nước: "請問房租包含水電費嗎？"`
     };
   }
 
@@ -482,7 +852,7 @@ export function simulateLocalAiReply(userText: string, roleId?: string): Convers
   ) {
     return {
       mode: 'guided',
-      content: `中文：請先給我你的健保卡掛號。請問你哪裡不舒服？\nPinyin: Qǐng xiān gěi wǒ nǐ de jiànbǎokǎ guàhào. Qǐngwèn nǐ nǎlǐ bù shūfu?\nTiếng Việt: Vui lòng đưa thẻ Bảo hiểm Y tế để đăng ký khám trước. Xin hỏi bạn thấy khó chịu ở đâu?\n練習：Dùng cấu trúc "時間 + 開始 + triệu chứng" để mô tả với bác sĩ: 我昨天開始頭痛，也有一點發燒。`,
+      content: `中文：請先給我你的健保卡掛號。請問你哪裡不舒服？\nPinyin: Qǐng xiān gěi wǒ nǐ de jiànbǎokǎ guàhào. Qǐngwèn nǐ nǎlǐ bù shūfu?\nTiếng Việt: Vui lòng đưa thẻ Bảo hiểm Y tế để đăng ký khám trước. Xin hỏi bạn thấy khó chịu ở đâu?\n練習：Dùng cấu trúc "時間 + 開始 + triệu chứng" để mô tả với bác sĩ: 我昨天開始頭痛，也有一點發燒。`
     };
   }
 
@@ -516,7 +886,7 @@ export function simulateLocalAiReply(userText: string, roleId?: string): Convers
   ) {
     return {
       mode: 'guided',
-      content: `中文：我們今天下午兩點開會。如果需要幫忙或請假，可以先告訴我。\nPinyin: Wǒmen jīntiān xiàwǔ liǎng diǎn kāihuì. Rúguǒ xūyào bāngmáng huò qǐngjià, kěyǐ xiān gàosu wǒ.\nTiếng Việt: Hai giờ chiều nay chúng ta họp. Nếu cần giúp đỡ hoặc xin nghỉ phép, bạn có thể báo trước cho tôi.\n練習：Khi nghe chưa rõ ở nơi làm việc, hãy lịch sự nói: "不好意思，可以請你再說一次嗎？"`,
+      content: `中文：我們今天下午兩點開會。如果需要幫忙或請假，可以先告訴我。\nPinyin: Wǒmen jīntiān xiàwǔ liǎng diǎn kāihuì. Rúguǒ xūyào bāngmáng huò qǐngjià, kěyǐ xiān gàosu wǒ.\nTiếng Việt: Hai giờ chiều nay chúng ta họp. Nếu cần giúp đỡ hoặc xin nghỉ phép, bạn có thể báo trước cho tôi.\n練習：Khi nghe chưa rõ ở nơi làm việc, hãy lịch sự nói: "不好意思，可以請你再說一次嗎？"`
     };
   }
 
@@ -550,11 +920,9 @@ export function simulateLocalAiReply(userText: string, roleId?: string): Convers
   // Topic 1 & General Greeting / Self-introduction
   return {
     mode: 'guided',
-    content: `中文：你好！很高興認識你。我也很喜歡跟來自越南的朋友一起練習繁體中文！\nPinyin: Nǐ hǎo! Hěn gāoxìng rènshi nǐ. Wǒ yě hěn xǐhuān gēn láizì Yuènán de péngyou yìqǐ liànxí fántǐ zhōngwén!\nTiếng Việt: Xin chào! Rất vui được làm quen với bạn. Tôi rất thích cùng những người bạn đến từ Việt Nam luyện tiếng Hoa Phồn thể!\n練習：Hãy thử giới thiệu tên bằng mẫu câu "我叫 + tên, 我來自越南" hoặc chọn một tình huống nhập vai ở menu phía trên nhé!`,
+    content: `中文：你好！很高興認識你。我也很喜歡跟來自越南的朋友一起練習繁體中文！\nPinyin: Nǐ hǎo! Hěn gāoxìng rènshi nǐ. Wǒ yě hěn xǐhuān gēn láizì Yuènán de péngyou yìqǐ liànxí fántǐ zhōngwén!\nTiếng Việt: Xin chào! Rất vui được làm quen với bạn. Tôi rất thích cùng những người bạn đến từ Việt Nam luyện tiếng Hoa Phồn thể!\n練習：Hãy thử giới thiệu tên bằng mẫu câu "我叫 + tên, 我來自越南" hoặc chọn một tình huống nhập vai ở menu phía trên nhé!`
   };
 }
-
-export type HandwritingStroke = [number[], number[], number[]];
 
 type StrokeType = 'H' | 'S' | 'P' | 'N' | 'D' | 'Z' | 'T';
 
@@ -565,7 +933,7 @@ interface HanziProfile {
   isCurriculum?: boolean;
 }
 
-const OFFLINE_HANZI_PROFILES: HanziProfile[] = [
+export const OFFLINE_HANZI_PROFILES: HanziProfile[] = [
   { char: '一', strokes: 1, types: ['H'], isCurriculum: true },
   { char: '乙', strokes: 1, types: ['Z'] },
   { char: '二', strokes: 2, types: ['H', 'H'] },
@@ -696,7 +1064,6 @@ const OFFLINE_HANZI_PROFILES: HanziProfile[] = [
   { char: '號', strokes: 13, isCurriculum: true },
   { char: '新', strokes: 13 },
   { char: '話', strokes: 13 },
-  { char: '話', strokes: 13 },
   { char: '想', strokes: 13 },
   { char: '微', strokes: 13 },
   { char: '說', strokes: 14, isCurriculum: true },
@@ -755,7 +1122,9 @@ function classifySingleStroke(stroke: HandwritingStroke): { type: StrokeType; cy
   return { type: Math.abs(dx) > Math.abs(dy) ? 'H' : 'S', cy };
 }
 
-/** Client-side stroke classifier fallback when backend :3001 is offline */
+/**
+ * Client-side stroke classifier fallback when handwriting API is offline or returns no candidates.
+ */
 export function fallbackClientHandwriting(strokes: HandwritingStroke[]): string[] {
   if (!strokes.length) return [];
   const count = strokes.length;
@@ -785,7 +1154,12 @@ export function fallbackClientHandwriting(strokes: HandwritingStroke[]): string[
       if (count === 2 && item.char === '二') score += 120;
       if (count === 3 && item.char === '三') score += 120;
     }
-    if (count === 2 && types[0] === 'P' && types[1] === 'N' && (item.char === '人' || item.char === '八' || item.char === '入')) {
+    if (
+      count === 2 &&
+      types[0] === 'P' &&
+      types[1] === 'N' &&
+      (item.char === '人' || item.char === '八' || item.char === '入')
+    ) {
       score += 80;
     }
     if (count === 4 && types.join('').startsWith('SZH') && item.char === '中') {
@@ -803,27 +1177,104 @@ export function fallbackClientHandwriting(strokes: HandwritingStroke[]): string[
     .slice(0, 8);
 }
 
-/** Recognize handwritten Chinese characters from stroke coordinate arrays */
+/**
+ * Validate handwriting strokes data structure.
+ */
+function isValidStrokeArray(strokes: unknown): strokes is HandwritingStroke[] {
+  if (!Array.isArray(strokes) || strokes.length === 0) return false;
+  return strokes.every(stroke => {
+    if (!Array.isArray(stroke) || stroke.length < 2) return false;
+    const [xs, ys] = stroke;
+    return (
+      Array.isArray(xs) &&
+      Array.isArray(ys) &&
+      xs.length === ys.length &&
+      xs.every(x => typeof x === 'number' && Number.isFinite(x)) &&
+      ys.every(y => typeof y === 'number' && Number.isFinite(y))
+    );
+  });
+}
+
+/**
+ * Recognize handwritten Chinese characters from stroke coordinate arrays.
+ * Supports AbortSignal and gracefully falls back to client handwriting recognizer.
+ */
 export async function recognizeHandwriting(
   strokes: HandwritingStroke[],
-  width = 300,
-  height = 300
+  signal?: AbortSignal
+): Promise<string[]>;
+
+export async function recognizeHandwriting(
+  strokes: HandwritingStroke[],
+  options?: HandwritingOptions,
+  signal?: AbortSignal
+): Promise<string[]>;
+
+export async function recognizeHandwriting(
+  strokes: HandwritingStroke[],
+  width?: number,
+  height?: number,
+  signal?: AbortSignal
+): Promise<string[]>;
+
+export async function recognizeHandwriting(
+  strokes: HandwritingStroke[],
+  widthOrOptionsOrSignal?: number | HandwritingOptions | AbortSignal,
+  heightOrSignal?: number | AbortSignal,
+  explicitSignal?: AbortSignal
 ): Promise<string[]> {
-  if (!strokes.length) return [];
+  if (!isValidStrokeArray(strokes)) {
+    return [];
+  }
+
+  let width = 300;
+  let height = 300;
+  let language = 'zh-TW';
+  let signal: AbortSignal | undefined;
+
+  if (widthOrOptionsOrSignal instanceof AbortSignal) {
+    signal = widthOrOptionsOrSignal;
+  } else if (typeof widthOrOptionsOrSignal === 'object' && widthOrOptionsOrSignal !== null) {
+    const opts = widthOrOptionsOrSignal as HandwritingOptions;
+    if (typeof opts.width === 'number') width = opts.width;
+    if (typeof opts.height === 'number') height = opts.height;
+    if (typeof opts.language === 'string') language = opts.language;
+    signal = opts.signal || (heightOrSignal instanceof AbortSignal ? heightOrSignal : undefined);
+  } else if (typeof widthOrOptionsOrSignal === 'number') {
+    width = widthOrOptionsOrSignal;
+    if (typeof heightOrSignal === 'number') {
+      height = heightOrSignal;
+    }
+    signal = explicitSignal || (heightOrSignal instanceof AbortSignal ? heightOrSignal : undefined);
+  }
+
+  if (signal?.aborted) {
+    throw new DOMException('The operation was aborted', 'AbortError');
+  }
+
   try {
-    const res = await fetchWithFallback('/api/handwriting', {
+    const res = await apiFetch('/api/handwriting', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ strokes, width, height }),
+      body: JSON.stringify({ strokes, width, height, language }),
+      signal
     });
+
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.candidates) && data.candidates.length > 0) {
-        return data.candidates;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = (await res.json()) as Partial<HandwritingResponse>;
+        if (Array.isArray(data.candidates) && data.candidates.length > 0) {
+          return data.candidates;
+        }
       }
     }
-  } catch {
-    // Fallback to client-side recognition
+  } catch (err: unknown) {
+    if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      throw err;
+    }
+    // Upstream or network error: fall back to client recognizer
   }
+
   return fallbackClientHandwriting(strokes);
 }

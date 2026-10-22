@@ -6,7 +6,7 @@ import type { Route } from '../components/Sidebar';
 import { lessons } from '../data/lessons';
 import { getStats, getWeeklyProgress, getQuizAccuracy, getDueWords, getCompetencyRadar } from '../domain/learning';
 import { getWordEtymology, getTodayRadical } from '../data/etymologyData';
-import { detectPitchF0 } from '../services/speech';
+import { captureMicrophonePitch, stopSpeaking } from '../services/speech';
 import { SpeakButton } from '../components/SpeakButton';
 import { WeeklyProgressCard } from '../components/WeeklyProgressCard';
 import { QuizAccuracyCard } from '../components/QuizAccuracyCard';
@@ -92,18 +92,20 @@ export function TodayView({
 }: TodayViewProps) {
     const [bannerVisible, setBannerVisible] = useState(true);
     const [micRecording, setMicRecording] = useState(false);
-    const [pitchScore, setPitchScore] = useState(96.2);
+    const [realMeasurement, setRealMeasurement] = useState<{ hz: number; toneMatch: boolean } | null>(null);
+    const [pitchFeedback, setPitchFeedback] = useState<string | null>(null);
     const [pitchCount, setPitchCount] = useState(0);
     const [userCurvePath, setUserCurvePath] = useState('M 15 50 C 75 48, 165 33, 305 17');
     const [pitchEndY, setPitchEndY] = useState(17);
     const [lastRatedLabel, setLastRatedLabel] = useState<string | null>(null);
-    const micTimeoutRef = useRef<number | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
         return () => {
-            if (micTimeoutRef.current) {
-                window.clearTimeout(micTimeoutRef.current);
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
             }
+            stopSpeaking();
         };
     }, []);
 
@@ -144,60 +146,66 @@ export function TodayView({
 
     async function handleRecordPitch() {
         if (micRecording) {
+            abortControllerRef.current?.abort();
             setMicRecording(false);
             return;
         }
+
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
         setMicRecording(true);
+        setPitchFeedback(null);
 
-        // Try Web Audio API pitch capture if available, with graceful fallback
-        let detectedHz: number | null = null;
-        if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-            try {
-                const stream = await Promise.race([
-                    navigator.mediaDevices.getUserMedia({ audio: true }),
-                    new Promise<null>(resolve => setTimeout(() => resolve(null), 500))
-                ]);
-                if (stream) {
-                    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-                    if (AudioCtx) {
-                        const ctx = new AudioCtx();
-                        const source = ctx.createMediaStreamSource(stream);
-                        const analyser = ctx.createAnalyser();
-                        analyser.fftSize = 1024;
-                        source.connect(analyser);
-                        const buf = new Float32Array(analyser.fftSize);
-                        await new Promise(resolve => setTimeout(resolve, 350));
-                        analyser.getFloatTimeDomainData(buf);
-                        detectedHz = detectPitchF0(buf, ctx.sampleRate);
-                        stream.getTracks().forEach(t => t.stop());
-                        void ctx.close();
-                    }
-                }
-            } catch {
-                detectedHz = null;
-            }
-        }
+        try {
+            const result = await captureMicrophonePitch({
+                durationMs: 450,
+                signal: controller.signal
+            });
 
-        micTimeoutRef.current = window.setTimeout(() => {
+            if (controller.signal.aborted) return;
+
             const nextCount = pitchCount + 1;
             setPitchCount(nextCount);
-            const variance = detectedHz ? ((detectedHz % 7) - 3) : ((nextCount * 3) % 7) - 3;
-            const endY = Math.max(12, Math.min(54, chaoCurve.endY + variance));
-            const startY = Math.max(12, Math.min(54, chaoCurve.startY + variance));
-            if (chaoCurve.label.includes('55')) {
-                setUserCurvePath(`M 15 ${startY} L 305 ${endY}`);
-            } else if (chaoCurve.label.includes('51')) {
-                setUserCurvePath(`M 15 ${startY} C 90 24, 190 44, 305 ${endY}`);
-            } else if (chaoCurve.label.includes('214')) {
-                setUserCurvePath(`M 15 ${startY} C 90 54, 180 54, 240 38 S 305 ${endY}, 305 ${endY}`);
+
+            if (result.isRealMeasurement && result.hz) {
+                const hz = Math.round(result.hz);
+                const variance = ((hz % 7) - 3);
+                const endY = Math.max(12, Math.min(54, chaoCurve.endY + variance));
+                const startY = Math.max(12, Math.min(54, chaoCurve.startY + variance));
+
+                if (chaoCurve.label.includes('55')) {
+                    setUserCurvePath(`M 15 ${startY} L 305 ${endY}`);
+                } else if (chaoCurve.label.includes('51')) {
+                    setUserCurvePath(`M 15 ${startY} C 90 24, 190 44, 305 ${endY}`);
+                } else if (chaoCurve.label.includes('214')) {
+                    setUserCurvePath(`M 15 ${startY} C 90 54, 180 54, 240 38 S 305 ${endY}, 305 ${endY}`);
+                } else {
+                    setUserCurvePath(`M 15 ${startY} C 78 46, 168 34, 305 ${endY}`);
+                }
+                setPitchEndY(endY);
+                setRealMeasurement({ hz, toneMatch: true });
+                setPitchFeedback(result.message);
             } else {
-                setUserCurvePath(`M 15 ${startY} C 78 46, 168 34, 305 ${endY}`);
+                setRealMeasurement(null);
+                setPitchFeedback(result.message);
+                const variance = ((nextCount * 3) % 7) - 3;
+                const endY = Math.max(12, Math.min(54, chaoCurve.endY + variance));
+                const startY = Math.max(12, Math.min(54, chaoCurve.startY + variance));
+
+                if (chaoCurve.label.includes('55')) {
+                    setUserCurvePath(`M 15 ${startY} L 305 ${endY}`);
+                } else if (chaoCurve.label.includes('51')) {
+                    setUserCurvePath(`M 15 ${startY} C 90 24, 190 44, 305 ${endY}`);
+                } else if (chaoCurve.label.includes('214')) {
+                    setUserCurvePath(`M 15 ${startY} C 90 54, 180 54, 240 38 S 305 ${endY}, 305 ${endY}`);
+                } else {
+                    setUserCurvePath(`M 15 ${startY} C 78 46, 168 34, 305 ${endY}`);
+                }
+                setPitchEndY(endY);
             }
-            setPitchEndY(endY);
-            const computedScore = Number((94.5 + ((nextCount * 1.7) % 4.6)).toFixed(1));
-            setPitchScore(computedScore);
+        } finally {
             setMicRecording(false);
-        }, 450);
+        }
     }
 
     const totalVocabCoverage = Math.min(100, Math.round((stats.learnedWords / 40) * 100));
@@ -442,13 +450,19 @@ export function TodayView({
                     <div className="bento-card">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: 'var(--jade-emerald)' }} />
+                                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: realMeasurement ? 'var(--jade-emerald)' : 'var(--cognate-gold)' }} />
                                 <h3 style={{ margin: 0, fontSize: '17px' }}>Khớp Âm điệu AI (Pitch Contour)</h3>
                             </div>
-                            <span className="badge-pill badge-jade">{pitchScore}% Trùng khớp</span>
+                            {realMeasurement ? (
+                                <span className="badge-pill badge-jade">Đo thực tế: {realMeasurement.hz} Hz</span>
+                            ) : (
+                                <span className="badge-pill badge-neutral">Mô phỏng hướng dẫn</span>
+                            )}
                         </div>
                         <p style={{ fontSize: '12px', color: 'var(--on-surface-variant)', margin: '0 0 10px' }}>
-                            Mô hình so sánh cao độ {etymology.toneClass} của từ <strong>{heroWord.hanzi}</strong> chuẩn ngữ âm Đài Bắc đối chiếu với luồng âm thanh bạn phát âm.
+                            {realMeasurement
+                                ? `Đã đo tần số F0 (${realMeasurement.hz} Hz) qua micro đối chiếu với thang cao độ ${etymology.toneClass} chuẩn Đài Bắc của từ ${heroWord.hanzi}.`
+                                : `Mô phỏng hướng đi cao độ ${etymology.toneClass} của từ ${heroWord.hanzi} chuẩn ngữ âm Đài Bắc. Nhấn nút bên dưới để cấp quyền micro và đo cao độ thực tế.`}
                         </p>
 
                         {/* Vector Pitch Visualizer SVG Box */}
@@ -457,7 +471,9 @@ export function TodayView({
                                 <span>Thang cao độ Chao 5 cấp (1 ➔ 5)</span>
                                 <span style={{ display: 'flex', gap: '10px' }}>
                                     <span style={{ color: 'var(--tone-5)' }}>● {chaoCurve.label}</span>
-                                    <span style={{ color: 'var(--primary-container)' }}>● Giọng của bạn</span>
+                                    <span style={{ color: 'var(--primary-container)' }}>
+                                        ● {realMeasurement ? `Giọng bạn (${realMeasurement.hz} Hz)` : 'Đường mô phỏng mẫu'}
+                                    </span>
                                 </span>
                             </div>
 
@@ -484,15 +500,22 @@ export function TodayView({
                             </div>
                         </div>
 
+                        {pitchFeedback && (
+                            <div style={{ fontSize: '11px', color: realMeasurement ? 'var(--jade-emerald)' : 'var(--cognate-gold)', margin: '6px 0 2px' }} role="status">
+                                {pitchFeedback}
+                            </div>
+                        )}
+
                         {/* Interactive Mic Record CTA */}
                         <button
                             type="button"
                             className="bento-btn-secondary"
                             style={{ width: '100%', justifyContent: 'center' }}
                             onClick={() => void handleRecordPitch()}
+                            aria-label={micRecording ? 'Đang lắng nghe phát âm... Nhấn để dừng' : 'Nhấn để thu âm và kiểm tra âm điệu'}
                         >
                             <Mic size={17} color="var(--vermilion-cinnabar)" className={micRecording ? 'animate-pulse' : ''} />
-                            <span>{micRecording ? 'Đang lắng nghe phát âm...' : 'Nhấn để thu âm lại & kiểm tra âm điệu'}</span>
+                            <span>{micRecording ? 'Đang lắng nghe phát âm... (Nhấn để dừng)' : 'Nhấn để thu âm & đo cao độ thực tế'}</span>
                         </button>
                     </div>
 

@@ -17,8 +17,11 @@ export default defineConfig(({ mode }) => {
       }
     },
     test: {
-      include: ['tests/domain*.test.ts'],
-      coverage: { include: ['src/domain/**'], reporter: ['text', 'html'] }
+      include: ['tests/**/*.test.ts'],
+      coverage: {
+        include: ['src/domain/**', 'src/services/**', 'server/**'],
+        reporter: ['text', 'html']
+      }
     }
   };
 });

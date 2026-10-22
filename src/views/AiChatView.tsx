@@ -1,17 +1,18 @@
-import { useState, useRef, useEffect } from 'react';
-import { Send, Volume2, Mic, MicOff, RefreshCw, Bot, Sparkles } from 'lucide-react';
-import { sendAiMessage, type ConversationTurn } from '../services/api';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Send, Volume2, Mic, MicOff, RefreshCw, Bot, Sparkles, X, RotateCcw } from 'lucide-react';
+import { simulateLocalAiReply } from '../services/api';
 import { speakChinese, speakChineseSlow } from '../services/speech';
+import type { ConversationTurn, ConversationReply } from '../types';
 
 const AI_CHAT_STORAGE_KEY = 'zhongxue.draft.aichat.v1';
 
-interface ScenarioRole {
+export interface ScenarioRole {
     id: string;
     label: string;
     aiGreeting: string;
 }
 
-const SCENARIO_ROLES: ScenarioRole[] = [
+export const SCENARIO_ROLES: ScenarioRole[] = [
     {
         id: 'free',
         label: '💬 Tự do',
@@ -79,34 +80,138 @@ const SCENARIO_ROLES: ScenarioRole[] = [
     }
 ];
 
-const INITIAL_GREETING: ConversationTurn = {
-    role: 'assistant',
-    content: SCENARIO_ROLES[0].aiGreeting
-};
+export interface ChatMessage {
+    id: string;
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    timestamp?: number;
+    mode?: 'ai' | 'guided';
+    model?: string;
+    provider?: string;
+    guidanceNote?: string;
+    latencyMs?: number;
+    source?: 'upstream' | 'local-fallback' | 'scenario-init';
+    status?: 'success' | 'canceled' | 'error';
+    retryText?: string;
+}
 
-function loadInitialMessages(): ConversationTurn[] {
-    if (typeof window === 'undefined') return [INITIAL_GREETING];
+function createInitialGreeting(role: ScenarioRole): ChatMessage {
+    return {
+        id: `greeting-${role.id}`,
+        role: 'assistant',
+        content: role.aiGreeting,
+        timestamp: Date.now(),
+        mode: 'guided',
+        provider: 'Gia sư TOCFL Đài Loan',
+        source: 'scenario-init',
+        status: 'success'
+    };
+}
+
+function loadInitialMessages(): ChatMessage[] {
+    const fallbackGreeting = createInitialGreeting(SCENARIO_ROLES[0]);
+    if (typeof window === 'undefined') return [fallbackGreeting];
+
     try {
         const raw = window.sessionStorage.getItem(AI_CHAT_STORAGE_KEY);
-        if (!raw) return [INITIAL_GREETING];
+        if (!raw) return [fallbackGreeting];
+
         const parsed: unknown = JSON.parse(raw);
-        if (
-            Array.isArray(parsed) &&
-            parsed.length > 0 &&
-            parsed.every(
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            const valid = parsed.every(
                 item =>
                     typeof item === 'object' &&
                     item !== null &&
-                    ((item as ConversationTurn).role === 'user' || (item as ConversationTurn).role === 'assistant') &&
+                    ((item as ConversationTurn).role === 'user' ||
+                        (item as ConversationTurn).role === 'assistant' ||
+                        (item as ConversationTurn).role === 'system') &&
                     typeof (item as ConversationTurn).content === 'string'
-            )
-        ) {
-            return parsed as ConversationTurn[];
+            );
+
+            if (valid) {
+                return (parsed as Array<Record<string, unknown>>).map((item, idx) => ({
+                    id: typeof item.id === 'string' ? item.id : `msg-${idx}-${Date.now()}`,
+                    role: item.role as 'user' | 'assistant' | 'system',
+                    content: item.content as string,
+                    timestamp: typeof item.timestamp === 'number' ? item.timestamp : Date.now(),
+                    mode: item.mode === 'ai' || item.mode === 'guided' ? item.mode : (item.role === 'assistant' ? 'guided' : undefined),
+                    model: typeof item.model === 'string' ? item.model : undefined,
+                    provider: typeof item.provider === 'string' ? item.provider : undefined,
+                    guidanceNote: typeof item.guidanceNote === 'string' ? item.guidanceNote : undefined,
+                    latencyMs: typeof item.latencyMs === 'number' ? item.latencyMs : undefined,
+                    source: item.source as 'upstream' | 'local-fallback' | 'scenario-init' | undefined,
+                    status: item.status as 'success' | 'canceled' | 'error' | undefined,
+                    retryText: typeof item.retryText === 'string' ? item.retryText : undefined
+                }));
+            }
         }
     } catch {
-        // Fallback to initial greeting
+        // Fallback to default greeting
     }
-    return [INITIAL_GREETING];
+
+    return [fallbackGreeting];
+}
+
+async function fetchConversationReply(
+    messageText: string,
+    history: ChatMessage[],
+    roleId: string,
+    modelCandidate: string,
+    signal: AbortSignal
+): Promise<ConversationReply> {
+    let apiKey: string | undefined;
+    let baseUrl: string | undefined;
+    let model = modelCandidate;
+
+    if (typeof window !== 'undefined') {
+        try {
+            const raw = window.localStorage.getItem('zhongxue.ai.config');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed?.apiKey) apiKey = parsed.apiKey;
+                if (parsed?.baseUrl) baseUrl = parsed.baseUrl;
+                if (!model && parsed?.model) model = parsed.model;
+            }
+        } catch {
+            // ignore
+        }
+    }
+
+    model = (model || 'gpt-6.1-sol').trim();
+    baseUrl = (baseUrl || 'https://agentrouter.org/v1').trim();
+
+    const turns: ConversationTurn[] = history
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+    turns.push({ role: 'user', content: messageText });
+
+    const payload = {
+        action: 'chat',
+        unitId: 1,
+        roleId,
+        messages: turns.slice(-10),
+        model,
+        baseUrl,
+        apiKey: apiKey ? apiKey.trim() : undefined
+    };
+
+    const res = await fetch('/api/conversation', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload),
+        signal
+    });
+
+    if (!res.ok) {
+        const errorJson = await res.json().catch(() => null);
+        const errorMsg = errorJson?.error?.message || `Máy chủ phản hồi mã ${res.status}`;
+        throw new Error(errorMsg);
+    }
+
+    return await res.json();
 }
 
 export interface AiChatViewProps {
@@ -115,7 +220,7 @@ export interface AiChatViewProps {
 }
 
 export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {}) {
-    const [messages, setMessages] = useState<ConversationTurn[]>(loadInitialMessages);
+    const [messages, setMessages] = useState<ChatMessage[]>(loadInitialMessages);
     const [activeRole, setActiveRole] = useState<string>('free');
     const [activeModel, setActiveModel] = useState<string>(() => {
         if (typeof window === 'undefined') return 'gpt-6.1-sol';
@@ -134,21 +239,28 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
     const [loading, setLoading] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
-    const chatMessagesRef = useRef<HTMLDivElement>(null);
 
+    const chatMessagesRef = useRef<HTMLDivElement>(null);
+    const activeAbortControllerRef = useRef<AbortController | null>(null);
+    const lastDraftTextRef = useRef<string>('');
+
+    // Toggle between primary models
     function toggleModel() {
         const nextModel = activeModel === 'gpt-6.1-sol' ? 'deepseek-v4-flash' : 'gpt-6.1-sol';
-
         setActiveModel(nextModel);
+
         if (typeof window !== 'undefined') {
             try {
                 const raw = window.localStorage.getItem('zhongxue.ai.config');
                 const prev = raw ? JSON.parse(raw) : {};
-                window.localStorage.setItem('zhongxue.ai.config', JSON.stringify({
-                    ...prev,
-                    baseUrl: prev?.baseUrl || 'https://agentrouter.org/v1',
-                    model: nextModel
-                }));
+                window.localStorage.setItem(
+                    'zhongxue.ai.config',
+                    JSON.stringify({
+                        ...prev,
+                        baseUrl: prev?.baseUrl || 'https://agentrouter.org/v1',
+                        model: nextModel
+                    })
+                );
             } catch {
                 //
             }
@@ -156,22 +268,52 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
         setVoiceNotice(`Đã chuyển sang mô hình: ${nextModel}`);
     }
 
-    // If an initial scenario prompt is received, send it to the AI partner
-    useEffect(() => {
-        if (initialPrompt && initialPrompt.trim()) {
-            const prompt = initialPrompt;
-            onResetPrompt?.();
-            queueMicrotask(() => {
-                const lower = prompt.toLowerCase();
-                const matchedRole = SCENARIO_ROLES.find(r => r.id !== 'free' && (lower.includes(r.id) || lower.includes(r.label.slice(2))));
-                if (matchedRole) {
-                    setActiveRole(matchedRole.id);
-                }
-                void handleSend(prompt);
-            });
+    // Cancel an active in-flight request
+    const handleCancelRequest = useCallback(() => {
+        if (activeAbortControllerRef.current) {
+            activeAbortControllerRef.current.abort();
+            activeAbortControllerRef.current = null;
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [initialPrompt]);
+        setLoading(false);
+
+        // Draft preservation: Restore the typed input if empty so learner does not lose it
+        if (!input.trim() && lastDraftTextRef.current) {
+            setInput(lastDraftTextRef.current);
+        }
+        setVoiceNotice('Đã hủy yêu cầu đối thoại. Nội dung câu hỏi đã được giữ lại trong ô nhập.');
+    }, [input]);
+
+    // Abort pending request automatically on unmount to prevent leaks
+    useEffect(() => {
+        return () => {
+            if (activeAbortControllerRef.current) {
+                activeAbortControllerRef.current.abort();
+                activeAbortControllerRef.current = null;
+            }
+        };
+    }, []);
+
+    // Switch scenario role: automatically abort any in-flight request to prevent cross-scenario response leaking
+    const switchRole = useCallback((role: ScenarioRole) => {
+        if (activeAbortControllerRef.current) {
+            activeAbortControllerRef.current.abort();
+            activeAbortControllerRef.current = null;
+        }
+        setLoading(false);
+        setActiveRole(role.id);
+
+        const greetingMsg = createInitialGreeting(role);
+        setMessages([greetingMsg]);
+        setVoiceNotice(null);
+
+        if (typeof window !== 'undefined') {
+            try {
+                window.sessionStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify([greetingMsg]));
+            } catch {
+                // Ignore
+            }
+        }
+    }, []);
 
     // Save conversation history to sessionStorage so tab switches don't lose messages
     useEffect(() => {
@@ -193,52 +335,139 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
         }
     }, [messages, loading]);
 
-    function switchRole(role: ScenarioRole) {
-        setActiveRole(role.id);
-        const greetingMsg: ConversationTurn = {
-            role: 'assistant',
-            content: role.aiGreeting
-        };
-        setMessages([greetingMsg]);
-        setVoiceNotice(null);
-        if (typeof window !== 'undefined') {
-            try {
-                window.sessionStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify([greetingMsg]));
-            } catch {
-                // Ignore
-            }
-        }
-    }
-
-    async function handleSend(customText?: string) {
+    // Send chat message with active AbortController and draft preservation
+    const handleSend = useCallback(async (customText?: string) => {
         const textToSend = (customText || input).trim();
-        if (!textToSend || loading) return;
+        if (!textToSend || loading) return; // Prevent double sending while in flight
 
         setVoiceNotice(null);
-        const newHistory: ConversationTurn[] = [...messages, { role: 'user', content: textToSend }];
-        setMessages(newHistory);
-        setInput('');
+
+        // Draft preservation: store draft for restoration upon cancel or error
+        lastDraftTextRef.current = textToSend;
+
+        if (!customText) {
+            setInput('');
+        }
+
+        // Abort any existing in-flight request before sending a new one
+        if (activeAbortControllerRef.current) {
+            activeAbortControllerRef.current.abort();
+            activeAbortControllerRef.current = null;
+        }
+
+        const controller = new AbortController();
+        activeAbortControllerRef.current = controller;
+
+        const userMsg: ChatMessage = {
+            id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            role: 'user',
+            content: textToSend,
+            timestamp: Date.now()
+        };
+
+        setMessages(prev => [...prev, userMsg]);
         setLoading(true);
 
+        const startTime = performance.now();
+
         try {
-            const reply = await sendAiMessage(textToSend, 1, messages, undefined, activeRole, activeModel);
-            setMessages(prev => [...prev, { role: 'assistant', content: reply.content }]);
-            // Auto-speak disabled: Only plays when user explicitly clicks the speaker icon!
-        } catch {
-            setMessages(prev => [
-                ...prev,
-                {
-                    role: 'assistant',
-                    content: '中文：不好意思，連線稍微延遲。請再試一次！\nPinyin: Bù hǎoyìsi, liánxiàn shāowéi yánchí. Qǐng zài shì yīcì!\nTiếng Việt: Rất tiếc, kết nối hơi chậm. Vui lòng thử lại câu vừa rồi nhé!'
+            const reply = await fetchConversationReply(
+                textToSend,
+                messages,
+                activeRole,
+                activeModel,
+                controller.signal
+            );
+
+            const latencyMs = Math.round(performance.now() - startTime);
+
+            // Success: clear draft
+            lastDraftTextRef.current = '';
+
+            const isLiveAi = reply.mode === 'ai';
+            const assistantMsg: ChatMessage = {
+                id: `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                role: 'assistant',
+                content: reply.content,
+                timestamp: Date.now(),
+                mode: reply.mode,
+                model: reply.model || (isLiveAi ? activeModel : undefined),
+                provider: reply.provider || (isLiveAi ? 'AgentRouter' : 'Gia sư Hán học Cục bộ'),
+                guidanceNote: reply.meta?.guidanceNote,
+                latencyMs: reply.meta?.latencyMs ?? latencyMs,
+                source: isLiveAi ? 'upstream' : 'local-fallback',
+                status: 'success'
+            };
+
+            setMessages(prev => [...prev, assistantMsg]);
+        } catch (err) {
+            const isAbort = controller.signal.aborted || (err instanceof Error && err.name === 'AbortError');
+
+            if (isAbort) {
+                // Request canceled by user or role switch
+                if (!input.trim() && lastDraftTextRef.current) {
+                    setInput(lastDraftTextRef.current);
                 }
-            ]);
+                setVoiceNotice('Đã hủy yêu cầu đối thoại. Nội dung câu hỏi đã được khôi phục vào ô nhập.');
+
+                const canceledMsg: ChatMessage = {
+                    id: `canceled-${Date.now()}`,
+                    role: 'assistant',
+                    content: '⚠️ Yêu cầu đối thoại đã được hủy theo lệnh của bạn. Bạn có thể chỉnh sửa câu hỏi hoặc bấm "Thử lại".',
+                    timestamp: Date.now(),
+                    mode: 'guided',
+                    status: 'canceled',
+                    retryText: textToSend
+                };
+                setMessages(prev => [...prev, canceledMsg]);
+            } else {
+                // Server or network error: activate resilient TOCFL local guided fallback
+                const fallbackReply = simulateLocalAiReply(textToSend, activeRole);
+                const fallbackMsg: ChatMessage = {
+                    id: `fallback-${Date.now()}`,
+                    role: 'assistant',
+                    content: fallbackReply.content,
+                    timestamp: Date.now(),
+                    mode: 'guided',
+                    model: 'Sinology Local Tutor',
+                    provider: 'Gia sư Hán học Cục bộ (TOCFL Taiwan)',
+                    guidanceNote: 'Kết nối mạng hoặc máy chủ AI trực tuyến gián đoạn. Đã tự động kích hoạt Gia sư Cục bộ chuẩn TOCFL Đài Loan để bạn không bị ngắt quãng bài học.',
+                    source: 'local-fallback',
+                    status: 'success'
+                };
+                setMessages(prev => [...prev, fallbackMsg]);
+                setVoiceNotice('Đang sử dụng phản hồi từ Gia sư Hướng dẫn Cục bộ (TOCFL Taiwan).');
+            }
         } finally {
+            if (activeAbortControllerRef.current === controller) {
+                activeAbortControllerRef.current = null;
+            }
             setLoading(false);
         }
-    }
+    }, [input, loading, messages, activeRole, activeModel]);
 
+    // Handle initial scenario prompt if injected from parent view
+    useEffect(() => {
+        if (initialPrompt && initialPrompt.trim()) {
+            const prompt = initialPrompt;
+            onResetPrompt?.();
+            queueMicrotask(() => {
+                const lower = prompt.toLowerCase();
+                const matchedRole = SCENARIO_ROLES.find(
+                    r => r.id !== 'free' && (lower.includes(r.id) || lower.includes(r.label.slice(2)))
+                );
+                if (matchedRole) {
+                    setActiveRole(matchedRole.id);
+                }
+                void handleSend(prompt);
+            });
+        }
+    }, [initialPrompt, onResetPrompt, handleSend]);
+
+    // Web Speech recognition
     function toggleVoiceInput() {
         if (typeof window === 'undefined') return;
+
         interface SpeechResult {
             transcript: string;
         }
@@ -267,7 +496,9 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
         const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition;
 
         if (!SpeechRec) {
-            setVoiceNotice('Trình duyệt của bạn chưa hỗ trợ nhận diện giọng nói Web Speech. Hãy nhập văn bản bằng bàn phím nhé!');
+            setVoiceNotice(
+                'Trình duyệt của bạn chưa hỗ trợ nhận diện giọng nói Web Speech. Hãy nhập văn bản bằng bàn phím nhé!'
+            );
             return;
         }
 
@@ -288,7 +519,9 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
             recognition.onerror = (event: SpeechErrorEvent) => {
                 setIsListening(false);
                 if (event.error === 'not-allowed') {
-                    setVoiceNotice('Trình duyệt chưa được cấp quyền micro. Bạn hãy bấm vào biểu tượng ổ khóa cạnh URL để Cho phép Micro nhé!');
+                    setVoiceNotice(
+                        'Trình duyệt chưa được cấp quyền micro. Bạn hãy bấm vào biểu tượng ổ khóa cạnh URL để Cho phép Micro nhé!'
+                    );
                 } else if (event.error === 'no-speech') {
                     setVoiceNotice('Chưa nhận được âm thanh. Hãy thử lại và nói to, rõ hơn gần micro nhé!');
                 } else if (event.error === 'audio-capture') {
@@ -325,44 +558,57 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
     const currentRoleObj = SCENARIO_ROLES.find(r => r.id === activeRole) || SCENARIO_ROLES[0];
 
     return (
-        <section className="ai-chat-container panel" style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: 'calc(100vh - 200px)',
-            minHeight: '560px',
-            padding: 0,
-            overflow: 'hidden',
-            borderRadius: '16px',
-            border: '1px solid var(--border-strong)',
-            background: 'var(--ivory-surface)'
-        }}>
-            {/* Chat Header Bar */}
-            <div style={{
-                padding: '12px 18px',
-                borderBottom: '1px solid var(--border-subtle)',
-                background: 'rgba(250, 250, 247, 0.95)',
+        <section
+            className="ai-chat-container panel"
+            style={{
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '8px'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '10px',
-                        background: 'linear-gradient(135deg, var(--vermilion-cinnabar), #e11d48)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff',
-                        boxShadow: '0 2px 8px rgba(200, 50, 43, 0.25)'
-                    }}>
+                flexDirection: 'column',
+                height: 'calc(100vh - 200px)',
+                minHeight: '560px',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box',
+                padding: 0,
+                overflow: 'hidden',
+                borderRadius: '16px',
+                border: '1px solid var(--border-strong)',
+                background: 'var(--ivory-surface)'
+            }}
+        >
+            {/* Chat Header Bar */}
+            <div
+                style={{
+                    padding: '12px 18px',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    background: 'rgba(250, 250, 247, 0.95)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    boxSizing: 'border-box',
+                    maxWidth: '100%'
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <div
+                        style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            background: 'linear-gradient(135deg, var(--vermilion-cinnabar), #e11d48)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            boxShadow: '0 2px 8px rgba(200, 50, 43, 0.25)',
+                            flexShrink: 0
+                        }}
+                    >
                         <Bot size={20} />
                     </div>
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--on-surface)' }}>
                                 Trợ lý Đối thoại AI (Hán ngữ Đài Loan)
                             </h2>
@@ -385,7 +631,14 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                                 }}
                                 title="Nhấp để chuyển đổi giữa GPT-6.1 Sol và DeepSeek V4 Flash"
                             >
-                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: activeModel === 'gpt-6.1-sol' ? '#d97706' : 'var(--jade-emerald)' }} />
+                                <span
+                                    style={{
+                                        width: '6px',
+                                        height: '6px',
+                                        borderRadius: '50%',
+                                        background: activeModel === 'gpt-6.1-sol' ? '#d97706' : 'var(--jade-emerald)'
+                                    }}
+                                />
                                 <span>AgentRouter: {activeModel}</span>
                                 <span style={{ fontSize: '9px', opacity: 0.7 }}>⇄</span>
                             </button>
@@ -396,22 +649,22 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                        fontSize: '12px',
-                        padding: '4px 10px',
-                        borderRadius: '8px',
-                        background: 'var(--surface-container)',
-                        color: 'var(--vermilion-cinnabar)',
-                        fontWeight: 600
-                    }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <span
+                        style={{
+                            fontSize: '12px',
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            background: 'var(--surface-container)',
+                            color: 'var(--vermilion-cinnabar)',
+                            fontWeight: 600
+                        }}
+                    >
                         🎭 {currentRoleObj.label}
                     </span>
                     <button
                         type="button"
-                        onClick={() => {
-                            switchRole(SCENARIO_ROLES[0]);
-                        }}
+                        onClick={() => switchRole(SCENARIO_ROLES[0])}
                         className="filter-button"
                         style={{ fontSize: '12px', padding: '5px 10px', height: 'auto' }}
                         title="Bắt đầu hội thoại mới"
@@ -423,17 +676,32 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
             </div>
 
             {/* AI Roleplay Scenario Selector Ribbon */}
-            <div style={{
-                padding: '8px 16px',
-                borderBottom: '1px solid var(--border-subtle)',
-                background: 'rgba(245, 245, 240, 0.85)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                overflowX: 'auto',
-                whiteSpace: 'nowrap'
-            }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--on-surface-variant)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div
+                style={{
+                    padding: '8px 16px',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    background: 'rgba(245, 245, 240, 0.85)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    overflowX: 'auto',
+                    whiteSpace: 'nowrap',
+                    WebkitOverflowScrolling: 'touch',
+                    boxSizing: 'border-box',
+                    maxWidth: '100%'
+                }}
+            >
+                <span
+                    style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: 'var(--on-surface-variant)',
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                    }}
+                >
                     <Sparkles size={13} color="var(--vermilion-cinnabar)" /> Nhập vai AI:
                 </span>
                 {SCENARIO_ROLES.map(role => {
@@ -474,15 +742,24 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        gap: '8px'
+                        gap: '8px',
+                        boxSizing: 'border-box',
+                        maxWidth: '100%'
                     }}
                 >
-                    <span>🎙️ {voiceNotice}</span>
+                    <span style={{ wordBreak: 'break-word' }}>🎙️ {voiceNotice}</span>
                     <button
                         type="button"
                         onClick={() => setVoiceNotice(null)}
-                        aria-label="Đóng thông báo giọng nói"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--on-surface-variant)' }}
+                        aria-label="Đóng thông báo"
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            color: 'var(--on-surface-variant)',
+                            flexShrink: 0
+                        }}
                     >
                         ✕
                     </button>
@@ -495,153 +772,399 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                 style={{
                     flex: 1,
                     overflowY: 'auto',
+                    overflowX: 'hidden',
                     padding: '20px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '16px'
+                    gap: '16px',
+                    boxSizing: 'border-box',
+                    maxWidth: '100%'
                 }}
             >
                 {messages.map((m, idx) => {
                     const isUser = m.role === 'user';
                     return (
                         <div
-                            key={idx}
+                            key={m.id || idx}
                             style={{
                                 display: 'flex',
                                 justifyContent: isUser ? 'flex-end' : 'flex-start',
                                 gap: '10px',
-                                maxWidth: '100%'
+                                maxWidth: '100%',
+                                boxSizing: 'border-box'
                             }}
                         >
                             {!isUser && (
-                                <div style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '50%',
-                                    background: 'var(--vermilion-cinnabar)',
-                                    color: '#fff',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '13px',
-                                    fontWeight: 700,
-                                    flexShrink: 0
-                                }}>
+                                <div
+                                    style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '50%',
+                                        background: 'var(--vermilion-cinnabar)',
+                                        color: '#fff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '13px',
+                                        fontWeight: 700,
+                                        flexShrink: 0
+                                    }}
+                                >
                                     中
                                 </div>
                             )}
 
-                            <div style={{
-                                maxWidth: '82%',
-                                padding: '14px 18px',
-                                borderRadius: isUser ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                                background: isUser
-                                    ? 'var(--vermilion-cinnabar)'
-                                    : 'var(--surface-container-low)',
-                                color: isUser ? '#ffffff' : 'var(--on-surface)',
-                                border: isUser ? 'none' : '1px solid var(--border-subtle)',
-                                boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)',
-                                fontSize: '14px',
-                                lineHeight: '1.6'
-                            }}>
+                            <div
+                                style={{
+                                    maxWidth: '85%',
+                                    padding: '14px 18px',
+                                    borderRadius: isUser ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                                    background: isUser ? 'var(--vermilion-cinnabar)' : 'var(--surface-container-low)',
+                                    color: isUser ? '#ffffff' : 'var(--on-surface)',
+                                    border: isUser ? 'none' : '1px solid var(--border-subtle)',
+                                    boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)',
+                                    fontSize: '14px',
+                                    lineHeight: '1.6',
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word',
+                                    boxSizing: 'border-box'
+                                }}
+                            >
                                 {isUser ? (
                                     <p style={{ margin: 0, fontWeight: 500 }}>{m.content}</p>
                                 ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        {m.content.split('\n').filter(Boolean).map((line, lIdx) => {
-                                            const clean = line.replace(/^\*\*|\*\*$/g, '').trim();
-                                            const isZhHeader = clean.startsWith('中文：') || clean.startsWith('中文:') || (lIdx === 0 && /[\u4e00-\u9fa5]/.test(clean) && !clean.includes('Pinyin') && !clean.includes('Tiếng Việt'));
-                                            if (isZhHeader) {
-                                                const zh = clean.replace(/^中文[：:]\s*/, '').replace(/^\*\*|\*\*$/g, '').trim();
-                                                return (
-                                                    <div key={lIdx} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
-                                                            <h3 lang="zh-TW" style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--vermilion-cinnabar)', fontFamily: 'var(--font-serif)' }}>
-                                                                {zh}
-                                                            </h3>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                <button
-                                                                    type="button"
-                                                                    className="icon-button"
-                                                                    onClick={() => speakChinese(zh, 0.92)}
-                                                                    title="Nghe phát âm chuẩn tự nhiên (1.0x)"
-                                                                    style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', borderRadius: '6px', background: 'var(--surface-container)' }}
-                                                                >
-                                                                    <Volume2 size={14} />
-                                                                    <span>Chuẩn</span>
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="icon-button"
-                                                                    onClick={() => speakChineseSlow(zh)}
-                                                                    title="Nghe phát âm chậm (0.7x) để bắt chước khẩu hình"
-                                                                    style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', borderRadius: '6px', background: 'var(--surface-container)' }}
-                                                                >
-                                                                    <span>🐢 Chậm</span>
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="icon-button"
-                                                                    onClick={() => {
-                                                                        setInput(zh);
-                                                                        setVoiceNotice(`Đã nạp câu "${zh}". Hãy bấm biểu tượng Micro bên dưới để nói thử!`);
+                                        {/* Status & Provider Badge */}
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: '8px',
+                                                marginBottom: '4px',
+                                                flexWrap: 'wrap'
+                                            }}
+                                        >
+                                            {m.mode === 'ai' ? (
+                                                <span
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '5px',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '6px',
+                                                        background: 'rgba(16, 185, 129, 0.12)',
+                                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                                        color: '#059669',
+                                                        fontSize: '11px',
+                                                        fontWeight: 700
+                                                    }}
+                                                    title={`Phản hồi trực tuyến từ mô hình ${m.model || activeModel} (${m.provider || 'AgentRouter'})`}
+                                                >
+                                                    <span
+                                                        style={{
+                                                            width: '6px',
+                                                            height: '6px',
+                                                            borderRadius: '50%',
+                                                            background: '#10b981'
+                                                        }}
+                                                    />
+                                                    <span>[Trực tuyến - {m.model || activeModel}]</span>
+                                                    {typeof m.latencyMs === 'number' && m.latencyMs > 0 && (
+                                                        <span style={{ opacity: 0.8, fontSize: '10px', fontWeight: 500 }}>
+                                                            ({(m.latencyMs / 1000).toFixed(1)}s)
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            ) : (
+                                                <span
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '5px',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '6px',
+                                                        background: 'rgba(99, 102, 241, 0.12)',
+                                                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                                                        color: '#4338ca',
+                                                        fontSize: '11px',
+                                                        fontWeight: 700
+                                                    }}
+                                                    title="Gia sư Hán học cục bộ chuẩn TOCFL Đài Loan (Không tiêu tốn token mạng)"
+                                                >
+                                                    <span
+                                                        style={{
+                                                            width: '6px',
+                                                            height: '6px',
+                                                            borderRadius: '50%',
+                                                            background: '#6366f1'
+                                                        }}
+                                                    />
+                                                    <span>[Gia sư hướng dẫn cục bộ]</span>
+                                                </span>
+                                            )}
+
+                                            {m.status === 'canceled' && (
+                                                <span
+                                                    style={{
+                                                        fontSize: '11px',
+                                                        color: '#be123c',
+                                                        fontWeight: 600,
+                                                        background: '#fff1f2',
+                                                        border: '1px solid #fecdd3',
+                                                        padding: '1px 6px',
+                                                        borderRadius: '4px'
+                                                    }}
+                                                >
+                                                    Đã hủy
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Guidance Note for Local Fallback */}
+                                        {m.mode === 'guided' && m.guidanceNote && (
+                                            <div
+                                                style={{
+                                                    padding: '6px 10px',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(99, 102, 241, 0.08)',
+                                                    borderLeft: '3px solid #6366f1',
+                                                    fontSize: '11.5px',
+                                                    color: 'var(--on-surface-variant)',
+                                                    display: 'flex',
+                                                    alignItems: 'flex-start',
+                                                    gap: '6px',
+                                                    lineHeight: '1.4'
+                                                }}
+                                            >
+                                                <span style={{ fontSize: '12px' }}>💡</span>
+                                                <span>{m.guidanceNote}</span>
+                                            </div>
+                                        )}
+
+                                        {/* Content Lines */}
+                                        {m.content
+                                            .split('\n')
+                                            .filter(Boolean)
+                                            .map((line, lIdx) => {
+                                                const clean = line.replace(/^\*\*|\*\*$/g, '').trim();
+                                                const isZhHeader =
+                                                    clean.startsWith('中文：') ||
+                                                    clean.startsWith('中文:') ||
+                                                    (lIdx === 0 &&
+                                                        /[\u4e00-\u9fa5]/.test(clean) &&
+                                                        !clean.includes('Pinyin') &&
+                                                        !clean.includes('Tiếng Việt'));
+
+                                                if (isZhHeader) {
+                                                    const zh = clean
+                                                        .replace(/^中文[：:]\s*/, '')
+                                                        .replace(/^\*\*|\*\*$/g, '')
+                                                        .trim();
+                                                    return (
+                                                        <div
+                                                            key={lIdx}
+                                                            style={{
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                gap: '6px'
+                                                            }}
+                                                        >
+                                                            <div
+                                                                style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'space-between',
+                                                                    gap: '10px',
+                                                                    flexWrap: 'wrap'
+                                                                }}
+                                                            >
+                                                                <h3
+                                                                    lang="zh-TW"
+                                                                    style={{
+                                                                        margin: 0,
+                                                                        fontSize: '18px',
+                                                                        fontWeight: 700,
+                                                                        color: 'var(--vermilion-cinnabar)',
+                                                                        fontFamily: 'var(--font-serif)',
+                                                                        wordBreak: 'break-word'
                                                                     }}
-                                                                    title="Luyện đọc câu này với Micro"
-                                                                    style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', borderRadius: '6px', background: 'var(--vermilion-tint)', color: 'var(--vermilion-cinnabar)' }}
                                                                 >
-                                                                    <Mic size={13} />
-                                                                    <span>Luyện đọc</span>
-                                                                </button>
+                                                                    {zh}
+                                                                </h3>
+                                                                <div
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '6px',
+                                                                        flexWrap: 'wrap'
+                                                                    }}
+                                                                >
+                                                                    <button
+                                                                        type="button"
+                                                                        className="icon-button"
+                                                                        onClick={() => speakChinese(zh, 0.92)}
+                                                                        title="Nghe phát âm chuẩn tự nhiên (1.0x)"
+                                                                        style={{
+                                                                            padding: '4px 8px',
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px',
+                                                                            fontSize: '11px',
+                                                                            borderRadius: '6px',
+                                                                            background: 'var(--surface-container)'
+                                                                        }}
+                                                                    >
+                                                                        <Volume2 size={14} />
+                                                                        <span>Chuẩn</span>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="icon-button"
+                                                                        onClick={() => speakChineseSlow(zh)}
+                                                                        title="Nghe phát âm chậm (0.7x) để bắt chước khẩu hình"
+                                                                        style={{
+                                                                            padding: '4px 8px',
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px',
+                                                                            fontSize: '11px',
+                                                                            borderRadius: '6px',
+                                                                            background: 'var(--surface-container)'
+                                                                        }}
+                                                                    >
+                                                                        <span>🐢 Chậm</span>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="icon-button"
+                                                                        onClick={() => {
+                                                                            setInput(zh);
+                                                                            setVoiceNotice(
+                                                                                `Đã nạp câu "${zh}". Hãy bấm biểu tượng Micro bên dưới để nói thử!`
+                                                                            );
+                                                                        }}
+                                                                        title="Luyện đọc câu này với Micro"
+                                                                        style={{
+                                                                            padding: '4px 8px',
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px',
+                                                                            fontSize: '11px',
+                                                                            borderRadius: '6px',
+                                                                            background: 'var(--vermilion-tint)',
+                                                                            color: 'var(--vermilion-cinnabar)'
+                                                                        }}
+                                                                    >
+                                                                        <Mic size={13} />
+                                                                        <span>Luyện đọc</span>
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                );
-                                            }
-                                            if (clean.startsWith('Pinyin:') || clean.startsWith('Pinyin：')) {
+                                                    );
+                                                }
+
+                                                if (clean.startsWith('Pinyin:') || clean.startsWith('Pinyin：')) {
+                                                    return (
+                                                        <p
+                                                            key={lIdx}
+                                                            style={{
+                                                                margin: 0,
+                                                                fontSize: '13px',
+                                                                color: 'var(--tone-1)',
+                                                                fontWeight: 500,
+                                                                fontFamily: 'monospace'
+                                                            }}
+                                                        >
+                                                            {clean}
+                                                        </p>
+                                                    );
+                                                }
+
+                                                if (
+                                                    clean.startsWith('Tiếng Việt:') ||
+                                                    clean.startsWith('Tiếng Việt：')
+                                                ) {
+                                                    return (
+                                                        <p
+                                                            key={lIdx}
+                                                            style={{
+                                                                margin: 0,
+                                                                fontSize: '13px',
+                                                                color: 'var(--on-surface)',
+                                                                fontWeight: 500
+                                                            }}
+                                                        >
+                                                            {clean}
+                                                        </p>
+                                                    );
+                                                }
+
+                                                if (
+                                                    clean.startsWith('練習：') ||
+                                                    clean.startsWith('練習:') ||
+                                                    clean.startsWith('Gợi ý:')
+                                                ) {
+                                                    return (
+                                                        <div
+                                                            key={lIdx}
+                                                            style={{
+                                                                marginTop: '4px',
+                                                                padding: '6px 10px',
+                                                                borderRadius: '6px',
+                                                                background: 'var(--gold-tint)',
+                                                                fontSize: '12px',
+                                                                color: 'var(--on-surface)',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                            title="Bấm để đưa câu này vào khung chat"
+                                                            onClick={() => {
+                                                                const quoteMatch = clean.match(/["“「](.+?)["”」]/);
+                                                                if (quoteMatch && quoteMatch[1]) {
+                                                                    setInput(quoteMatch[1]);
+                                                                }
+                                                            }}
+                                                        >
+                                                            💡 {clean}
+                                                        </div>
+                                                    );
+                                                }
+
                                                 return (
-                                                    <p key={lIdx} style={{ margin: 0, fontSize: '13px', color: 'var(--tone-1)', fontWeight: 500, fontFamily: 'monospace' }}>
+                                                    <p key={lIdx} style={{ margin: 0 }}>
                                                         {clean}
                                                     </p>
                                                 );
-                                            }
-                                            if (clean.startsWith('Tiếng Việt:') || clean.startsWith('Tiếng Việt：')) {
-                                                return (
-                                                    <p key={lIdx} style={{ margin: 0, fontSize: '13px', color: 'var(--on-surface)', fontWeight: 500 }}>
-                                                        {clean}
-                                                    </p>
-                                                );
-                                            }
-                                            if (clean.startsWith('練習：') || clean.startsWith('練習:') || clean.startsWith('Gợi ý:')) {
-                                                return (
-                                                    <div
-                                                        key={lIdx}
-                                                        style={{
-                                                            marginTop: '4px',
-                                                            padding: '6px 10px',
-                                                            borderRadius: '6px',
-                                                            background: 'var(--gold-tint)',
-                                                            fontSize: '12px',
-                                                            color: 'var(--on-surface)',
-                                                            cursor: 'pointer'
-                                                        }}
-                                                        title="Bấm để đưa câu này vào khung chat"
-                                                        onClick={() => {
-                                                            const quoteMatch = clean.match(/["“「](.+?)["”」]/);
-                                                            if (quoteMatch && quoteMatch[1]) {
-                                                                setInput(quoteMatch[1]);
-                                                            }
-                                                        }}
-                                                    >
-                                                        💡 {clean}
-                                                    </div>
-                                                );
-                                            }
-                                            return (
-                                                <p key={lIdx} style={{ margin: 0 }}>
-                                                    {clean}
-                                                </p>
-                                            );
-                                        })}
+                                            })}
+
+                                        {/* Retry Button for Canceled Messages */}
+                                        {m.status === 'canceled' && m.retryText && (
+                                            <div style={{ marginTop: '8px' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => void handleSend(m.retryText)}
+                                                    disabled={loading}
+                                                    className="button"
+                                                    style={{
+                                                        padding: '5px 12px',
+                                                        borderRadius: '8px',
+                                                        fontSize: '12px',
+                                                        fontWeight: 600,
+                                                        background: 'var(--surface-container)',
+                                                        color: 'var(--vermilion-cinnabar)',
+                                                        border: '1px solid var(--border-subtle)',
+                                                        cursor: 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px'
+                                                    }}
+                                                >
+                                                    <RotateCcw size={13} />
+                                                    <span>Thử lại câu vừa hủy</span>
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -649,26 +1172,95 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                     );
                 })}
 
+                {/* Loading indicator with visible Cancel Request Button */}
                 {loading && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--on-surface-variant)', fontSize: '13px' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--vermilion-cinnabar)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>
-                            中
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                            padding: '10px 14px',
+                            borderRadius: '12px',
+                            background: 'var(--surface-container-low)',
+                            border: '1px solid var(--border-subtle)',
+                            maxWidth: '100%',
+                            fontSize: '13px',
+                            flexWrap: 'wrap',
+                            boxSizing: 'border-box'
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            <div
+                                style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '50%',
+                                    background: 'var(--vermilion-cinnabar)',
+                                    color: '#fff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '12px',
+                                    flexShrink: 0
+                                }}
+                            >
+                                中
+                            </div>
+                            <span
+                                style={{
+                                    fontStyle: 'italic',
+                                    color: 'var(--on-surface-variant)',
+                                    wordBreak: 'break-word'
+                                }}
+                            >
+                                AI đối thoại đang soạn câu trả lời chuẩn Phồn thể... ⏳
+                            </span>
                         </div>
-                        <span style={{ fontStyle: 'italic' }}>AI đối thoại đang soạn câu trả lời chuẩn Phồn thể... ⏳</span>
+                        <button
+                            type="button"
+                            onClick={handleCancelRequest}
+                            className="button"
+                            style={{
+                                padding: '5px 12px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#be123c',
+                                borderColor: '#fda4af',
+                                background: '#fff1f2',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                flexShrink: 0
+                            }}
+                            title="Hủy yêu cầu đối thoại này"
+                        >
+                            <X size={14} />
+                            <span>Hủy yêu cầu</span>
+                        </button>
                     </div>
                 )}
             </div>
 
             {/* Quick Prompt Chips */}
-            <div style={{
-                padding: '8px 16px',
-                borderTop: '1px solid var(--border-subtle)',
-                background: 'rgba(250, 250, 247, 0.5)',
-                display: 'flex',
-                gap: '8px',
-                overflowX: 'auto',
-                whiteSpace: 'nowrap'
-            }}>
+            <div
+                style={{
+                    padding: '8px 16px',
+                    borderTop: '1px solid var(--border-subtle)',
+                    background: 'rgba(250, 250, 247, 0.5)',
+                    display: 'flex',
+                    gap: '8px',
+                    overflowX: 'auto',
+                    whiteSpace: 'nowrap',
+                    WebkitOverflowScrolling: 'touch',
+                    boxSizing: 'border-box',
+                    maxWidth: '100%'
+                }}
+            >
                 {PROMPT_SUGGESTIONS.map((p, idx) => (
                     <button
                         key={idx}
@@ -683,9 +1275,10 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                             fontSize: '11px',
                             fontWeight: 600,
                             color: 'var(--on-surface)',
-                            cursor: 'pointer',
+                            cursor: loading ? 'not-allowed' : 'pointer',
                             flexShrink: 0,
-                            transition: 'all 0.15s ease'
+                            transition: 'all 0.15s ease',
+                            opacity: loading ? 0.6 : 1
                         }}
                     >
                         {p.label}
@@ -695,22 +1288,30 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
 
             {/* AI Pronunciation Evaluation Shortcut */}
             {input.trim() && (
-                <div style={{
-                    padding: '6px 16px',
-                    background: 'rgba(200, 50, 43, 0.06)',
-                    borderTop: '1px solid var(--border-subtle)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '8px',
-                    flexWrap: 'wrap'
-                }}>
+                <div
+                    style={{
+                        padding: '6px 16px',
+                        background: 'rgba(200, 50, 43, 0.06)',
+                        borderTop: '1px solid var(--border-subtle)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        flexWrap: 'wrap',
+                        boxSizing: 'border-box',
+                        maxWidth: '100%'
+                    }}
+                >
                     <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>
                         🎯 Luyện phát âm: Nhờ AI đối thoại nhận xét âm điệu của câu bạn vừa gõ/thu âm
                     </span>
                     <button
                         type="button"
-                        onClick={() => void handleSend(`我正在練習這句繁體中文發音：「${input.trim()}」。請幫我檢查發音要點、聲調與給予評分建議。`)}
+                        onClick={() =>
+                            void handleSend(
+                                `我正在練習這句繁體中文發音：「${input.trim()}」。請幫我檢查發音要點、聲調與給予評分建議。`
+                            )
+                        }
                         disabled={loading}
                         style={{
                             fontSize: '11px',
@@ -720,10 +1321,11 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                             background: 'var(--vermilion-cinnabar)',
                             color: '#ffffff',
                             fontWeight: 600,
-                            cursor: 'pointer',
+                            cursor: loading ? 'not-allowed' : 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px'
+                            gap: '4px',
+                            opacity: loading ? 0.6 : 1
                         }}
                     >
                         <Sparkles size={12} />
@@ -744,7 +1346,9 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                     background: 'var(--ivory-surface)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px'
+                    gap: '8px',
+                    boxSizing: 'border-box',
+                    maxWidth: '100%'
                 }}
             >
                 <button
@@ -752,17 +1356,20 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                     onClick={toggleVoiceInput}
                     aria-label={isListening ? 'Dừng ghi âm' : 'Nói tiếng Trung bằng micro'}
                     title={isListening ? 'Đang lắng nghe... bấm để dừng' : 'Bấm để nói tiếng Trung'}
+                    disabled={loading}
                     style={{
                         padding: '10px',
                         borderRadius: '50%',
                         border: 'none',
                         background: isListening ? '#e11d48' : 'var(--surface-container-low)',
                         color: isListening ? '#ffffff' : 'var(--on-surface-variant)',
-                        cursor: 'pointer',
+                        cursor: loading ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        transition: 'all 0.2s ease'
+                        transition: 'all 0.2s ease',
+                        flexShrink: 0,
+                        opacity: loading ? 0.6 : 1
                     }}
                 >
                     {isListening ? <MicOff size={18} /> : <Mic size={18} />}
@@ -772,36 +1379,69 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                     type="text"
                     value={input}
                     onChange={e => setInput(e.target.value)}
-                    placeholder="Gõ câu tiếng Trung hoặc tiếng Việt (vd: Tôi muốn thuê xe máy / 請問捷運站在哪裡？)..."
+                    placeholder={
+                        loading
+                            ? 'Đang gửi yêu cầu... bấm "Hủy yêu cầu" nếu muốn dừng'
+                            : 'Gõ câu tiếng Trung hoặc tiếng Việt (vd: Tôi muốn thuê xe máy / 請問捷運站在哪裡？)...'
+                    }
                     disabled={loading}
                     style={{
                         flex: 1,
+                        minWidth: 0,
                         padding: '10px 16px',
                         borderRadius: '999px',
                         border: '1px solid var(--border-strong)',
-                        background: 'var(--surface-container-low)',
+                        background: loading ? 'var(--surface-container)' : 'var(--surface-container-low)',
                         fontSize: '14px',
                         color: 'var(--on-surface)',
-                        outline: 'none'
+                        outline: 'none',
+                        boxSizing: 'border-box'
                     }}
                 />
 
-                <button
-                    type="submit"
-                    disabled={!input.trim() || loading}
-                    className="button button-primary"
-                    style={{
-                        padding: '10px 18px',
-                        borderRadius: '999px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '13px'
-                    }}
-                >
-                    <span>Gửi</span>
-                    <Send size={15} />
-                </button>
+                {loading ? (
+                    <button
+                        type="button"
+                        onClick={handleCancelRequest}
+                        className="button"
+                        style={{
+                            padding: '10px 16px',
+                            borderRadius: '999px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '13px',
+                            background: '#fff1f2',
+                            color: '#be123c',
+                            border: '1px solid #fecdd3',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            flexShrink: 0
+                        }}
+                        title="Bấm để hủy yêu cầu đang chờ"
+                    >
+                        <span>Hủy yêu cầu</span>
+                        <X size={15} />
+                    </button>
+                ) : (
+                    <button
+                        type="submit"
+                        disabled={!input.trim()}
+                        className="button button-primary"
+                        style={{
+                            padding: '10px 18px',
+                            borderRadius: '999px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '13px',
+                            flexShrink: 0
+                        }}
+                    >
+                        <span>Gửi</span>
+                        <Send size={15} />
+                    </button>
+                )}
             </form>
         </section>
     );

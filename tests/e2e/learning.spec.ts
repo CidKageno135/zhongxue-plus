@@ -14,16 +14,35 @@ test('new learner has usable responsive navigation without horizontal overflow',
   expect(errors).toEqual([]);
 });
 
-test('dictionary finds unaccented Vietnamese and pinyin, handles no results', async ({ page }) => {
+test('dictionary finds accented and toneless Pinyin, unaccented Vietnamese, and handles helpful empty state', async ({ page }) => {
   await page.goto('/');
   await navigate(page, 'Từ điển');
   const search = page.getByLabel('Tìm từ vựng');
+
+  // 1. Verify Pinyin with tone marks returns 學生
+  await search.fill('xuéshēng');
+  await expect(page.getByRole('main')).toContainText('學生');
+
+  // 2. Verify toneless Pinyin returns 學生
+  await search.fill('xuesheng');
+  await expect(page.getByRole('main')).toContainText('學生');
+
+  // 3. Verify unaccented Vietnamese returns 學生
+  await search.fill('hoc sinh');
+  await expect(page.getByRole('main')).toContainText('學生');
+
+  // 4. Verify search variations for 你好
   for (const query of ['xin chao', 'ni hao', 'nihao', '你好']) {
     await search.fill(query);
     await expect(page.getByRole('main')).toContainText('你好');
   }
+
+  // 5. Verify helpful empty state when search finds no results
   await search.fill('zzzznonexistent');
-  await expect(page.getByRole('main')).toContainText(/Không tìm thấy từ phù hợp/i);
+  await expect(page.getByRole('main')).toContainText(/Không tìm thấy mục từ nào khớp/i);
+  await expect(page.getByText(/Mẹo tra cứu hiệu quả/i)).toBeVisible();
+
+  // 6. Reset search to restore full vocabulary list
   await page.getByRole('button', { name: 'Xóa tìm kiếm' }).click();
   await expect(page.getByRole('main')).toContainText('你好');
 });
@@ -31,21 +50,19 @@ test('dictionary finds unaccented Vietnamese and pinyin, handles no results', as
 test('saving a dictionary word creates a review and rating schedules it after reload', async ({ page }) => {
   await page.goto('/');
   await navigate(page, 'Từ điển');
-  await page.getByLabel('Tìm từ vựng').fill('你好');
-  await page.getByRole('button', { name: 'Lưu 你好', exact: true }).click();
+  await page.getByLabel('Tìm từ vựng').fill('學生');
+  await page.getByRole('button', { name: 'Lưu 學生', exact: true }).click();
   await page.reload();
   await navigate(page, 'Ôn tập');
   await expect(page.getByRole('main')).toContainText('1 từ đến lịch ôn');
   await page.getByRole('button', { name: 'Hiện đáp án' }).click();
-  await expect(page.getByRole('heading', { name: 'Xin chào', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Học sinh/i })).toBeVisible();
   await page.getByRole('button', { name: /Nhớ được/ }).click();
   await expect(page.getByRole('main')).toContainText('Bạn đã ôn xong hôm nay!');
   await page.reload();
   await navigate(page, 'Ôn tập');
   await expect(page.getByRole('main')).toContainText('0 từ đến lịch ôn');
 });
-
-
 
 test('again-rated word remains due today and can explicitly be retried', async ({ page }) => {
   await page.goto('/');

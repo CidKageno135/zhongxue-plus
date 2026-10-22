@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { RotateCcw, Trash2, X, Sparkles, Edit3 } from 'lucide-react';
-import { recognizeHandwriting, type HandwritingStroke } from '../services/api';
+import { RotateCcw, Trash2, X, Sparkles, Edit3, AlertCircle, Info } from 'lucide-react';
+import { recognizeHandwriting, fallbackClientHandwriting, type HandwritingStroke } from '../services/api';
 
 interface HandwritingPadProps {
     onSelectWord: (word: string) => void;
@@ -8,24 +8,83 @@ interface HandwritingPadProps {
 }
 
 export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
+    const dialogRef = useRef<HTMLDivElement | null>(null);
+    const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+    const triggerElementRef = useRef<HTMLElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+
     const [isDrawing, setIsDrawing] = useState(false);
     const [strokes, setStrokes] = useState<HandwritingStroke[]>([]);
     const [candidates, setCandidates] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
+    const [recognitionMode, setRecognitionMode] = useState<'idle' | 'online' | 'offline_fallback' | 'no_candidates'>('idle');
 
     const currentStroke = useRef<{ x: number[]; y: number[]; t: number[] }>({ x: [], y: [], t: [] });
     const startTimeRef = useRef<number>(0);
 
     const CANVAS_SIZE = 300;
 
-    // Close modal via Escape key
+    // Accessibility: Focus management (save trigger, focus close button, restore on unmount)
+    useEffect(() => {
+        triggerElementRef.current = document.activeElement as HTMLElement | null;
+
+        const timer = setTimeout(() => {
+            closeBtnRef.current?.focus();
+        }, 30);
+
+        return () => {
+            clearTimeout(timer);
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            if (triggerElementRef.current && typeof triggerElementRef.current.focus === 'function') {
+                triggerElementRef.current.focus();
+            }
+        };
+    }, []);
+
+    // Accessibility: Keyboard navigation (Escape to close, Tab loop focus trap)
     useEffect(() => {
         function handleKeyDown(e: KeyboardEvent) {
             if (e.key === 'Escape') {
+                e.preventDefault();
                 onClose();
+                return;
+            }
+
+            if (e.key === 'Tab') {
+                const dialog = dialogRef.current;
+                if (!dialog) return;
+
+                const focusableElements = Array.from(
+                    dialog.querySelectorAll<HTMLElement>(
+                        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                    )
+                ).filter(el => el.offsetParent !== null || el.offsetWidth > 0 || el.offsetHeight > 0);
+
+                if (focusableElements.length === 0) {
+                    e.preventDefault();
+                    return;
+                }
+
+                const firstElement = focusableElements[0];
+                const lastElement = focusableElements[focusableElements.length - 1];
+
+                if (e.shiftKey) {
+                    if (document.activeElement === firstElement || !dialog.contains(document.activeElement)) {
+                        e.preventDefault();
+                        lastElement.focus();
+                    }
+                } else {
+                    if (document.activeElement === lastElement || !dialog.contains(document.activeElement)) {
+                        e.preventDefault();
+                        firstElement.focus();
+                    }
+                }
             }
         }
+
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onClose]);
@@ -81,11 +140,17 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
             if (xs.length === 0) continue;
 
             ctx.beginPath();
-            ctx.moveTo(xs[0], ys[0]);
-            for (let i = 1; i < xs.length; i++) {
-                ctx.lineTo(xs[i], ys[i]);
+            if (xs.length === 1) {
+                ctx.arc(xs[0], ys[0], 2.25, 0, Math.PI * 2);
+                ctx.fillStyle = '#1e293b';
+                ctx.fill();
+            } else {
+                ctx.moveTo(xs[0], ys[0]);
+                for (let i = 1; i < xs.length; i++) {
+                    ctx.lineTo(xs[i], ys[i]);
+                }
+                ctx.stroke();
             }
-            ctx.stroke();
         }
         ctx.restore();
     }, [strokes]);
@@ -103,20 +168,79 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         redrawCanvas();
     }, [redrawCanvas]);
 
+    /** Trigger handwriting recognition with timeout cancellation and offline fallback */
     const triggerRecognition = useCallback(async (currentStrokes: HandwritingStroke[]) => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+
         if (!currentStrokes.length) {
             setCandidates([]);
+            setRecognitionMode('idle');
+            setLoading(false);
             return;
         }
 
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
         setLoading(true);
+
+        const isBrowserOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+        // If explicitly offline, use client fallback directly without network delay
+        if (isBrowserOffline) {
+            const fallback = fallbackClientHandwriting(currentStrokes);
+            if (!controller.signal.aborted) {
+                setCandidates(fallback);
+                setRecognitionMode(fallback.length > 0 ? 'offline_fallback' : 'no_candidates');
+                setLoading(false);
+            }
+            return;
+        }
+
+        // Online recognition with 3500ms timeout
+        const timeoutPromise = new Promise<string[]>((_, reject) => {
+            const timer = setTimeout(() => {
+                reject(new Error('HANDWRITING_TIMEOUT'));
+            }, 3500);
+            controller.signal.addEventListener('abort', () => {
+                clearTimeout(timer);
+                reject(new DOMException('Aborted', 'AbortError'));
+            });
+        });
+
         try {
-            const results = await recognizeHandwriting(currentStrokes, CANVAS_SIZE, CANVAS_SIZE);
-            setCandidates(results);
+            const results = await Promise.race([
+                recognizeHandwriting(currentStrokes, CANVAS_SIZE, CANVAS_SIZE),
+                timeoutPromise
+            ]);
+
+            if (controller.signal.aborted) return;
+
+            if (Array.isArray(results) && results.length > 0) {
+                setCandidates(results);
+                setRecognitionMode('online');
+            } else {
+                const fallback = fallbackClientHandwriting(currentStrokes);
+                setCandidates(fallback);
+                setRecognitionMode(fallback.length > 0 ? 'offline_fallback' : 'no_candidates');
+            }
         } catch {
-            //
+            if (controller.signal.aborted && abortControllerRef.current !== controller) {
+                return;
+            }
+
+            // Timeout, network or server error -> seamlessly switch to client fallback
+            const fallback = fallbackClientHandwriting(currentStrokes);
+            if (!controller.signal.aborted) {
+                setCandidates(fallback);
+                setRecognitionMode(fallback.length > 0 ? 'offline_fallback' : 'no_candidates');
+            }
         } finally {
-            setLoading(false);
+            if (abortControllerRef.current === controller) {
+                setLoading(false);
+            }
         }
     }, []);
 
@@ -124,12 +248,21 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        // Ignore secondary/tertiary mouse clicks
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+        try {
+            canvas.setPointerCapture(e.pointerId);
+        } catch {
+            // ignore if pointer capture fails
+        }
         setIsDrawing(true);
 
         const rect = canvas.getBoundingClientRect();
-        const x = Math.round(e.clientX - rect.left);
-        const y = Math.round(e.clientY - rect.top);
+        const scaleX = CANVAS_SIZE / (rect.width || CANVAS_SIZE);
+        const scaleY = CANVAS_SIZE / (rect.height || CANVAS_SIZE);
+        const x = Math.max(0, Math.min(CANVAS_SIZE, Math.round((e.clientX - rect.left) * scaleX)));
+        const y = Math.max(0, Math.min(CANVAS_SIZE, Math.round((e.clientY - rect.top) * scaleY)));
         startTimeRef.current = Date.now();
 
         currentStroke.current = {
@@ -159,12 +292,22 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         if (!canvas) return;
 
         const rect = canvas.getBoundingClientRect();
-        const x = Math.round(e.clientX - rect.left);
-        const y = Math.round(e.clientY - rect.top);
+        const scaleX = CANVAS_SIZE / (rect.width || CANVAS_SIZE);
+        const scaleY = CANVAS_SIZE / (rect.height || CANVAS_SIZE);
+        const x = Math.max(0, Math.min(CANVAS_SIZE, Math.round((e.clientX - rect.left) * scaleX)));
+        const y = Math.max(0, Math.min(CANVAS_SIZE, Math.round((e.clientY - rect.top) * scaleY)));
         const t = Date.now() - startTimeRef.current;
 
-        currentStroke.current.x.push(x);
-        currentStroke.current.y.push(y);
+        const xs = currentStroke.current.x;
+        const ys = currentStroke.current.y;
+
+        // Prevent redundant identical points
+        if (xs.length > 0 && xs[xs.length - 1] === x && ys[ys.length - 1] === y) {
+            return;
+        }
+
+        xs.push(x);
+        ys.push(y);
         currentStroke.current.t.push(t);
 
         const ctx = canvas.getContext('2d');
@@ -177,8 +320,6 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        const xs = currentStroke.current.x;
-        const ys = currentStroke.current.y;
         if (xs.length >= 2) {
             ctx.beginPath();
             ctx.moveTo(xs[xs.length - 2], ys[ys.length - 2]);
@@ -191,10 +332,13 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
     function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
         if (!isDrawing) return;
         setIsDrawing(false);
-        try {
-            (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-        } catch {
-            // ignore if pointer was not captured
+        const canvas = canvasRef.current;
+        if (canvas) {
+            try {
+                canvas.releasePointerCapture(e.pointerId);
+            } catch {
+                // ignore
+            }
         }
 
         const s = currentStroke.current;
@@ -208,22 +352,42 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
 
     function handleUndo() {
         if (!strokes.length) return;
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+
         const updated = strokes.slice(0, -1);
         setStrokes(updated);
-        void triggerRecognition(updated);
+        if (updated.length === 0) {
+            setCandidates([]);
+            setRecognitionMode('idle');
+            setLoading(false);
+        } else {
+            void triggerRecognition(updated);
+        }
     }
 
     function handleClear() {
+        if (!strokes.length && !candidates.length) return;
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+
         setStrokes([]);
         setCandidates([]);
-        redrawCanvas();
+        setRecognitionMode('idle');
+        setLoading(false);
     }
 
     return (
         <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="handwriting-pad-title"
+            aria-describedby="handwriting-pad-desc"
             onClick={e => {
                 if (e.target === e.currentTarget) {
                     onClose();
@@ -241,6 +405,31 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                 padding: '16px'
             }}
         >
+            {/* Screen Reader Announcement Live Region */}
+            <div
+                aria-live="polite"
+                aria-atomic="true"
+                style={{
+                    position: 'absolute',
+                    width: '1px',
+                    height: '1px',
+                    padding: 0,
+                    margin: '-1px',
+                    overflow: 'hidden',
+                    clip: 'rect(0, 0, 0, 0)',
+                    whiteSpace: 'nowrap',
+                    border: 0
+                }}
+            >
+                {loading
+                    ? 'Đang nhận diện nét vẽ...'
+                    : candidates.length > 0
+                        ? `Đã nhận diện ${candidates.length} gợi ý chữ Hán`
+                        : strokes.length > 0
+                            ? 'Chưa nhận diện được chữ phù hợp'
+                            : ''}
+            </div>
+
             <div style={{
                 width: '100%',
                 maxWidth: '420px',
@@ -278,12 +467,13 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                             <h3 id="handwriting-pad-title" style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)' }}>
                                 Tra bằng chữ viết tay (手寫輸入)
                             </h3>
-                            <small style={{ color: 'var(--on-surface-variant)', fontSize: '11px' }}>
+                            <small id="handwriting-pad-desc" style={{ color: 'var(--on-surface-variant)', fontSize: '11px' }}>
                                 Vẽ chữ Hán bằng chuột hoặc ngón tay (Nhấn Esc để đóng)
                             </small>
                         </div>
                     </div>
                     <button
+                        ref={closeBtnRef}
                         type="button"
                         onClick={onClose}
                         className="icon-button"
@@ -307,15 +497,23 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                     whiteSpace: 'nowrap'
                 }}>
                     {loading && (
-                        <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)', fontStyle: 'italic' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--vermilion-cinnabar)' }} />
                             Đang nhận diện...
                         </span>
                     )}
 
-                    {!loading && candidates.length === 0 && (
+                    {!loading && strokes.length === 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--on-surface-variant)', fontSize: '12px' }}>
                             <Sparkles size={14} color="var(--tone-3)" />
-                            <span>Vẽ nét vào ô vuông bên dưới, từ khóa sẽ xuất hiện ở đây.</span>
+                            <span>Vẽ nét vào ô vuông bên dưới, gợi ý chữ Hán sẽ xuất hiện ở đây.</span>
+                        </div>
+                    )}
+
+                    {!loading && strokes.length > 0 && candidates.length === 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--on-surface-variant)', fontSize: '12px' }}>
+                            <AlertCircle size={14} color="var(--tone-4)" />
+                            <span>Chưa nhận diện được. Hãy thử lùi 1 nét hoặc vẽ nét rõ hơn.</span>
                         </div>
                     )}
 
@@ -328,6 +526,7 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                                 onClose();
                             }}
                             title={`Chọn "${char}" để tra từ điển`}
+                            aria-label={char}
                             style={{
                                 width: '42px',
                                 height: '42px',
@@ -360,6 +559,25 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                     ))}
                 </div>
 
+                {/* Offline Recognition Disclaimer / Limits Notice */}
+                {recognitionMode === 'offline_fallback' && (
+                    <div style={{
+                        padding: '6px 16px',
+                        background: 'rgba(217, 119, 6, 0.08)',
+                        borderBottom: '1px solid rgba(217, 119, 6, 0.2)',
+                        fontSize: '11px',
+                        color: '#92400e',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                    }}>
+                        <Info size={13} style={{ flexShrink: 0 }} />
+                        <span>
+                            Chế độ ngoại tuyến: Nhận diện theo hình học nét (~120 chữ Hán thông dụng & bài học). Cần kết nối mạng để nhận diện toàn bộ Hán tự hiếm.
+                        </span>
+                    </div>
+                )}
+
                 {/* Canvas Drawing Area */}
                 <div style={{
                     padding: '20px',
@@ -383,6 +601,8 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                             onPointerMove={handlePointerMove}
                             onPointerUp={handlePointerUp}
                             onPointerCancel={handlePointerUp}
+                            role="img"
+                            aria-label="Khung vẽ chữ Hán"
                             style={{
                                 width: '100%',
                                 height: '100%',
@@ -410,12 +630,16 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                             onClick={handleUndo}
                             disabled={!strokes.length}
                             className="filter-button"
+                            aria-label="Lùi 1 nét"
+                            title="Lùi 1 nét (Undo)"
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
                                 fontSize: '12px',
-                                padding: '6px 12px'
+                                padding: '6px 12px',
+                                opacity: !strokes.length ? 0.5 : 1,
+                                cursor: !strokes.length ? 'not-allowed' : 'pointer'
                             }}
                         >
                             <RotateCcw size={14} />
@@ -426,12 +650,16 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                             onClick={handleClear}
                             disabled={!strokes.length}
                             className="filter-button"
+                            aria-label="Xóa hết"
+                            title="Xóa hết nét vẽ (Clear)"
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
                                 fontSize: '12px',
-                                padding: '6px 12px'
+                                padding: '6px 12px',
+                                opacity: !strokes.length ? 0.5 : 1,
+                                cursor: !strokes.length ? 'not-allowed' : 'pointer'
                             }}
                         >
                             <Trash2 size={14} />
@@ -439,7 +667,7 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
                         </button>
                     </div>
 
-                    <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)', fontWeight: 500 }}>
                         {strokes.length} nét đã vẽ
                     </span>
                 </div>
