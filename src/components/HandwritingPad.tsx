@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { RotateCcw, Trash2, X, Sparkles, Edit3, AlertCircle, Info } from 'lucide-react';
-import { recognizeHandwriting, fallbackClientHandwriting, type HandwritingStroke } from '../services/api';
+import { recognizeHandwritingDetailed, fallbackClientHandwriting, type HandwritingRecognitionResult, type HandwritingStroke } from '../services/api';
 
 interface HandwritingPadProps {
     onSelectWord: (word: string) => void;
@@ -26,14 +26,16 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
 
     const CANVAS_SIZE = 300;
 
-    const handleClose = useCallback(() => {
+    const cancelRecognition = useCallback(() => {
         requestIdRef.current++;
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
-        }
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = null;
+    }, []);
+
+    const handleClose = useCallback(() => {
+        cancelRecognition();
         onClose();
-    }, [onClose]);
+    }, [onClose, cancelRecognition]);
 
     // Accessibility: Focus management (save trigger, focus close button, restore on unmount)
     useEffect(() => {
@@ -45,15 +47,12 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
 
         return () => {
             clearTimeout(timer);
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-                abortControllerRef.current = null;
-            }
+            cancelRecognition();
             if (triggerElementRef.current && typeof triggerElementRef.current.focus === 'function') {
                 triggerElementRef.current.focus();
             }
         };
-    }, []);
+    }, [cancelRecognition]);
 
     // Accessibility: Keyboard navigation (Escape to close, Tab loop focus trap)
     useEffect(() => {
@@ -214,27 +213,28 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
         }
 
         // Online recognition with 3500ms timeout
-        const timeoutPromise = new Promise<string[]>((_, reject) => {
-            const timer = setTimeout(() => {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        const timeoutPromise = new Promise<HandwritingRecognitionResult>((_, reject) => {
+            timeout = setTimeout(() => {
                 reject(new Error('HANDWRITING_TIMEOUT'));
             }, 3500);
             controller.signal.addEventListener('abort', () => {
-                clearTimeout(timer);
+                clearTimeout(timeout);
                 reject(new DOMException('Aborted', 'AbortError'));
             });
         });
 
         try {
             const results = await Promise.race([
-                recognizeHandwriting(currentStrokes, CANVAS_SIZE, CANVAS_SIZE, controller.signal),
+                recognizeHandwritingDetailed(currentStrokes, CANVAS_SIZE, CANVAS_SIZE, controller.signal),
                 timeoutPromise
             ]);
 
             if (controller.signal.aborted || requestIdRef.current !== thisRequestId) return;
 
-            if (Array.isArray(results) && results.length > 0) {
-                setCandidates(results);
-                setRecognitionMode('online');
+            if (results.candidates.length > 0) {
+                setCandidates(results.candidates);
+                setRecognitionMode(results.source === 'online' ? 'online' : 'offline_fallback');
             } else {
                 const fallback = fallbackClientHandwriting(currentStrokes);
                 setCandidates(fallback);
@@ -250,8 +250,10 @@ export function HandwritingPad({ onSelectWord, onClose }: HandwritingPadProps) {
             if (!controller.signal.aborted && requestIdRef.current === thisRequestId) {
                 setCandidates(fallback);
                 setRecognitionMode(fallback.length > 0 ? 'offline_fallback' : 'no_candidates');
+                controller.abort();
             }
         } finally {
+            clearTimeout(timeout);
             if (abortControllerRef.current === controller && requestIdRef.current === thisRequestId) {
                 setLoading(false);
             }

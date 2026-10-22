@@ -1263,8 +1263,23 @@ export async function recognizeHandwriting(
   heightOrSignal?: number | AbortSignal,
   explicitSignal?: AbortSignal
 ): Promise<string[]> {
+  return (await recognizeHandwritingDetailed(strokes, widthOrOptionsOrSignal, heightOrSignal, explicitSignal)).candidates;
+}
+
+export interface HandwritingRecognitionResult {
+  candidates: string[];
+  source: 'online' | 'local_fallback';
+}
+
+/** Detailed counterpart for UIs that must identify geometric fallback honestly. */
+export async function recognizeHandwritingDetailed(
+  strokes: HandwritingStroke[],
+  widthOrOptionsOrSignal?: number | HandwritingOptions | AbortSignal,
+  heightOrSignal?: number | AbortSignal,
+  explicitSignal?: AbortSignal
+): Promise<HandwritingRecognitionResult> {
   if (!isValidStrokeArray(strokes)) {
-    return [];
+    return { candidates: [], source: 'local_fallback' };
   }
 
   let width = 300;
@@ -1305,7 +1320,7 @@ export async function recognizeHandwriting(
       if (contentType.includes('application/json')) {
         const data = (await res.json()) as Partial<HandwritingResponse>;
         if (Array.isArray(data.candidates) && data.candidates.length > 0) {
-          return data.candidates;
+          return { candidates: data.candidates, source: data.source === 'local_fallback' ? 'local_fallback' : 'online' };
         }
       }
     }
@@ -1316,5 +1331,5 @@ export async function recognizeHandwriting(
     // Upstream or network error: fall back to client recognizer
   }
 
-  return fallbackClientHandwriting(strokes);
+  return { candidates: fallbackClientHandwriting(strokes), source: 'local_fallback' };
 }

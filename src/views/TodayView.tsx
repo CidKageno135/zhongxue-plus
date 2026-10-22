@@ -92,11 +92,8 @@ export function TodayView({
 }: TodayViewProps) {
     const [bannerVisible, setBannerVisible] = useState(true);
     const [micRecording, setMicRecording] = useState(false);
-    const [realMeasurement, setRealMeasurement] = useState<{ hz: number; toneMatch: boolean } | null>(null);
+    const [realMeasurement, setRealMeasurement] = useState<{ hz: number } | null>(null);
     const [pitchFeedback, setPitchFeedback] = useState<string | null>(null);
-    const [pitchCount, setPitchCount] = useState(0);
-    const [userCurvePath, setUserCurvePath] = useState('M 15 50 C 75 48, 165 33, 305 17');
-    const [pitchEndY, setPitchEndY] = useState(17);
     const [lastRatedLabel, setLastRatedLabel] = useState<string | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -164,45 +161,12 @@ export function TodayView({
 
             if (controller.signal.aborted) return;
 
-            const nextCount = pitchCount + 1;
-            setPitchCount(nextCount);
-
             if (result.isRealMeasurement && result.hz) {
-                const hz = Math.round(result.hz);
-                const variance = ((hz % 7) - 3);
-                const endY = Math.max(12, Math.min(54, chaoCurve.endY + variance));
-                const startY = Math.max(12, Math.min(54, chaoCurve.startY + variance));
-
-                if (chaoCurve.label.includes('55')) {
-                    setUserCurvePath(`M 15 ${startY} L 305 ${endY}`);
-                } else if (chaoCurve.label.includes('51')) {
-                    setUserCurvePath(`M 15 ${startY} C 90 24, 190 44, 305 ${endY}`);
-                } else if (chaoCurve.label.includes('214')) {
-                    setUserCurvePath(`M 15 ${startY} C 90 54, 180 54, 240 38 S 305 ${endY}, 305 ${endY}`);
-                } else {
-                    setUserCurvePath(`M 15 ${startY} C 78 46, 168 34, 305 ${endY}`);
-                }
-                setPitchEndY(endY);
-                setRealMeasurement({ hz, toneMatch: true });
-                setPitchFeedback(result.message);
+                setRealMeasurement({ hz: Math.round(result.hz) });
             } else {
                 setRealMeasurement(null);
-                setPitchFeedback(result.message);
-                const variance = ((nextCount * 3) % 7) - 3;
-                const endY = Math.max(12, Math.min(54, chaoCurve.endY + variance));
-                const startY = Math.max(12, Math.min(54, chaoCurve.startY + variance));
-
-                if (chaoCurve.label.includes('55')) {
-                    setUserCurvePath(`M 15 ${startY} L 305 ${endY}`);
-                } else if (chaoCurve.label.includes('51')) {
-                    setUserCurvePath(`M 15 ${startY} C 90 24, 190 44, 305 ${endY}`);
-                } else if (chaoCurve.label.includes('214')) {
-                    setUserCurvePath(`M 15 ${startY} C 90 54, 180 54, 240 38 S 305 ${endY}, 305 ${endY}`);
-                } else {
-                    setUserCurvePath(`M 15 ${startY} C 78 46, 168 34, 305 ${endY}`);
-                }
-                setPitchEndY(endY);
             }
+            setPitchFeedback(result.message);
         } finally {
             setMicRecording(false);
         }
@@ -451,7 +415,7 @@ export function TodayView({
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: realMeasurement ? 'var(--jade-emerald)' : 'var(--cognate-gold)' }} />
-                                <h3 style={{ margin: 0, fontSize: '17px' }}>Khớp Âm điệu AI (Pitch Contour)</h3>
+                                <h3 style={{ margin: 0, fontSize: '17px' }}>Cao độ và thanh điệu</h3>
                             </div>
                             {realMeasurement ? (
                                 <span className="badge-pill badge-jade">Đo thực tế: {realMeasurement.hz} Hz</span>
@@ -461,7 +425,7 @@ export function TodayView({
                         </div>
                         <p style={{ fontSize: '12px', color: 'var(--on-surface-variant)', margin: '0 0 10px' }}>
                             {realMeasurement
-                                ? `Đã đo tần số F0 (${realMeasurement.hz} Hz) qua micro đối chiếu với thang cao độ ${etymology.toneClass} chuẩn Đài Bắc của từ ${heroWord.hanzi}.`
+                                ? `Đã đo tần số F0 (${realMeasurement.hz} Hz) qua micro. Chỉ đo một mẫu F0; chưa đánh giá độ khớp thanh điệu. Đường hiển thị vẫn là mẫu tham khảo.`
                                 : `Đường cao độ mẫu (Mô phỏng thanh điệu) ${etymology.toneClass} của từ ${heroWord.hanzi} chuẩn ngữ âm Đài Bắc. Nhấn nút bên dưới để cấp quyền micro và đo cao độ thực tế.`}
                         </p>
 
@@ -472,7 +436,7 @@ export function TodayView({
                                 <span style={{ display: 'flex', gap: '10px' }}>
                                     <span style={{ color: 'var(--tone-5)' }}>● {chaoCurve.label}</span>
                                     <span style={{ color: 'var(--primary-container)' }}>
-                                        ● {realMeasurement ? `Giọng bạn (${realMeasurement.hz} Hz)` : 'Đường cao độ mẫu (Mô phỏng thanh điệu)'}
+                                        ● Đường cao độ mẫu (Mô phỏng thanh điệu)
                                     </span>
                                 </span>
                             </div>
@@ -487,11 +451,8 @@ export function TodayView({
                                 <text x="2" y="55" fontSize="8" fill="var(--on-surface-variant)">1</text>
                                 {/* Reference curve */}
                                 <path d={chaoCurve.refPath} stroke="#64748B" strokeWidth="3" strokeLinecap="round" />
-                                {/* User recorded contour */}
-                                <path d={userCurvePath} stroke="#C8322B" strokeWidth="2.5" strokeLinecap="round" />
                                 <circle cx="15" cy={chaoCurve.startY} r="3.5" fill="#64748B" />
                                 <circle cx="305" cy={chaoCurve.endY} r="3.5" fill="#64748B" />
-                                <circle cx="305" cy={pitchEndY} r="3.5" fill="#C8322B" />
                             </svg>
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--on-surface-variant)', marginTop: '4px' }}>

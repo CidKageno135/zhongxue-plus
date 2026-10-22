@@ -23,6 +23,7 @@ declare global {
 }
 
 let activeUtterance: SpeechSynthesisUtterance | null = null;
+let finishActiveUtterance: (() => void) | null = null;
 let cachedBestVoice: SpeechSynthesisVoice | null = null;
 
 function retainUtterance(utt: SpeechSynthesisUtterance): void {
@@ -192,6 +193,8 @@ export function isSpeechSynthesisSupported(): boolean {
  * Stop any current speech synthesis playback and clear active references.
  */
 export function stopSpeaking(): void {
+    // Some browsers do not emit end/error for canceled queued utterances.
+    finishActiveUtterance?.();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         try {
             window.speechSynthesis.cancel();
@@ -229,7 +232,7 @@ export function speakChinese(text: string, options?: number | SpeakOptions): boo
     }
 
     try {
-        window.speechSynthesis.cancel();
+        stopSpeaking();
         if (window.speechSynthesis.paused) {
             window.speechSynthesis.resume();
         }
@@ -261,6 +264,7 @@ export function speakChinese(text: string, options?: number | SpeakOptions): boo
             if (isDone) return;
             isDone = true;
             releaseUtterance(utterance);
+            if (finishActiveUtterance === markDone) finishActiveUtterance = null;
             opts.onEnd?.();
         };
 
@@ -269,19 +273,30 @@ export function speakChinese(text: string, options?: number | SpeakOptions): boo
         };
 
         utterance.onerror = (e) => {
+            if (isDone) return;
             // In Chromium, canceling an utterance triggers error event with error === 'interrupted' or 'canceled'.
             // Do not display a user error for deliberate stops; notify onEnd so caller/SpeakButton resets state.
             const errType = (e as unknown as { error?: string })?.error;
             if (errType === 'interrupted' || errType === 'canceled') {
                 markDone();
             } else {
+                isDone = true;
                 releaseUtterance(utterance);
+                if (finishActiveUtterance === markDone) finishActiveUtterance = null;
                 opts.onError?.('Chưa thể phát âm thanh trên thiết bị này. Hãy thử lại.');
             }
         };
 
         retainUtterance(utterance);
-        window.speechSynthesis.speak(utterance);
+        finishActiveUtterance = markDone;
+        try {
+            window.speechSynthesis.speak(utterance);
+        } catch (error) {
+            isDone = true;
+            releaseUtterance(utterance);
+            if (finishActiveUtterance === markDone) finishActiveUtterance = null;
+            throw error;
+        }
         return true;
     } catch {
         opts.onError?.('Chưa thể phát âm thanh trên thiết bị này. Hãy thử lại.');

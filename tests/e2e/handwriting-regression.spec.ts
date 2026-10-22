@@ -255,6 +255,9 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
 
     await expect(dialog.getByRole('button', { name: '一' })).toBeVisible({ timeout: 5000 });
 
+    const secondRequest = page.waitForRequest(request =>
+      request.url().endsWith('/api/handwriting') && request.postDataJSON()?.strokes?.length === 2
+    );
     if (box) {
       // Draw stroke 2
       await page.mouse.move(box.x + 40, box.y + 180);
@@ -263,9 +266,15 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
       await page.mouse.up();
     }
 
-    // Immediately click Undo before delayed response for 2 strokes arrives
+    await secondRequest;
+    await expect(dialog.getByText('2 nét đã vẽ')).toBeVisible();
+    const abortedRequest = page.waitForEvent('requestfailed', {
+      predicate: request => request.url().endsWith('/api/handwriting') && request.postDataJSON()?.strokes?.length === 2
+    });
+    // Click Undo while the second request is actually in flight.
     const undoBtn = page.getByRole('button', { name: 'Lùi 1 nét' });
     await undoBtn.click();
+    await abortedRequest;
 
     // Wait past the delay
     await page.waitForTimeout(1600);
