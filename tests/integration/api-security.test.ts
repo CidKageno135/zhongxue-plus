@@ -21,6 +21,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import http from 'node:http';
 import { createTestServer, type RunningTestServer } from '../fixtures/api/test-server.ts';
 import { MockUpstreamServer } from '../fixtures/api/mock-upstream-server.ts';
 import {
@@ -36,6 +37,13 @@ import {
   MALFORMED_JSON_STRING,
   createOversizedPayload
 } from '../fixtures/api/sentinel-secrets.ts';
+import {
+  SENTINEL_AGENTROUTER_KEY,
+  SENTINEL_OPENROUTER_KEY,
+  SENTINEL_CLIENT_KEY as T10_SENTINEL_CLIENT_KEY,
+  PROVIDER_URLS,
+  ATTACK_VECTORS
+} from '../fixtures/security/index.js';
 
 describe('API Security Integration Tests (A16 Independent QA)', () => {
   let testServer: RunningTestServer;
@@ -44,9 +52,10 @@ describe('API Security Integration Tests (A16 Independent QA)', () => {
 
   beforeAll(async () => {
     // Inject fake sentinel secrets into environment
-    process.env.AI_SOL_KEY = SENTINEL_SOL_KEY;
-    process.env.AI_DEEPSEEK_KEY = SENTINEL_DEEPSEEK_KEY;
-    process.env.AI_API_KEY = SENTINEL_API_KEY;
+    process.env.AI_AGENTROUTER_KEY = SENTINEL_AGENTROUTER_KEY;
+    process.env.AI_SOL_KEY = SENTINEL_AGENTROUTER_KEY;
+    process.env.AI_DEEPSEEK_KEY = SENTINEL_AGENTROUTER_KEY;
+    process.env.AI_API_KEY = SENTINEL_AGENTROUTER_KEY;
     process.env.AI_MODEL = 'gpt-6.1-sol';
 
     // Start mock upstream and test server
@@ -465,6 +474,274 @@ describe('API Security Integration Tests (A16 Independent QA)', () => {
 
       const text = await res.text();
       expect(text).toContain('<!doctype html>');
+    });
+  });
+
+  // ==========================================================================
+  // Section 4: T10 Acceptance Tests - F02: Provider Key Confusion (G2)
+  // ==========================================================================
+  describe('4. T10 Acceptance: F02 Cross-Provider Key Forwarding via /api/conversation (G2)', () => {
+    it('4.1 should NEVER forward AgentRouter server key to OpenRouter when client requests OpenRouter without apiKey', async () => {
+      // Client explicitly requests OpenRouter baseUrl, but provides NO client apiKey.
+      // Server environment has AgentRouter server key (SENTINEL_AGENTROUTER_KEY).
+      const res = await testServer.fetch('/api/conversation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: AUTHORIZED_DEV_ORIGIN
+        },
+        body: JSON.stringify({
+          action: 'chat',
+          baseUrl: PROVIDER_URLS.OPENROUTER,
+          model: 'gpt-6.1-sol',
+          messages: [{ role: 'user', content: 'Testing cross-provider key protection' }]
+        })
+      });
+
+      // INVARIANT (G2):
+      // When client does not pass apiKey and specifies OpenRouter (or custom),
+      // backend MUST NOT transfer server key of AgentRouter to OpenRouter.
+      // It must reject or return 400.
+      expect(res.status).toBe(400);
+
+      // CRITICAL ASSERTION:
+      // Zero outbound requests to OpenRouter containing the AgentRouter server sentinel!
+      expect(mockUpstream.wasSecretReceived(SENTINEL_AGENTROUTER_KEY)).toBe(false);
+
+      const data = await res.json();
+      expect(data.mode).not.toBe('ai');
+      expect(JSON.stringify(data)).not.toContain(SENTINEL_AGENTROUTER_KEY);
+    });
+
+    it('4.2 should REJECT ping to OpenRouter without apiKey and never leak AgentRouter key', async () => {
+      const res = await testServer.fetch('/api/conversation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: AUTHORIZED_DEV_ORIGIN
+        },
+        body: JSON.stringify({
+          action: 'ping',
+          baseUrl: PROVIDER_URLS.OPENROUTER,
+          model: 'gpt-6.1-sol'
+        })
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockUpstream.wasSecretReceived(SENTINEL_AGENTROUTER_KEY)).toBe(false);
+
+      const data = await res.json();
+      expect(data.ok).toBe(false);
+      expect(JSON.stringify(data)).not.toContain(SENTINEL_AGENTROUTER_KEY);
+    });
+
+    it('4.3 should forward client-provided apiKey to OpenRouter without injecting AgentRouter key', async () => {
+      const res = await testServer.fetch('/api/conversation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: AUTHORIZED_DEV_ORIGIN
+        },
+        body: JSON.stringify({
+          action: 'ping',
+          baseUrl: PROVIDER_URLS.OPENROUTER,
+          apiKey: T10_SENTINEL_CLIENT_KEY,
+          model: 'gpt-6.1-sol'
+        })
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockUpstream.wasSecretReceived(SENTINEL_AGENTROUTER_KEY)).toBe(false);
+      expect(mockUpstream.wasSecretReceived(T10_SENTINEL_CLIENT_KEY)).toBe(true);
+    });
+  });
+
+  // ==========================================================================
+  // Section 5: T10 Acceptance Tests - F03: SSRF & Fragment Defense (G2)
+  // ==========================================================================
+  describe('5. T10 Acceptance: F03 SSRF & Fragment Defense via /api/conversation (G2)', () => {
+    let localInternalServer: http.Server;
+    let localInternalPort: number;
+    const internalRequests: Array<{ method: string; path: string; headers: http.IncomingHttpHeaders }> = [];
+
+    beforeAll(async () => {
+      localInternalServer = http.createServer((req, res) => {
+        internalRequests.push({
+          method: req.method || 'GET',
+          path: req.url || '/',
+          headers: req.headers
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'internal_pwned', message: 'Internal service reached' }));
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        localInternalServer.on('error', reject);
+        localInternalServer.listen(0, '127.0.0.1', () => {
+          const addr = localInternalServer.address();
+          if (addr && typeof addr === 'object') {
+            localInternalPort = addr.port;
+            resolve();
+          } else {
+            reject(new Error('Failed to bind internal server'));
+          }
+        });
+      });
+    });
+
+    afterAll(async () => {
+      await new Promise<void>(resolve => {
+        localInternalServer.closeAllConnections?.();
+        localInternalServer.close(() => resolve());
+      });
+    });
+
+    beforeEach(() => {
+      internalRequests.length = 0;
+    });
+
+    it('5.1: MUST BLOCK request with URL fragment (#) targeting loopback: http://127.0.0.1:<port>/admin-action#', async () => {
+      const exploitUrl = `http://127.0.0.1:${localInternalPort}/admin-action#`;
+
+      const res = await testServer.fetch('/api/conversation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: AUTHORIZED_DEV_ORIGIN
+        },
+        body: JSON.stringify({
+          action: 'chat',
+          baseUrl: exploitUrl,
+          apiKey: T10_SENTINEL_CLIENT_KEY,
+          model: 'test-model',
+          messages: [{ role: 'user', content: 'SSRF exploit probe' }]
+        })
+      });
+
+      // INVARIANT (G2):
+      // SSRF: Chặn request tới loopback/localhost/private IP,
+      // chặn URL chứa fragment (#) làm cắt đuôi path.
+      // Must return 400 Bad Request
+      expect(res.status).toBe(400);
+
+      // Internal loopback server MUST NOT receive any request!
+      expect(internalRequests.length, 'Internal loopback service was reached via SSRF!').toBe(0);
+
+      const data = await res.json();
+      expect(data.mode).not.toBe('ai');
+    });
+
+    it('5.2: MUST BLOCK request with URL fragment (#) on public provider: https://openrouter.ai/api/v1#/chat/completions', async () => {
+      const fragmentUrl = 'https://openrouter.ai/api/v1#/chat/completions';
+
+      const res = await testServer.fetch('/api/conversation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: AUTHORIZED_DEV_ORIGIN
+        },
+        body: JSON.stringify({
+          action: 'chat',
+          baseUrl: fragmentUrl,
+          apiKey: T10_SENTINEL_CLIENT_KEY,
+          model: 'gpt-6.1-sol',
+          messages: [{ role: 'user', content: 'Fragment probe' }]
+        })
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.mode).not.toBe('ai');
+    });
+
+    it('5.3: MUST BLOCK SSRF requests to cloud metadata (169.254.169.254)', async () => {
+      const res = await testServer.fetch('/api/conversation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: AUTHORIZED_DEV_ORIGIN
+        },
+        body: JSON.stringify({
+          action: 'chat',
+          baseUrl: 'http://169.254.169.254/latest/meta-data',
+          apiKey: T10_SENTINEL_CLIENT_KEY,
+          model: 'test-model',
+          messages: [{ role: 'user', content: 'Cloud metadata probe' }]
+        })
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.mode).not.toBe('ai');
+    });
+
+    it('5.4: MUST BLOCK SSRF requests to RFC 1918 private network addresses (10.0.0.1, 192.168.1.1)', async () => {
+      for (const ip of ['http://10.0.0.1/admin', 'http://192.168.1.1/setup']) {
+        const res = await testServer.fetch('/api/conversation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Origin: AUTHORIZED_DEV_ORIGIN
+          },
+          body: JSON.stringify({
+            action: 'chat',
+            baseUrl: ip,
+            apiKey: T10_SENTINEL_CLIENT_KEY,
+            model: 'test-model',
+            messages: [{ role: 'user', content: 'Private network probe' }]
+          })
+        });
+
+        expect(res.status).toBe(400);
+      }
+    });
+
+    it('5.5: Redirect MUST NOT carry Authorization header across redirects to a new destination', async () => {
+      let leakedAuthHeader: string | undefined;
+      const sinkServer = http.createServer((req, res) => {
+        leakedAuthHeader = req.headers.authorization;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'sink_reached' }));
+      });
+
+      await new Promise<void>(resolve => sinkServer.listen(0, '127.0.0.1', () => resolve()));
+      const sinkPort = (sinkServer.address() as any).port;
+
+      const redirectHopServer = http.createServer((req, res) => {
+        res.writeHead(302, {
+          Location: `http://127.0.0.1:${sinkPort}/leaked-credentials`,
+          'Content-Type': 'text/plain'
+        });
+        res.end('Redirecting');
+      });
+
+      await new Promise<void>(resolve => redirectHopServer.listen(0, '127.0.0.1', () => resolve()));
+      const hopPort = (redirectHopServer.address() as any).port;
+
+      try {
+        await testServer.fetch('/api/conversation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Origin: AUTHORIZED_DEV_ORIGIN
+          },
+          body: JSON.stringify({
+            action: 'chat',
+            baseUrl: `http://127.0.0.1:${hopPort}/v1`,
+            apiKey: T10_SENTINEL_CLIENT_KEY,
+            model: 'test-model',
+            messages: [{ role: 'user', content: 'Redirect probe' }]
+          })
+        });
+
+        // The sink server must NEVER receive the client or server Authorization token!
+        expect(leakedAuthHeader).toBeUndefined();
+      } finally {
+        sinkServer.closeAllConnections?.();
+        sinkServer.close();
+        redirectHopServer.closeAllConnections?.();
+        redirectHopServer.close();
+      }
     });
   });
 });

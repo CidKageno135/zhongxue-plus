@@ -16,6 +16,13 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  SENTINEL_AGENTROUTER_KEY,
+  SENTINEL_OPENROUTER_KEY,
+  SENTINEL_CLIENT_KEY as T10_SENTINEL_CLIENT_KEY,
+  PROVIDER_URLS,
+  ATTACK_VECTORS
+} from './fixtures/security/index.js';
+import {
   validateUpstreamUrl,
   isTrustedHost,
   isLoopbackOrLocalhost,
@@ -494,6 +501,153 @@ describe('server/security.ts - Upstream Security Policy', () => {
 
       expect((options.headers as Record<string, string>)['Authorization']).toBeUndefined();
       expect(options.redirect).toBe('manual');
+    });
+  });
+
+  // ==========================================================================
+  // Section 8: T10 Acceptance Tests - F02: Provider Key Confusion & Binding (G2)
+  // ==========================================================================
+  describe('8. T10 Acceptance Tests: F02 Provider Key Confusion & Isolation (G2)', () => {
+    const providerEnv = {
+      AI_SOL_KEY: SENTINEL_AGENTROUTER_KEY,
+      AI_DEEPSEEK_KEY: SENTINEL_AGENTROUTER_KEY,
+      AI_API_KEY: SENTINEL_AGENTROUTER_KEY,
+      AI_BASE_URL: PROVIDER_URLS.AGENTROUTER,
+      AI_MODEL: 'gpt-6.1-sol'
+    };
+
+    it('F02.1: MUST NOT attach AgentRouter server key when client requests OpenRouter without apiKey', () => {
+      const creds = resolveUpstreamCredentials({
+        requestedBaseUrl: PROVIDER_URLS.OPENROUTER,
+        model: 'gpt-6.1-sol',
+        env: providerEnv
+      });
+
+      // G2 Invariant:
+      // When client does not provide apiKey and specifies OpenRouter (or custom),
+      // backend MUST NOT transfer server key of AgentRouter to OpenRouter.
+      expect(creds.apiKey).not.toBe(SENTINEL_AGENTROUTER_KEY);
+      expect(creds.isAllowed).toBe(false);
+      expect(creds.keySource).toBe('none');
+    });
+
+    it('F02.2: MUST NOT attach AgentRouter server key when client requests api.openrouter.ai without apiKey', () => {
+      const creds = resolveUpstreamCredentials({
+        requestedBaseUrl: PROVIDER_URLS.OPENROUTER_ALT,
+        model: 'gpt-6.1-sol',
+        env: providerEnv
+      });
+
+      expect(creds.apiKey).not.toBe(SENTINEL_AGENTROUTER_KEY);
+      expect(creds.isAllowed).toBe(false);
+      expect(creds.keySource).toBe('none');
+    });
+
+    it('F02.3: Multi-provider isolation with distinct sentinels: binds ONLY correct sentinel per provider', () => {
+      const multiProviderEnv = {
+        AI_AGENTROUTER_KEY: SENTINEL_AGENTROUTER_KEY,
+        AI_SOL_KEY: SENTINEL_AGENTROUTER_KEY,
+        AI_OPENROUTER_KEY: SENTINEL_OPENROUTER_KEY,
+        AI_BASE_URL: PROVIDER_URLS.AGENTROUTER
+      };
+
+      // Requesting AgentRouter must receive AgentRouter sentinel
+      const credsAgentRouter = resolveUpstreamCredentials({
+        requestedBaseUrl: PROVIDER_URLS.AGENTROUTER,
+        env: multiProviderEnv
+      });
+      expect(credsAgentRouter.isAllowed).toBe(true);
+      expect(credsAgentRouter.apiKey).toBe(SENTINEL_AGENTROUTER_KEY);
+      expect(credsAgentRouter.apiKey).not.toBe(SENTINEL_OPENROUTER_KEY);
+
+      // Requesting OpenRouter without client key: must NEVER receive AgentRouter sentinel
+      const credsOpenRouter = resolveUpstreamCredentials({
+        requestedBaseUrl: PROVIDER_URLS.OPENROUTER,
+        env: multiProviderEnv
+      });
+      expect(credsOpenRouter.apiKey).not.toBe(SENTINEL_AGENTROUTER_KEY);
+    });
+
+    it('F02.4: Client-provided apiKey is forwarded to OpenRouter, NEVER substituting server AgentRouter key', () => {
+      const creds = resolveUpstreamCredentials({
+        requestedBaseUrl: PROVIDER_URLS.OPENROUTER,
+        clientApiKey: T10_SENTINEL_CLIENT_KEY,
+        env: providerEnv
+      });
+
+      expect(creds.isAllowed).toBe(true);
+      expect(creds.apiKey).toBe(T10_SENTINEL_CLIENT_KEY);
+      expect(creds.apiKey).not.toBe(SENTINEL_AGENTROUTER_KEY);
+      expect(creds.keySource).toBe('client');
+    });
+  });
+
+  // ==========================================================================
+  // Section 9: T10 Acceptance Tests - F03: SSRF, Fragment, Query & Defaults (G2)
+  // ==========================================================================
+  describe('9. T10 Acceptance Tests: F03 SSRF Defense, Fragment & Query Rejection (G2)', () => {
+    it('F03.1: Strictly REJECTS URLs containing fragment (#) which truncate path', () => {
+      const fragmentUrls = [
+        'https://agentrouter.org/v1#injected',
+        'https://openrouter.ai/api/v1#/chat/completions',
+        'http://127.0.0.1:8080/admin-action#',
+        'https://api.openrouter.ai/v1#frag',
+        'https://evil.com/admin#agentrouter.org'
+      ];
+
+      for (const url of fragmentUrls) {
+        const result = validateUpstreamUrl(url, { allowLocalDev: true });
+        expect(result.valid, `Expected URL with fragment to be rejected: ${url}`).toBe(false);
+        expect(result.error).toMatch(/fragment/i);
+      }
+    });
+
+    it('F03.2: Strictly REJECTS URLs containing query parameters (?) in baseUrl', () => {
+      const queryUrls = [
+        'https://agentrouter.org/v1?admin=true',
+        'https://openrouter.ai/api/v1?token=steal',
+        'https://api.deepseek.com?bypass=1'
+      ];
+
+      for (const url of queryUrls) {
+        const result = validateUpstreamUrl(url);
+        expect(result.valid, `Expected URL with query parameters to be rejected: ${url}`).toBe(false);
+        expect(result.error).toMatch(/query/i);
+      }
+    });
+
+    it('F03.3: Production default MUST reject loopback/localhost/private IP unless allowLocalDev is explicitly true', () => {
+      const localUrls = [
+        'http://127.0.0.1:8080/v1',
+        'http://localhost:3000/v1',
+        'http://[::1]:8080/v1'
+      ];
+
+      for (const url of localUrls) {
+        // Without allowLocalDev, must be rejected by default
+        const defaultResult = validateUpstreamUrl(url, { env: {} });
+        expect(defaultResult.valid, `Expected local URL ${url} to be rejected by default`).toBe(false);
+        expect(defaultResult.error).toMatch(/Insecure protocol|SSRF|private|internal|loopback/i);
+      }
+    });
+
+    it('F03.4: Strictly REJECTS cloud metadata & RFC 1918 private IP ranges under all conditions', () => {
+      const ssrfUrls = [
+        'http://169.254.169.254/latest/meta-data',
+        'https://169.254.169.254/latest/meta-data',
+        'http://metadata.google.internal/computeMetadata/v1',
+        'http://10.0.0.1/admin',
+        'https://10.0.0.1/admin',
+        'http://172.16.0.1/secret',
+        'http://192.168.1.1/setup',
+        'http://0.0.0.0:8080'
+      ];
+
+      for (const url of ssrfUrls) {
+        const res = validateUpstreamUrl(url, { allowLocalDev: true });
+        expect(res.valid, `Expected SSRF target ${url} to be rejected`).toBe(false);
+        expect(res.error).toMatch(/SSRF|private|internal|Insecure protocol/i);
+      }
     });
   });
 
