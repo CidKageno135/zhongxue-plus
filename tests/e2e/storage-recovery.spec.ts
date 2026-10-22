@@ -44,7 +44,8 @@ test.describe('E2E Storage Recovery & Large Dataset Invariants (T09)', () => {
 
     await page.getByRole('button', { name: 'Từ điển', exact: true }).click();
     await page.getByRole('button', { name: 'Đã lưu (600)', exact: true }).click();
-    const firstWord = page.locator('.word-card').filter({ hasText: '單詞1' }).first();
+    const firstWord = page.locator('.word-card').filter({ has: page.getByRole('heading', { name: '單詞1', exact: true }) });
+    await expect(firstWord).toHaveCount(1);
     await expect(firstWord).toContainText(words[0].meaning);
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('zhongxue.learning.v1')!));
     expect(stored.savedWordIds).toEqual(largePayload.savedWordIds);
@@ -95,4 +96,83 @@ test.describe('E2E Storage Recovery & Large Dataset Invariants (T09)', () => {
       }
     });
   }
+  for (const quotaFailure of [false, true]) {
+    test(`explicit import and reset handle corrupted history safely (quota failure: ${quotaFailure})`, async ({ page }) => {
+      const brokenRaw = '{valuable-history';
+      await page.goto('/');
+      await page.evaluate(raw => {
+        localStorage.removeItem('zhongxue.learning.v1.corrupt_backup');
+        localStorage.setItem('zhongxue.learning.v1', raw);
+      }, brokenRaw);
+      if (quotaFailure) {
+        await page.addInitScript(() => {
+          const original = Storage.prototype.setItem;
+          Storage.prototype.setItem = function (key: string, value: string) {
+            if (key === 'zhongxue.learning.v1.corrupt_backup') throw new DOMException('Full', 'QuotaExceededError');
+            original.call(this, key, value);
+          };
+        });
+      }
+      await page.reload();
+      await page.getByRole('button', { name: 'Mở hồ sơ & cài đặt' }).click();
+      const originalRegistry = await page.evaluate(() => localStorage.getItem('zhongxue.custom_words.v1'));
+      const imported = {
+        version: 1, profile: { name: 'Bản nhập được bảo vệ', dailyGoal: 30 },
+        savedWordIds: ['cv_recovered'], completedLessonIds: [], reviews: {}, activity: {}, quizScores: {},
+        customWords: [{ id: 'cv_recovered', hanzi: '復原', pinyin: 'fùyuán', meaning: 'Khôi phục đầy đủ',
+          example: '資料已復原', examplePinyin: 'zīliào yǐ fùyuán', exampleMeaning: 'Dữ liệu đã khôi phục', category: 'Phục hồi', lessonId: 'custom-dictionary' }]
+      };
+      await page.getByLabel('Chọn tệp dữ liệu JSON').setInputFiles({
+        name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(imported))
+      });
+      if (quotaFailure) {
+        await expect(page.getByRole('status')).toContainText('Không thể lưu tiến độ');
+        await expect(page.locator('#profile-name')).not.toHaveValue(imported.profile.name);
+        expect(await page.evaluate(() => localStorage.getItem('zhongxue.custom_words.v1'))).toBe(originalRegistry);
+        expect(await page.evaluate(() => localStorage.getItem('zhongxue.learning.v1'))).toBe(brokenRaw);
+      } else {
+        await expect(page.getByRole('alert', { name: 'Khôi phục tiến độ' })).not.toBeVisible();
+        await page.reload();
+        expect(await page.evaluate(() => JSON.parse(localStorage.getItem('zhongxue.learning.v1')!))).toEqual(imported);
+        expect(await page.evaluate(() => localStorage.getItem('zhongxue.learning.v1.corrupt_backup'))).toBe(brokenRaw);
+        await page.getByRole('button', { name: 'Mở hồ sơ & cài đặt' }).click();
+        await expect(page.locator('#profile-name')).toHaveValue(imported.profile.name);
+      }
+      await page.getByRole('button', { name: 'Xóa toàn bộ tiến độ', exact: true }).click();
+      await page.getByLabel('Nhập XÓA để xác nhận').fill('XÓA');
+      await page.getByRole('button', { name: 'Xác nhận xóa', exact: true }).click();
+      if (quotaFailure) {
+        await expect(page.getByRole('dialog', { name: 'Xác nhận xóa tiến độ' })).toBeVisible();
+        expect(await page.evaluate(() => localStorage.getItem('zhongxue.learning.v1'))).toBe(brokenRaw);
+      } else {
+        await expect(page.getByRole('dialog', { name: 'Xác nhận xóa tiến độ' })).not.toBeVisible();
+        await page.reload();
+        const reset = await page.evaluate(() => JSON.parse(localStorage.getItem('zhongxue.learning.v1')!));
+        expect(reset.savedWordIds).toEqual([]);
+        expect(await page.evaluate(() => localStorage.getItem('zhongxue.custom_words.v1'))).toBeNull();
+        expect(await page.evaluate(() => localStorage.getItem('zhongxue.learning.v1.corrupt_backup'))).toBe(brokenRaw);
+      }
+    });
+  }
+
+  test('imports a valid UTF-8 backup above two MB when its character count is within the shared limit', async ({ page }) => {
+    const meaning = '漢'.repeat(700000);
+    const imported = { version: 1, profile: { name: 'Bản sao Unicode', dailyGoal: 30 },
+      savedWordIds: ['cv_unicode'], completedLessonIds: [], reviews: {}, activity: {}, quizScores: {},
+      customWords: [{ id: 'cv_unicode', hanzi: '漢字', pinyin: 'hànzì', meaning,
+        example: '', examplePinyin: '', exampleMeaning: '', category: 'Unicode', lessonId: 'custom-dictionary' }] };
+    const json = JSON.stringify(imported);
+    expect(json.length).toBeLessThan(2000000);
+    const buffer = Buffer.from(json);
+    expect(buffer.length).toBeGreaterThan(2000000);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Mở hồ sơ & cài đặt' }).click();
+    await page.getByLabel('Chọn tệp dữ liệu JSON').setInputFiles({ name: 'unicode.json', mimeType: 'application/json', buffer });
+    await expect(page.locator('#profile-name')).toHaveValue(imported.profile.name);
+    await page.reload();
+    const restored = await page.evaluate(() => JSON.parse(localStorage.getItem('zhongxue.learning.v1')!));
+    expect(restored.savedWordIds).toEqual(imported.savedWordIds);
+    expect(restored.customWords[0].meaning).toBe(meaning);
+  });
+
 });

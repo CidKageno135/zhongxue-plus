@@ -488,6 +488,15 @@ function validDate(v: unknown, today: string): v is string {
 }
 
 export function importState(json: string, date = new Date()): LearningState {
+    return parseState(json, date, true);
+}
+
+/** Validate an imported backup without mutating the custom-word registry or browser storage. */
+export function parseImportState(json: string, date = new Date()): LearningState {
+    return parseState(json, date, false);
+}
+
+function parseState(json: string, date: Date, registerWords: boolean): LearningState {
     if (typeof json !== 'string') throw Error('Dữ liệu không hợp lệ.');
     if (json.length > MAX_STATE_JSON_LENGTH || (json.length > 200000 && json.trim().length === 0)) {
         throw Error('Tệp dữ liệu quá lớn.');
@@ -649,11 +658,11 @@ export function importState(json: string, date = new Date()): LearningState {
         throw Error('Lượt ôn không khớp lịch sử.');
 
     // Commit custom words atomically only after all checks pass
-    for (const w of customWordsList) {
-        customWordRegistry.set(w.id, w);
-    }
-    if (customWordsList.length > 0) {
-        persistCustomRegistry();
+    if (registerWords) {
+        for (const w of customWordsList) {
+            customWordRegistry.set(w.id, w);
+        }
+        if (customWordsList.length > 0) persistCustomRegistry();
     }
 
     return s as unknown as LearningState;
@@ -681,7 +690,10 @@ export function exportState(state: LearningState): string {
         ...(customWords && customWords.length > 0 ? { customWords: [...customWords] } : {})
     };
 
-    return JSON.stringify(payload);
+    const json = JSON.stringify(payload);
+    // Use the same size and schema contract as import before claiming export/save success.
+    parseState(json, new Date(), false);
+    return json;
 }
 
 export function loadState(
@@ -701,7 +713,7 @@ export function loadState(
     } catch {
         if (raw && typeof storage.setItem === 'function') {
             try {
-                storage.setItem(STORAGE_BACKUP_KEY, raw);
+                preserveCorruptBackup(storage as Pick<Storage, 'getItem' | 'setItem'>, raw);
             } catch {
                 // Ignore backup storage/quota errors
             }
@@ -714,26 +726,33 @@ export function loadState(
     }
 }
 
+function preserveCorruptBackup(storage: Pick<Storage, 'getItem' | 'setItem'>, raw: string): void {
+    const backup = storage.getItem(STORAGE_BACKUP_KEY);
+    if (backup !== null && backup !== raw) {
+        throw Error('Bản sao khôi phục trước đó cần được giữ nguyên.');
+    }
+    if (backup === null) storage.setItem(STORAGE_BACKUP_KEY, raw);
+    if (storage.getItem(STORAGE_BACKUP_KEY) !== raw) throw Error('Không thể tạo bản sao khôi phục.');
+}
+
 export function saveState(
     state: LearningState,
     storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'getItem'>> = typeof localStorage !== 'undefined' ? localStorage : ({} as Storage)
 ): string | null {
     try {
-        if (typeof storage.getItem === 'function' && typeof storage.setItem === 'function') {
+        const json = exportState(state);
+        if (typeof storage.getItem === 'function') {
             const existingRaw = storage.getItem(STORAGE_KEY);
             if (existingRaw) {
                 try {
-                    importState(existingRaw);
+                    parseState(existingRaw, new Date(), false);
                 } catch {
-                    try {
-                        storage.setItem(STORAGE_BACKUP_KEY, existingRaw);
-                    } catch {
-                        // Ignore backup storage/quota errors
-                    }
+                    // Recovery is allowed only after the exact previous raw is safely retained.
+                    preserveCorruptBackup(storage as Pick<Storage, 'getItem' | 'setItem'>, existingRaw);
                 }
             }
         }
-        storage.setItem(STORAGE_KEY, exportState(state));
+        storage.setItem(STORAGE_KEY, json);
         return null;
     } catch {
         return 'Không thể lưu tiến độ trên thiết bị. Hãy xuất bản sao dữ liệu.';

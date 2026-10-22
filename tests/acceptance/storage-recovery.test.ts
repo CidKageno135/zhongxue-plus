@@ -7,6 +7,8 @@ import {
     createInitialState,
     exportState,
     MAX_STATE_JSON_LENGTH,
+    parseImportState,
+    getCustomWordRegistry,
     clearCustomWordRegistry
 } from '../../src/domain/learning';
 
@@ -227,5 +229,22 @@ describe('Save/read contract and recovery atomicity', () => {
         expect(saveState(createInitialState(), storage)).toBeTruthy();
         expect(storage.getItem(STORAGE_KEY)).toBe('{second valuable raw');
         expect(storage.getItem(STORAGE_BACKUP_KEY)).toBe('{first valuable raw');
+    });
+});
+
+
+describe('Pure restore validation', () => {
+    it('does not register imported words until restoration can commit', () => {
+        clearCustomWordRegistry();
+        const word = { id: 'cv_import_atomic', hanzi: '還原', pinyin: 'huányuán', meaning: 'khôi phục',
+            example: '', examplePinyin: '', exampleMeaning: '', category: '', lessonId: 'custom' };
+        const next = parseImportState(JSON.stringify({ ...createInitialState(), savedWordIds: [word.id], customWords: [word] }));
+        expect(next.savedWordIds).toEqual([word.id]);
+        expect(getCustomWordRegistry().has(word.id)).toBe(false);
+        const raw = '{unrecoverable';
+        const storage = { getItem: (key: string) => key === STORAGE_KEY ? raw : null,
+            setItem: () => { throw Error('quota'); } };
+        expect(saveState(next, storage)).toBeTruthy();
+        expect(getCustomWordRegistry().has(word.id)).toBe(false);
     });
 });

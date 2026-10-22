@@ -16,9 +16,10 @@ import {
 import type { LearningState } from '../domain/learning';
 import {
     createInitialState,
+    MAX_STATE_JSON_LENGTH,
     exportState,
     getStats,
-    importState,
+    parseImportState,
     updateProfile,
     getQuizAccuracy,
     getSrsBreakdown,
@@ -32,6 +33,7 @@ import type { HealthResponse, AiConnectionStatus } from '../types';
 interface SettingsViewProps {
     state: LearningState;
     setState: (s: LearningState) => void;
+    onRestoreState: (s: LearningState) => string | null;
     notify: (s: string) => void;
 }
 
@@ -69,7 +71,7 @@ function readStoredAiConfig(): StoredAiConfig {
     return {};
 }
 
-export function SettingsView({ state, setState, notify }: SettingsViewProps) {
+export function SettingsView({ state, setState, onRestoreState, notify }: SettingsViewProps) {
     // -------------------------------------------------------------------------
     // Learning Profile State
     // -------------------------------------------------------------------------
@@ -144,11 +146,13 @@ export function SettingsView({ state, setState, notify }: SettingsViewProps) {
     async function readFile(file: File | undefined) {
         if (!file) return;
         try {
-            if (file.size > 2000000) {
-                throw new Error('Tệp quá lớn. Giới hạn 2 MB.');
+            // UTF-8 may use three bytes per UTF-16 code unit; importState enforces the shared character limit.
+            if (file.size > MAX_STATE_JSON_LENGTH * 3) {
+                throw new Error('Tệp dữ liệu quá lớn.');
             }
-            const next = importState(await file.text());
-            setState(next);
+            const next = parseImportState(await file.text());
+            const error = onRestoreState(next);
+            if (error) throw new Error(error);
             setName(next.profile.name);
             setGoal(next.profile.dailyGoal);
             notify('Đã nhập dữ liệu học tập.');
@@ -856,15 +860,18 @@ export function SettingsView({ state, setState, notify }: SettingsViewProps) {
                         <Button
                             secondary
                             onClick={() => {
-                                const url = URL.createObjectURL(
-                                    new Blob([exportState(state)], { type: 'application/json' })
-                                );
-                                const link = document.createElement('a');
-                                link.href = url;
-                                link.download = 'zhongxue-tien-do.json';
-                                link.click();
-                                URL.revokeObjectURL(url);
-                                notify('Đã xuất bản sao dữ liệu.');
+                                try {
+                                    const json = exportState(state);
+                                    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = 'zhongxue-tien-do.json';
+                                    link.click();
+                                    URL.revokeObjectURL(url);
+                                    notify('Đã xuất bản sao dữ liệu.');
+                                } catch (error) {
+                                    notify(error instanceof Error ? error.message : 'Không thể xuất dữ liệu.');
+                                }
                             }}
                         >
                             <Download size={16} /> Xuất dữ liệu
@@ -925,7 +932,11 @@ export function SettingsView({ state, setState, notify }: SettingsViewProps) {
                                     disabled={confirmation !== 'XÓA'}
                                     onClick={() => {
                                         const next = createInitialState();
-                                        setState(next);
+                                        const error = onRestoreState(next);
+                                        if (error) {
+                                            notify(error);
+                                            return;
+                                        }
                                         setName(next.profile.name);
                                         setGoal(next.profile.dailyGoal);
                                         setReset(false);

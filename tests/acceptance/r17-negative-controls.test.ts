@@ -17,7 +17,8 @@ import {
   localDate,
 } from '../../src/domain/learning';
 import { allWords } from '../../src/data/lessons';
-import type { Word, LearningState } from '../../src/types';
+import type { Word } from '../../src/types';
+import type { LearningState } from '../../src/domain/learning';
 
 // Fresh isolated Storage mock
 function createMockStorage(): Storage {
@@ -210,7 +211,7 @@ describe('R17 Data Reviewer Negative Controls & Falsification Suite', () => {
       expect(w1500?.meaning).toContain('【Mục từ #1500');
     });
 
-    it('falsification boundary: protects raw data and backs up when payload exceeds MAX_STATE_JSON_LENGTH', () => {
+    it('falsification boundary: rejects unreadable saves before replacing valid raw data', () => {
       // Build a dataset that intentionally crosses MAX_STATE_JSON_LENGTH (2,000,000 chars)
       let stateHuge = createInitialState();
       const hugePadding = 'X'.repeat(2500);
@@ -289,10 +290,7 @@ describe('R17 Data Reviewer Negative Controls & Falsification Suite', () => {
       };
 
       // Must catch backup write quota error and return fallback initial state safely
-      let loaded: ReturnType<typeof loadState> | null = null;
-      expect(() => {
-        loaded = loadState(storageQuotaBackup);
-      }).not.toThrow();
+      const loaded = loadState(storageQuotaBackup);
 
       expect(loaded?.error).toBeTruthy();
       expect(loaded?.isCorrupt).toBe(true);

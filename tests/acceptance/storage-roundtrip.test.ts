@@ -12,7 +12,8 @@ import {
     updateProfile,
     localDate
 } from '../../src/domain/learning';
-import type { Word, LearningState } from '../../src/types';
+import type { Word } from '../../src/types';
+import type { LearningState } from '../../src/domain/learning';
 
 // Fixture generator for realistic Taiwanese vocabulary entries with rich examples
 function createRealisticWord(index: number): Word {
