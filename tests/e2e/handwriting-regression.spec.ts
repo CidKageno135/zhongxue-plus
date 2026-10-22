@@ -158,7 +158,7 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
     await expect(dialog).not.toBeVisible();
 
     // Verify query input received the character
-    const searchInput = page.getByPlaceholder(/Tra cứu Hán tự, Pinyin, hoặc Tiếng Việt/);
+    const searchInput = page.getByRole('textbox', { name: 'Tìm từ vựng', exact: true });
     await expect(searchInput).toHaveValue('一');
   });
 
