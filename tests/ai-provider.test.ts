@@ -416,11 +416,14 @@ describe('A05: Upstream AI Provider & Timeout Connector (server/ai.ts)', () => {
     expect(result.statusCode).toBe(499);
   });
 
-  it('performs ping health check successfully on upstream', async () => {
+  it('performs ping health check successfully on upstream with valid schema', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      text: async () => 'pong'
+      json: async () => ({
+        choices: [{ message: { role: 'assistant', content: 'pong' } }]
+      }),
+      text: async () => JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'pong' } }] })
     });
 
     const result = await executeConversation(
@@ -434,6 +437,51 @@ describe('A05: Upstream AI Provider & Timeout Connector (server/ai.ts)', () => {
     expect(body.provider).toContain('AgentRouter');
     expect(body.model).toBe('gpt-6.1-sol');
     expect(typeof body.latencyMs).toBe('number');
+  });
+
+  it('rejects ping as ok=false when upstream returns HTTP 200 with empty body (G3 invariant)', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => ''
+    });
+
+    const result = await executeConversation(
+      { action: 'ping' },
+      { env: mockEnv, fetchFn: mockFetch as unknown as typeof fetch }
+    );
+
+    expect(result.statusCode).toBe(200);
+    const body = result.body as AiConnectionStatus;
+    // On baseline: returns ok=true without checking body -> FAILS (RED)
+    expect(
+      body.ok,
+      'HTTP 200 with empty body must NOT be reported as reachable/ready'
+    ).toBe(false);
+    expect(body.error).toBeDefined();
+  });
+
+  it('rejects ping as ok=false when upstream returns HTTP 200 with invalid schema or error payload (G3 invariant)', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ error: 'Model overloaded' }),
+      text: async () => JSON.stringify({ error: 'Model overloaded' })
+    });
+
+    const result = await executeConversation(
+      { action: 'ping' },
+      { env: mockEnv, fetchFn: mockFetch as unknown as typeof fetch }
+    );
+
+    expect(result.statusCode).toBe(200);
+    const body = result.body as AiConnectionStatus;
+    // On baseline: returns ok=true without inspecting schema -> FAILS (RED)
+    expect(
+      body.ok,
+      'HTTP 200 with error schema must NOT be reported as reachable/ready'
+    ).toBe(false);
+    expect(body.error).toBeDefined();
   });
 
   it('returns ok=false on ping when no API key is configured', async () => {

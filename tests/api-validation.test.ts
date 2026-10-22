@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Readable } from 'node:stream';
 import type { IncomingMessage } from 'node:http';
+import { RealTcpAppServer } from './fixtures/ai-http/real-tcp-server.ts';
 import {
   HttpError,
   badRequest,
@@ -754,6 +755,110 @@ describe('server/validation.ts', () => {
         expect((e as HttpError).statusCode).toBe(413);
         expect((e as HttpError).code).toBe('PAYLOAD_TOO_LARGE');
       }
+    });
+  });
+
+  describe('F05 Acceptance: Live HTTP TCP Route Validation for /api/conversation (Invariant G3 / F05)', () => {
+    let appServer: RealTcpAppServer;
+
+    beforeAll(async () => {
+      appServer = new RealTcpAppServer();
+      await appServer.start();
+    });
+
+    afterAll(async () => {
+      await appServer.close();
+    });
+
+    it('rejects POST body "null" with 400 Bad Request (F05 reproduction: baseline returns 500)', async () => {
+      const res = await appServer.postRaw('/api/conversation', 'null', 'application/json');
+      // On baseline: JSON.parse("null") returns null -> TypeError reading 'messages' -> 500 INTERNAL_SERVER_ERROR
+      // Acceptance invariant: Must return 400 Bad Request
+      expect(
+        res.statusCode,
+        'POST "null" must return 400 Bad Request instead of 500 Internal Server Error'
+      ).toBe(400);
+      const body = res.json() as { error?: { code?: string } };
+      expect(body.error?.code).toBe('BAD_REQUEST');
+    });
+
+    it('rejects POST body with messages as string with 400 Bad Request (F05 reproduction: baseline returns 200 guided)', async () => {
+      const res = await appServer.postJson('/api/conversation', {
+        action: 'chat',
+        roleId: 'greeting',
+        messages: 'invalid-string-instead-of-array'
+      });
+      // On baseline: messages string is not rejected -> falls through to guided fallback -> 200 OK
+      // Acceptance invariant: Must return 400 Bad Request
+      expect(
+        res.statusCode,
+        'POST with messages string must return 400 Bad Request instead of 200 guided fallback'
+      ).toBe(400);
+      const body = res.json() as { error?: { code?: string } };
+      expect(body.error?.code).toBe('BAD_REQUEST');
+    });
+
+    it('rejects POST body with messages array item missing role with 400 Bad Request (F05 reproduction: baseline returns 200 guided)', async () => {
+      const res = await appServer.postJson('/api/conversation', {
+        action: 'chat',
+        roleId: 'greeting',
+        messages: [{ content: 'hello without role' }]
+      });
+      // On baseline: message turn missing role is not validated by route -> 200 OK guided
+      // Acceptance invariant: Must return 400 Bad Request
+      expect(
+        res.statusCode,
+        'POST with missing role must return 400 Bad Request instead of 200 guided fallback'
+      ).toBe(400);
+      const body = res.json() as { error?: { code?: string } };
+      expect(body.error?.code).toBe('BAD_REQUEST');
+    });
+
+    it('rejects POST body with invalid message role with 400 Bad Request', async () => {
+      const res = await appServer.postJson('/api/conversation', {
+        action: 'chat',
+        roleId: 'greeting',
+        messages: [{ role: 'super_admin', content: 'test' }]
+      });
+      expect(
+        res.statusCode,
+        'POST with invalid role must return 400 Bad Request instead of 200 guided fallback'
+      ).toBe(400);
+      const body = res.json() as { error?: { code?: string } };
+      expect(body.error?.code).toBe('BAD_REQUEST');
+    });
+
+    it('rejects non-object body (JSON array) with 400 Bad Request', async () => {
+      const res = await appServer.postRaw('/api/conversation', '[1, 2, 3]', 'application/json');
+      expect(
+        res.statusCode,
+        'POST with array body must return 400 Bad Request'
+      ).toBe(400);
+      const body = res.json() as { error?: { code?: string } };
+      expect(body.error?.code).toBe('BAD_REQUEST');
+    });
+
+    it('rejects non-JSON Content-Type (text/plain) with 415 or 400', async () => {
+      const res = await appServer.postRaw('/api/conversation', '{"action":"ping"}', 'text/plain');
+      expect([400, 415]).toContain(res.statusCode);
+    });
+
+    it('rejects payload exceeding 100KB with 413 Payload Too Large', async () => {
+      const oversizedChunk = 'a'.repeat(105 * 1024);
+      const res = await appServer.postRaw('/api/conversation', `{"messages":[{"role":"user","content":"${oversizedChunk}"}]}`);
+      expect(res.statusCode).toBe(413);
+    });
+
+    it('accepts valid request body and returns 200 OK', async () => {
+      const res = await appServer.postJson('/api/conversation', {
+        action: 'chat',
+        roleId: 'greeting',
+        messages: [{ role: 'user', content: 'Xin chào' }]
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { mode?: string; content?: string };
+      expect(body.mode).toBeDefined();
+      expect(body.content).toBeDefined();
     });
   });
 });
