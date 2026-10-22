@@ -32,7 +32,13 @@ import {
   type ResolvedCredentials
 } from './security.ts';
 import { createGuidedFallbackReply } from './aiFallback.ts';
-import { sendJson } from './errors.ts';
+import { sendJson, sendError, methodNotAllowed, badRequest, payloadTooLarge } from './errors.ts';
+import {
+  parseJsonBody,
+  validateConversationBody,
+  validateJsonContentType,
+  MAX_BODY_SIZE_CONVERSATION
+} from './validation.ts';
 
 /** Default server response deadline (12 seconds) */
 export const DEFAULT_AI_TIMEOUT_MS = 12000;
@@ -168,13 +174,16 @@ export async function executeConversation(
   const model = (body.model || env.AI_MODEL || 'gpt-6.1-sol').trim();
   const isSolModel = model === 'gpt-6.1-sol' || model.includes('sol');
 
+  // Allow local dev/test when running in test environment or explicitly enabled
+  const allowLocalDev = options?.allowLocalDev ?? (env.ALLOW_LOCAL_TEST_UPSTREAM === 'true' || env.VITEST === 'true' || env.NODE_ENV === 'test');
+
   // Resolve credentials with A03 security boundary
   const creds: ResolvedCredentials = resolveUpstreamCredentials({
     model,
     requestedBaseUrl: body.baseUrl,
     clientApiKey: body.apiKey,
     env,
-    allowLocalDev: options?.allowLocalDev
+    allowLocalDev
   });
 
   // Calculate clamped timeout: default 12s, max 15s, min 1s
@@ -262,6 +271,86 @@ export async function executeConversation(
 
         const elapsed = Date.now() - tStart;
         if (pingRes.ok) {
+          const rawPingBody = await pingRes.text().catch(() => '');
+          if (!rawPingBody || !rawPingBody.trim()) {
+            return {
+              statusCode: 200,
+              body: {
+                ok: false,
+                provider: providerLabel,
+                model,
+                baseUrl: creds.baseUrl,
+                error: 'Upstream returned empty or whitespace-only response body'
+              } as AiConnectionStatus
+            };
+          }
+
+          let pingData: Record<string, unknown>;
+          try {
+            pingData = JSON.parse(rawPingBody);
+          } catch {
+            return {
+              statusCode: 200,
+              body: {
+                ok: false,
+                provider: providerLabel,
+                model,
+                baseUrl: creds.baseUrl,
+                error: 'Upstream response is not valid JSON'
+              } as AiConnectionStatus
+            };
+          }
+
+          if (!pingData || typeof pingData !== 'object' || Array.isArray(pingData)) {
+            return {
+              statusCode: 200,
+              body: {
+                ok: false,
+                provider: providerLabel,
+                model,
+                baseUrl: creds.baseUrl,
+                error: 'Upstream response must be a JSON object'
+              } as AiConnectionStatus
+            };
+          }
+
+          if ('error' in pingData && pingData.error) {
+            const errVal = pingData.error;
+            const errMsg = typeof errVal === 'string'
+              ? errVal
+              : typeof errVal === 'object' && errVal && 'message' in errVal && typeof (errVal as { message?: unknown }).message === 'string'
+                ? (errVal as { message: string }).message
+                : JSON.stringify(errVal);
+            return {
+              statusCode: 200,
+              body: {
+                ok: false,
+                provider: providerLabel,
+                model,
+                baseUrl: creds.baseUrl,
+                error: `Upstream returned error: ${errMsg}`
+              } as AiConnectionStatus
+            };
+          }
+
+          const hasValidSchema =
+            (Array.isArray(pingData.choices) && pingData.choices.length > 0) ||
+            Array.isArray(pingData.output) ||
+            Boolean(extractAiResponseText(pingData));
+
+          if (!hasValidSchema) {
+            return {
+              statusCode: 200,
+              body: {
+                ok: false,
+                provider: providerLabel,
+                model,
+                baseUrl: creds.baseUrl,
+                error: 'Upstream response missing choices or output schema'
+              } as AiConnectionStatus
+            };
+          }
+
           return {
             statusCode: 200,
             body: {
@@ -370,11 +459,25 @@ export async function executeConversation(
         });
 
         if (llmRes.ok) {
-          const llmData = await llmRes.json();
+          let llmData: unknown = null;
+          if (typeof llmRes.json === 'function') {
+            try {
+              llmData = await llmRes.json();
+            } catch {
+              llmData = null;
+            }
+          } else if (typeof llmRes.text === 'function') {
+            try {
+              const raw = await llmRes.text();
+              llmData = raw ? JSON.parse(raw) : null;
+            } catch {
+              llmData = null;
+            }
+          }
           aiText = extractAiResponseText(llmData);
         } else {
           upstreamErrorStatus = llmRes.status;
-          const errBody = await llmRes.text().catch(() => '');
+          const errBody = typeof llmRes.text === 'function' ? await llmRes.text().catch(() => '') : '';
           console.warn(`[zhongxue-ai] Responses API error ${llmRes.status}:`, errBody.slice(0, 150));
         }
       } else {
@@ -400,11 +503,25 @@ export async function executeConversation(
         });
 
         if (llmRes.ok) {
-          const llmData = await llmRes.json();
+          let llmData: unknown = null;
+          if (typeof llmRes.json === 'function') {
+            try {
+              llmData = await llmRes.json();
+            } catch {
+              llmData = null;
+            }
+          } else if (typeof llmRes.text === 'function') {
+            try {
+              const raw = await llmRes.text();
+              llmData = raw ? JSON.parse(raw) : null;
+            } catch {
+              llmData = null;
+            }
+          }
           aiText = extractAiResponseText(llmData);
         } else {
           upstreamErrorStatus = llmRes.status;
-          const errBody = await llmRes.text().catch(() => '');
+          const errBody = typeof llmRes.text === 'function' ? await llmRes.text().catch(() => '') : '';
           console.warn(`[zhongxue-ai] Chat completions error ${llmRes.status}:`, errBody.slice(0, 150));
         }
       }
@@ -503,59 +620,109 @@ export async function handleConversationRoute(
 
   // 2. Only POST allowed for conversation turns
   if (method !== 'POST') {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: `Method ${method} is not allowed on /api/conversation` }
-    });
+    sendError(res, methodNotAllowed(`Method ${method} is not allowed on /api/conversation`));
     return;
   }
 
-  // Read body if not pre-parsed
-  let body: ConversationRequestBody;
-  if (parsedBody) {
-    body = parsedBody;
-  } else {
-    try {
-      body = await new Promise<ConversationRequestBody>((resolve, reject) => {
-        let raw = '';
-        req.on('data', chunk => {
-          raw += chunk;
-          if (raw.length > 100 * 1024) {
-            reject(new Error('PAYLOAD_TOO_LARGE'));
-          }
-        });
-        req.on('end', () => {
-          try {
-            resolve(JSON.parse(raw || '{}'));
-          } catch {
-            reject(new Error('INVALID_JSON'));
-          }
-        });
-        req.on('error', reject);
-      });
-    } catch (err) {
-      const isTooLarge = err instanceof Error && err.message === 'PAYLOAD_TOO_LARGE';
-      const statusCode = isTooLarge ? 413 : 400;
-      sendJson(res, statusCode, {
-        error: {
-          code: isTooLarge ? 'PAYLOAD_TOO_LARGE' : 'BAD_REQUEST',
-          message: isTooLarge ? 'Request payload exceeds 100KB limit' : 'Invalid JSON request body'
-        }
-      });
-      return;
-    }
-  }
-
-  // Link client disconnect to abort signal
+  // Early client disconnect / abort controller setup
   const clientController = new AbortController();
-  req.on('close', () => {
+  const onClientDisconnect = () => {
     if (!res.writableEnded) {
       clientController.abort(new Error('CLIENT_CLOSED'));
     }
-  });
+  };
 
-  const result = await executeConversation(body, { clientSignal: clientController.signal });
+  if (typeof res.on === 'function') {
+    res.on('close', onClientDisconnect);
+  }
+  if (typeof req.on === 'function') {
+    req.on('aborted', onClientDisconnect);
+    req.on('close', () => {
+      if (!req.complete && !res.writableEnded) {
+        onClientDisconnect();
+      }
+    });
+  }
 
-  if (!res.writableEnded) {
-    sendJson(res, result.statusCode, result.body);
+  try {
+    // 3. Content-Type and Body reading & validation
+    let rawBody: unknown;
+    if (parsedBody !== undefined) {
+      const contentType = req.headers ? req.headers['content-type'] : undefined;
+      if (contentType) {
+        validateJsonContentType(contentType);
+      }
+      rawBody = parsedBody;
+    } else {
+      const contentType = req.headers ? req.headers['content-type'] : undefined;
+      if (contentType) {
+        validateJsonContentType(contentType);
+      }
+
+      rawBody = await new Promise((resolve, reject) => {
+        let raw = '';
+        let bytesRead = 0;
+        const maxBytes = MAX_BODY_SIZE_CONVERSATION;
+
+        if (req.headers && req.headers['content-length']) {
+          const declared = parseInt(req.headers['content-length'], 10);
+          if (!isNaN(declared) && declared > maxBytes) {
+            reject(payloadTooLarge(`Request body size (${declared} bytes) exceeds limit of ${maxBytes} bytes`));
+            return;
+          }
+        }
+
+        req.on('data', (chunk: Buffer | string) => {
+          const len = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk);
+          bytesRead += len;
+          if (bytesRead > maxBytes) {
+            reject(payloadTooLarge(`Request body size (${bytesRead} bytes) exceeds limit of ${maxBytes} bytes`));
+            return;
+          }
+          raw += chunk.toString();
+        });
+
+        req.on('end', () => {
+          try {
+            resolve(parseJsonBody(raw));
+          } catch {
+            reject(badRequest('Invalid JSON request body', undefined, 'BAD_REQUEST'));
+          }
+        });
+
+        req.on('error', reject);
+      });
+    }
+
+    // Validate body structure and chat messages
+    const validBody = validateConversationBody(rawBody);
+
+    // If action is chat (or default), ensure messages is not empty
+    if ((!validBody.action || validBody.action === 'chat') && (!validBody.messages || validBody.messages.length === 0)) {
+      throw badRequest('messages array cannot be empty');
+    }
+
+    if (res.writableEnded || clientController.signal.aborted) {
+      return;
+    }
+
+    const result = await executeConversation(validBody, {
+      clientSignal: clientController.signal
+    });
+
+    if (!res.writableEnded) {
+      sendJson(res, result.statusCode, result.body);
+    }
+  } catch (err) {
+    if (!res.writableEnded) {
+      sendError(res, err);
+    }
+  } finally {
+    if (typeof res.removeListener === 'function') {
+      res.removeListener('close', onClientDisconnect);
+    }
+    if (typeof req.removeListener === 'function') {
+      req.removeListener('aborted', onClientDisconnect);
+    }
   }
 }

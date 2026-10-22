@@ -16,6 +16,7 @@ import type {
  * Size constants (in bytes)
  */
 export const MAX_BODY_SIZE_CHAT = 512 * 1024; // 512 KB
+export const MAX_BODY_SIZE_CONVERSATION = 100 * 1024; // 100 KB
 export const MAX_BODY_SIZE_HANDWRITING = 1024 * 1024; // 1 MB
 export const MAX_BODY_SIZE_DEFAULT = 512 * 1024; // 512 KB
 
@@ -185,6 +186,51 @@ export function validateDictionaryQuery(
 }
 
 /**
+ * Validate chat messages array strictly.
+ * Ensures messages is an array, each item is an object with valid role and string content.
+ */
+export function validateChatMessages(messages: unknown): ConversationTurn[] {
+  if (!Array.isArray(messages)) {
+    throw badRequest('messages must be an array');
+  }
+  if (messages.length > MAX_MESSAGES_COUNT) {
+    throw badRequest(`messages array cannot exceed ${MAX_MESSAGES_COUNT} items`);
+  }
+
+  const result: ConversationTurn[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg)) {
+      throw badRequest(`Message at index ${i} must be a JSON object`);
+    }
+    const role = (msg as { role?: unknown }).role;
+    const content = (msg as { content?: unknown }).content;
+
+    if (typeof role !== 'string' || !VALID_MESSAGE_ROLES.includes(role as typeof VALID_MESSAGE_ROLES[number])) {
+      throw badRequest(
+        `Invalid message role "${role}" at index ${i}. Allowed roles: ${VALID_MESSAGE_ROLES.join(', ')}`
+      );
+    }
+
+    if (typeof content !== 'string') {
+      throw badRequest(`Message content at index ${i} must be a string`);
+    }
+
+    if (content.length > MAX_MESSAGE_CONTENT_LENGTH) {
+      throw badRequest(
+        `Message content at index ${i} exceeds maximum limit of ${MAX_MESSAGE_CONTENT_LENGTH} characters`
+      );
+    }
+
+    result.push({
+      role: role as ConversationTurn['role'],
+      content
+    });
+  }
+  return result;
+}
+
+/**
  * Validate /api/conversation request body
  */
 export function validateConversationBody(rawBody: unknown): ConversationRequestBody & {
@@ -263,42 +309,7 @@ export function validateConversationBody(rawBody: unknown): ConversationRequestB
 
   const messages: ConversationTurn[] = [];
   if (obj.messages !== undefined) {
-    if (!Array.isArray(obj.messages)) {
-      throw badRequest('messages must be an array');
-    }
-    if (obj.messages.length > MAX_MESSAGES_COUNT) {
-      throw badRequest(`messages array cannot exceed ${MAX_MESSAGES_COUNT} items`);
-    }
-
-    for (let i = 0; i < obj.messages.length; i++) {
-      const msg = obj.messages[i];
-      if (!msg || typeof msg !== 'object' || Array.isArray(msg)) {
-        throw badRequest(`Message at index ${i} must be a JSON object`);
-      }
-      const role = (msg as { role?: unknown }).role;
-      const content = (msg as { content?: unknown }).content;
-
-      if (typeof role !== 'string' || !VALID_MESSAGE_ROLES.includes(role as typeof VALID_MESSAGE_ROLES[number])) {
-        throw badRequest(
-          `Invalid message role "${role}" at index ${i}. Allowed roles: ${VALID_MESSAGE_ROLES.join(', ')}`
-        );
-      }
-
-      if (typeof content !== 'string') {
-        throw badRequest(`Message content at index ${i} must be a string`);
-      }
-
-      if (content.length > MAX_MESSAGE_CONTENT_LENGTH) {
-        throw badRequest(
-          `Message content at index ${i} exceeds maximum limit of ${MAX_MESSAGE_CONTENT_LENGTH} characters`
-        );
-      }
-
-      messages.push({
-        role: role as ConversationTurn['role'],
-        content
-      });
-    }
+    messages.push(...validateChatMessages(obj.messages));
   }
 
   return {
@@ -313,6 +324,8 @@ export function validateConversationBody(rawBody: unknown): ConversationRequestB
     messages
   };
 }
+
+export const validateConversationRequest = validateConversationBody;
 
 /**
  * Validate /api/handwriting request body

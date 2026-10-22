@@ -79,12 +79,16 @@ export interface HttpResponseLike {
  * Send JSON response with appropriate headers
  */
 export function sendJson(res: HttpResponseLike | ServerResponse, statusCode: number, data: unknown): void {
-  if (res.writableEnded) return;
-  const json = JSON.stringify(data);
-  res.statusCode = statusCode;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Content-Length', Buffer.byteLength(json));
-  res.end(json);
+  if (res.writableEnded || ('destroyed' in res && (res as { destroyed?: boolean }).destroyed)) return;
+  try {
+    const json = JSON.stringify(data);
+    res.statusCode = statusCode;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Length', Buffer.byteLength(json));
+    res.end(json);
+  } catch {
+    // Ignore write errors if socket closed concurrently
+  }
 }
 
 /**
@@ -159,7 +163,7 @@ export function sendError(
   arg3?: string,
   arg4?: unknown
 ): void {
-  if (res.writableEnded) return;
+  if (res.writableEnded || ('destroyed' in res && (res as { destroyed?: boolean }).destroyed)) return;
 
   let statusCode = 500;
   let code = 'INTERNAL_ERROR';
