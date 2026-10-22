@@ -163,6 +163,15 @@ export function validateUpstreamUrl(
 
   const trimmed = urlStr.trim();
 
+  // F03: Strictly forbid fragment (#) anywhere in the URL string
+  if (trimmed.includes('#')) {
+    return {
+      valid: false,
+      isTrusted: false,
+      error: 'Forbidden fragment: URLs containing "#" are strictly forbidden'
+    };
+  }
+
   // Explicitly require http:// or https:// scheme prefix
   if (!/^https?:\/\//i.test(trimmed)) {
     return {
@@ -177,6 +186,15 @@ export function validateUpstreamUrl(
     parsed = new URL(trimmed);
   } catch {
     return { valid: false, isTrusted: false, error: 'Malformed URL: unable to parse' };
+  }
+
+  // Double check fragment from parsed URL object
+  if (parsed.hash && parsed.hash !== '') {
+    return {
+      valid: false,
+      isTrusted: false,
+      error: 'Forbidden fragment: URLs containing "#" are strictly forbidden'
+    };
   }
 
   // Strictly forbid userinfo (user:pass@host)
@@ -194,7 +212,17 @@ export function validateUpstreamUrl(
   const env = options?.env || process.env;
 
   const isLocal = isLoopbackOrLocalhost(hostname);
-  const isDevOrTest = options?.allowLocalDev ?? (env.NODE_ENV !== 'production');
+  // F03: Default secure: loopback / local dev requires explicit opt-in allowLocalDev === true or ALLOW_LOCAL_TEST_UPSTREAM === 'true'
+  const isDevOrTest = options?.allowLocalDev === true || env.ALLOW_LOCAL_TEST_UPSTREAM === 'true';
+
+  // Reject local loopback/localhost when not in explicitly allowed dev/test mode
+  if (isLocal && !isDevOrTest) {
+    return {
+      valid: false,
+      isTrusted: false,
+      error: 'Insecure protocol: loopback/localhost access is forbidden unless allowLocalDev is explicitly enabled'
+    };
+  }
 
   // Protocol validation:
   if (protocol === 'http:') {
@@ -202,7 +230,9 @@ export function validateUpstreamUrl(
       return {
         valid: false,
         isTrusted: false,
-        error: 'Insecure protocol: http is strictly forbidden for remote upstream providers'
+        error: isLocal
+          ? 'Insecure protocol: http is forbidden for loopback unless allowLocalDev is explicitly enabled'
+          : 'Insecure protocol: http is strictly forbidden for remote upstream providers'
       };
     }
   } else if (protocol !== 'https:') {
@@ -210,6 +240,15 @@ export function validateUpstreamUrl(
       valid: false,
       isTrusted: false,
       error: `Unsupported protocol: ${protocol}. Only https is supported.`
+    };
+  }
+
+  // F03: Strictly forbid query parameters (?) in baseUrl
+  if (trimmed.includes('?') || (parsed.search && parsed.search !== '')) {
+    return {
+      valid: false,
+      isTrusted: false,
+      error: 'Forbidden query: URLs containing query parameters are not permitted in baseUrl'
     };
   }
 
@@ -246,21 +285,80 @@ export function validateUpstreamUrl(
 }
 
 /**
+ * Recognized AI provider types for strict key binding (F02).
+ */
+export type AiProvider = 'agentrouter' | 'openrouter' | 'deepseek' | 'custom';
+
+/**
+ * Identifies the AI provider based on hostname.
+ */
+export function getProviderForHostname(hostname: string): AiProvider {
+  if (!hostname || typeof hostname !== 'string') return 'custom';
+  const h = hostname.toLowerCase().trim();
+  if (h === 'agentrouter.org' || h.endsWith('.agentrouter.org')) {
+    return 'agentrouter';
+  }
+  if (h === 'openrouter.ai' || h === 'api.openrouter.ai' || h.endsWith('.openrouter.ai')) {
+    return 'openrouter';
+  }
+  if (h === 'api.deepseek.com' || h.endsWith('.deepseek.com')) {
+    return 'deepseek';
+  }
+  return 'custom';
+}
+
+/**
+ * Resolves server API key strictly scoped to the destination provider (F02).
+ * Prevents transferring AgentRouter server keys to OpenRouter or other providers.
+ */
+export function getServerKeyForProvider(
+  provider: AiProvider,
+  model?: string,
+  env: Record<string, string | undefined> = process.env
+): string {
+  const modelName = (model || env.AI_MODEL || '').toLowerCase();
+
+  if (provider === 'agentrouter') {
+    const isSol = modelName === 'gpt-6.1-sol' || modelName.includes('sol');
+    const agentRouterKey = (env.AI_AGENTROUTER_KEY || '').trim();
+    const solKey = (env.AI_SOL_KEY || '').trim();
+    const deepseekKey = (env.AI_DEEPSEEK_KEY || '').trim();
+    const genericKey = (env.AI_API_KEY || '').trim();
+
+    if (isSol) {
+      return solKey || agentRouterKey || genericKey || deepseekKey;
+    }
+    return deepseekKey || agentRouterKey || genericKey || solKey;
+  }
+
+  if (provider === 'openrouter') {
+    // F02 invariant: OpenRouter MUST ONLY use keys specifically configured for OpenRouter
+    return (env.AI_OPENROUTER_KEY || '').trim();
+  }
+
+  if (provider === 'deepseek') {
+    return (env.AI_DEEPSEEK_DIRECT_KEY || env.AI_DEEPSEEK_KEY || '').trim();
+  }
+
+  return '';
+}
+
+/**
  * Determine default server API key based on requested model and environment.
  */
 export function getServerKeyForModel(
   model?: string,
   env: Record<string, string | undefined> = process.env
 ): string {
-  const modelName = (model || env.AI_MODEL || 'gpt-6.1-sol').toLowerCase();
-  const solKey = (env.AI_SOL_KEY || env.AI_API_KEY || '').trim();
-  const deepseekKey = (env.AI_DEEPSEEK_KEY || '').trim();
-
-  const isSolModel = modelName === 'gpt-6.1-sol' || modelName.includes('sol');
-  if (isSolModel) {
-    return solKey || deepseekKey;
+  const defaultUrl = env.AI_BASE_URL || DEFAULT_AI_BASE_URL;
+  let provider: AiProvider = 'agentrouter';
+  try {
+    const parsed = new URL(defaultUrl);
+    provider = getProviderForHostname(parsed.hostname);
+  } catch {
+    provider = 'agentrouter';
   }
-  return deepseekKey || solKey;
+  return getServerKeyForProvider(provider, model, env);
 }
 
 /**
@@ -284,11 +382,12 @@ export function getDefaultBaseUrl(
  *
  * Core invariant:
  * - Server environment keys (AI_SOL_KEY, AI_DEEPSEEK_KEY, AI_API_KEY) are ONLY injected
- *   when the destination is an approved trusted host.
+ *   when the destination is an approved trusted host AND matches the intended provider.
  * - If client provides custom baseUrl:
  *     - If client provides their own apiKey, forward ONLY client's key.
  *     - If client does NOT provide apiKey, REJECT request (isAllowed = false).
  *       NEVER attach server keys to a custom or untrusted baseUrl.
+ * - F02: Server key is strictly bound to provider (OpenRouter will never receive AgentRouter key).
  */
 export function resolveUpstreamCredentials(options: ResolveCredentialsOptions): ResolvedCredentials {
   const env = options.env || process.env;
@@ -315,6 +414,8 @@ export function resolveUpstreamCredentials(options: ResolveCredentialsOptions): 
     }
 
     const cleanBaseUrl = requestedBaseUrl.replace(/\/+$/, '');
+    const hostname = urlValidation.url ? urlValidation.url.hostname.toLowerCase() : '';
+    const provider = getProviderForHostname(hostname);
 
     // Destination is trusted host
     if (urlValidation.isTrusted) {
@@ -330,8 +431,8 @@ export function resolveUpstreamCredentials(options: ResolveCredentialsOptions): 
         };
       }
 
-      // No client key, but destination IS trusted: inject server key
-      const serverKey = getServerKeyForModel(options.model, env);
+      // No client key, but destination IS trusted: inject server key strictly bound to provider (F02)
+      const serverKey = getServerKeyForProvider(provider, options.model, env);
       if (serverKey) {
         return {
           apiKey: serverKey,
@@ -350,7 +451,7 @@ export function resolveUpstreamCredentials(options: ResolveCredentialsOptions): 
         isTrusted: true,
         isCustomUrl: false,
         keySource: 'none',
-        error: 'No API key provided by client and no server key configured for trusted host'
+        error: `No API key provided by client and no server key configured for trusted host (${hostname}). Client must provide an apiKey.`
       };
     }
 
@@ -415,7 +516,9 @@ export function resolveUpstreamCredentials(options: ResolveCredentialsOptions): 
 
   // Only inject server key if default url is trusted
   if (urlValidation.isTrusted) {
-    const serverKey = getServerKeyForModel(options.model, env);
+    const hostname = urlValidation.url ? urlValidation.url.hostname.toLowerCase() : '';
+    const provider = getProviderForHostname(hostname);
+    const serverKey = getServerKeyForProvider(provider, options.model, env);
     if (serverKey) {
       return {
         apiKey: serverKey,
