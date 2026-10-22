@@ -53,9 +53,9 @@ test.describe('Settings & AI Provider Configuration (Subagent A15)', () => {
     // Click "Kiểm tra kết nối AI (Ping)"
     await page.getByRole('button', { name: /Kiểm tra kết nối AI \(Ping\)/ }).click();
 
-    // Verify success banner with latency is displayed
-    await expect(page.getByText(/Kết nối AI thành công!/)).toBeVisible();
-    await expect(page.getByText(/128ms/)).toBeVisible();
+    // Verify success status notification with latency is displayed without strict mode conflict
+    await expect(page.getByRole('status').filter({ hasText: /Kết nối AI thành công!/ })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /128ms/ })).toBeVisible();
 
     // Assert that NO client apiKey was sent in the request body
     expect(interceptedApiKey).toBeUndefined();
@@ -110,7 +110,7 @@ test.describe('Settings & AI Provider Configuration (Subagent A15)', () => {
 
     // Trigger AI Ping probe and verify client key is forwarded
     await page.getByRole('button', { name: /Kiểm tra kết nối AI \(Ping\)/ }).click();
-    await expect(page.getByText(/Kết nối AI thành công!/)).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /Kết nối AI thành công!/ })).toBeVisible();
     expect(interceptedKey).toBe('sk-personal-user-test-key-999');
 
     // Click "Xóa khóa"
@@ -171,8 +171,8 @@ test.describe('Settings & AI Provider Configuration (Subagent A15)', () => {
     // Click "Kiểm tra hệ thống"
     await page.getByRole('button', { name: 'Kiểm tra hệ thống' }).click();
 
-    // Verify UI reflects real dictionary loaded entries
-    await expect(page.getByText('122.596 mục từ')).toBeVisible();
+    // Verify UI reflects real dictionary loaded entries (support both comma and period group separators)
+    await expect(page.getByText(/122[.,]596 mục từ/)).toBeVisible();
     await expect(page.getByText('application/json')).toBeVisible();
     await expect(page.getByText('Sẵn sàng (200 OK)')).toBeVisible();
   });

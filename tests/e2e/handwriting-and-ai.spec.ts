@@ -35,7 +35,7 @@ test('handwriting search modal opens, recognizes strokes offline, and closes via
 });
 
 test('AI chat handles live AI reply with Traditional Chinese, Pinyin, Vietnamese translation, and practice tips', async ({ page }) => {
-  // Hermetic mock fixture for upstream AI response
+  // Hermetic mock fixture for upstream AI response with unique response text
   await page.route('**/api/conversation', async route => {
     const req = route.request();
     if (req.method() === 'POST') {
@@ -44,7 +44,7 @@ test('AI chat handles live AI reply with Traditional Chinese, Pinyin, Vietnamese
         contentType: 'application/json',
         body: JSON.stringify({
           mode: 'ai',
-          content: '中文：你好！我是你的華語 AI 學習夥伴。今天想在臺灣練習什麼情境？\nPinyin: Nǐ hǎo! Wǒ shì nǐ de huáyǔ AI xuéxí huǒbàn. Jīntiān xiǎng zài Táiwān liànxí shénme qíngjìng?\nTiếng Việt: Xin chào! Tôi là bạn đồng hành học tiếng Trung AI của bạn. Hôm nay bạn muốn luyện tập tình huống nào ở Đài Loan?\n練習：Gợi ý phản xạ: Hãy thử trả lời bằng "我想練習搭捷運" (Tôi muốn luyện tập đi MRT).',
+          content: '中文：你好！我是你的華語 AI 學習夥伴。很高興與你一起練習！\nPinyin: Nǐ hǎo! Wǒ shì nǐ de huáyǔ AI xuéxí huǒbàn. Hěn gāoxìng yǔ nǐ yìqǐ liànxí!\nTiếng Việt: Xin chào! Tôi là bạn đồng hành học tiếng Trung AI của bạn. Rất vui được cùng bạn luyện tập!\n練習：Gợi ý phản xạ: Hãy thử trả lời bằng "我想練習搭捷運" (Tôi muốn luyện tập đi MRT).',
           model: 'gpt-6.1-sol',
           provider: 'AgentRouter (gpt-6.1-sol)',
           thread: { id: 1001, messages: [] },
@@ -73,15 +73,16 @@ test('AI chat handles live AI reply with Traditional Chinese, Pinyin, Vietnamese
   await expect(page.getByText('[Trực tuyến - gpt-6.1-sol]')).toBeVisible();
 
   // Verify response fields: Traditional Chinese, Pinyin, Vietnamese translation, and practice tips
-  await expect(page.getByText('你好！我是你的華語 AI 學習夥伴。今天想在臺灣練習什麼情境？')).toBeVisible();
-  await expect(page.getByText(/Nǐ hǎo! Wǒ shì nǐ de huáyǔ AI xuéxí huǒbàn/)).toBeVisible();
-  await expect(page.getByText(/Xin chào! Tôi là bạn đồng hành học tiếng Trung AI của bạn/)).toBeVisible();
+  await expect(page.getByText('你好！我是你的華語 AI 學習夥伴。很高興與你一起練習！')).toBeVisible();
+  await expect(page.getByText(/Hěn gāoxìng yǔ nǐ yìqǐ liànxí/)).toBeVisible();
+  await expect(page.getByText(/Rất vui được cùng bạn luyện tập/)).toBeVisible();
   await expect(page.getByText(/Gợi ý phản xạ: Hãy thử trả lời bằng "我想練習搭捷運"/)).toBeVisible();
 
-  // Verify pronunciation audio action buttons are rendered
-  await expect(page.getByRole('button', { name: 'Chuẩn', exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: '🐢 Chậm', exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Luyện đọc', exact: true }).first()).toBeVisible();
+  // Verify pronunciation audio action buttons inside the AI response bubble without .first()
+  const responseRow = page.getByRole('heading', { name: '你好！我是你的華語 AI 學習夥伴。很高興與你一起練習！' }).locator('xpath=..');
+  await expect(responseRow.getByRole('button', { name: 'Chuẩn', exact: true })).toBeVisible();
+  await expect(responseRow.getByRole('button', { name: '🐢 Chậm', exact: true })).toBeVisible();
+  await expect(responseRow.getByRole('button', { name: 'Luyện đọc', exact: true })).toBeVisible();
 });
 
 test('AI chat handles guided local fallback transparently with badge and guidance note', async ({ page }) => {
@@ -120,11 +121,10 @@ test('AI chat handles guided local fallback transparently with badge and guidanc
   // Loading indicator resolves promptly
   await expect(page.getByText('AI đối thoại đang soạn câu trả lời')).not.toBeVisible();
 
-  // Transparent guided badge verification
-  await expect(page.getByText('[Gia sư hướng dẫn cục bộ]')).toBeVisible();
-
-  // Transparent pedagogical guidance note
-  await expect(page.getByText('Đã tự động kích hoạt Gia sư Cục bộ chuẩn TOCFL Đài Loan để bạn không bị ngắt quãng bài học.')).toBeVisible();
+  // Transparent guided badge and note verification within the fallback bubble without strict mode conflict
+  const guidanceNote = page.getByText('Đã tự động kích hoạt Gia sư Cục bộ chuẩn TOCFL Đài Loan để bạn không bị ngắt quãng bài học.');
+  await expect(guidanceNote).toBeVisible();
+  await expect(guidanceNote.locator('xpath=../..').getByText('[Gia sư hướng dẫn cục bộ]')).toBeVisible();
 
   // Content rendered properly
   await expect(page.getByText('組長，這台機台剛才亮紅燈警報了，需要通知技術員維修。')).toBeVisible();
@@ -157,8 +157,8 @@ test('AI chat supports request cancellation, restoring input into draft so user 
   const typingIndicator = page.getByText(/AI đối thoại đang soạn câu trả lời/);
   await expect(typingIndicator).toBeVisible();
 
-  // Cancel request in flight
-  const cancelBtn = page.getByRole('button', { name: 'Hủy yêu cầu' }).first();
+  // Cancel request in flight via status indicator action button (scoped, no .first())
+  const cancelBtn = page.getByRole('status').getByRole('button', { name: 'Hủy yêu cầu' });
   await expect(cancelBtn).toBeVisible();
   await cancelBtn.click();
   cancelRoute?.();
@@ -236,10 +236,11 @@ test('review view supports keyboard shortcuts (Space to reveal, 2 for Hard) and 
   await page.goto('/');
   await navigate(page, 'Ôn tập');
 
-  // Load a Taiwan starter deck into SRS
-  const deckButtons = page.getByRole('button', { name: /Nạp bộ thẻ/ });
-  await expect(deckButtons.first()).toBeVisible();
-  await deckButtons.first().click();
+  // Load a Taiwan starter deck into SRS (unambiguous selector by deck title without .first())
+  const starterDeck = page.locator('.bento-card', { hasText: 'Sống sót Chợ đêm Đài Loan' });
+  const deckButton = starterDeck.getByRole('button', { name: /Nạp bộ thẻ/ });
+  await expect(deckButton).toBeVisible();
+  await deckButton.click();
 
   await expect(page.getByRole('button', { name: 'Hiện đáp án' })).toBeVisible();
 

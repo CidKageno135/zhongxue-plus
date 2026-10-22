@@ -59,9 +59,9 @@ test.describe('Settings View & AI Configuration Suite (Subagent A18)', () => {
     // Click "Kiểm tra kết nối AI (Ping)"
     await page.getByRole('button', { name: /Kiểm tra kết nối AI \(Ping\)/ }).click();
 
-    // Verify roundtrip latency and green check badge
-    await expect(page.getByText(/Kết nối AI thành công!/)).toBeVisible();
-    await expect(page.getByText(/95ms/)).toBeVisible();
+    // Verify roundtrip latency in status notification without strict mode conflict
+    await expect(page.getByRole('status').filter({ hasText: /Kết nối AI thành công!/ })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /95ms/ })).toBeVisible();
 
     // Assert that NO client apiKey was sent in the request body
     expect(interceptedApiKey).toBeUndefined();
@@ -94,10 +94,11 @@ test.describe('Settings View & AI Configuration Suite (Subagent A18)', () => {
     await expect(pingBtn).toBeVisible();
     await pingBtn.click();
 
-    // Verify green success badge and latency
-    await expect(page.getByText('✅ Kết nối AI thành công!')).toBeVisible();
-    await expect(page.getByText('95ms')).toBeVisible();
-    await expect(page.getByText('AgentRouter (gpt-6.1-sol)')).toBeVisible();
+    // Verify green success badge and latency in the provider result container without strict mode conflict
+    const resultCard = page.locator('.bento-card', { hasText: 'Nhà cung cấp & Điểm cuối' });
+    await expect(resultCard.getByText('✅ Kết nối AI thành công!')).toBeVisible();
+    await expect(resultCard.locator('strong', { hasText: '95ms' })).toBeVisible();
+    await expect(resultCard.getByText('AgentRouter (gpt-6.1-sol)')).toBeVisible();
   });
 
   test('client-key mode allows entering personal API key, persists to localStorage, and can be cleared cleanly', async ({ page }) => {
@@ -149,7 +150,7 @@ test.describe('Settings View & AI Configuration Suite (Subagent A18)', () => {
 
     // Trigger AI Ping probe and verify client key is forwarded
     await page.getByRole('button', { name: /Kiểm tra kết nối AI \(Ping\)/ }).click();
-    await expect(page.getByText(/Kết nối AI thành công!/)).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /Kết nối AI thành công!/ })).toBeVisible();
     expect(interceptedKey).toBe('sk-personal-user-test-key-999');
 
     // Click "Xóa khóa"
@@ -261,8 +262,9 @@ test.describe('Branching Conversation Scenarios', () => {
   test('conversation explains an unsuitable answer, supports clarification and completion', async ({ page }) => {
     await page.goto('/');
     await navigate(page, 'Hội thoại');
-    await page.getByRole('button', { name: 'Bắt đầu hội thoại', exact: true }).first().click();
     const scenario = scenarios[0];
+    const scenarioCard = page.locator('article.scenario-card', { hasText: scenario.title });
+    await scenarioCard.getByRole('button', { name: 'Bắt đầu hội thoại' }).click();
     await page.locator('.conversation-choices button').filter({ hasText: scenario.nodes.start.choices[2].text }).click();
     await expect(page.getByRole('status')).toContainText('chưa trả lời câu hỏi');
     await expect(page.getByRole('heading', { name: scenario.nodes.start.hanzi, exact: true })).toBeVisible();
