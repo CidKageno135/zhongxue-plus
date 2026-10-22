@@ -92,6 +92,7 @@ export function TodayView({
 }: TodayViewProps) {
     const [bannerVisible, setBannerVisible] = useState(true);
     const [micRecording, setMicRecording] = useState(false);
+    const [pitchCount, setPitchCount] = useState(0);
     const [realMeasurement, setRealMeasurement] = useState<{ hz: number } | null>(null);
     const [pitchFeedback, setPitchFeedback] = useState<string | null>(null);
     const [lastRatedLabel, setLastRatedLabel] = useState<string | null>(null);
@@ -161,6 +162,7 @@ export function TodayView({
 
             if (controller.signal.aborted) return;
 
+            setPitchCount(count => count + 1);
             if (result.isRealMeasurement && result.hz) {
                 setRealMeasurement({ hz: Math.round(result.hz) });
             } else {
