@@ -84,9 +84,11 @@ const EXTENDED_ROLEPLAYS: ExtendedRoleplayCard[] = [
 
 export function ConversationListView({ onSelectScenario }: ConversationListViewProps) {
     const [activePrompt, setActivePrompt] = useState<string | undefined>(undefined);
+    const [activeRoleId, setActiveRoleId] = useState<string | undefined>(undefined);
 
     function startAiPractice(s: Scenario) {
         const prompt = SCENARIO_AI_PROMPTS[s.id] || `你好！我想練習「${s.title}」的情境對話。`;
+        setActiveRoleId(s.id);
         setActivePrompt(prompt);
         if (typeof document !== 'undefined') {
             document.querySelector('.ai-chat-container')?.scrollIntoView({ behavior: 'smooth' });
@@ -94,6 +96,7 @@ export function ConversationListView({ onSelectScenario }: ConversationListViewP
     }
 
     function startRoleplayPractice(rp: ExtendedRoleplayCard) {
+        setActiveRoleId(rp.id);
         setActivePrompt(rp.samplePrompt);
         if (typeof document !== 'undefined') {
             document.querySelector('.ai-chat-container')?.scrollIntoView({ behavior: 'smooth' });
@@ -113,7 +116,14 @@ export function ConversationListView({ onSelectScenario }: ConversationListViewP
 
             {/* Section 1: Live Interactive AI Conversational Partner */}
             <div style={{ margin: '20px 0 36px' }}>
-                <AiChatView initialPrompt={activePrompt} onResetPrompt={() => setActivePrompt(undefined)} />
+                <AiChatView
+                    initialPrompt={activePrompt}
+                    initialRoleId={activeRoleId}
+                    onResetPrompt={() => {
+                        setActivePrompt(undefined);
+                        setActiveRoleId(undefined);
+                    }}
+                />
             </div>
 
             {/* Section 2: Structured Life Scenarios */}

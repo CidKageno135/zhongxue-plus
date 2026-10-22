@@ -5,6 +5,7 @@ import { speakChinese, speakChineseSlow } from '../services/speech';
 import type { ConversationTurn, ConversationReply } from '../types';
 
 const AI_CHAT_STORAGE_KEY = 'zhongxue.draft.aichat.v1';
+const AI_CHAT_ROLE_STORAGE_KEY = 'zhongxue.draft.aichat.role.v1';
 
 export interface ScenarioRole {
     id: string;
@@ -108,8 +109,23 @@ function createInitialGreeting(role: ScenarioRole): ChatMessage {
     };
 }
 
+function loadInitialRole(): string {
+    if (typeof window === 'undefined') return 'free';
+    try {
+        const stored = window.sessionStorage.getItem(AI_CHAT_ROLE_STORAGE_KEY);
+        if (stored && SCENARIO_ROLES.some(r => r.id === stored)) {
+            return stored;
+        }
+    } catch {
+        // ignore
+    }
+    return 'free';
+}
+
 function loadInitialMessages(): ChatMessage[] {
-    const fallbackGreeting = createInitialGreeting(SCENARIO_ROLES[0]);
+    const initialRole = loadInitialRole();
+    const matchedRole = SCENARIO_ROLES.find(r => r.id === initialRole) || SCENARIO_ROLES[0];
+    const fallbackGreeting = createInitialGreeting(matchedRole);
     if (typeof window === 'undefined') return [fallbackGreeting];
 
     try {
@@ -180,11 +196,38 @@ async function fetchConversationReply(
     model = (model || 'gpt-6.1-sol').trim();
     baseUrl = (baseUrl || 'https://agentrouter.org/v1').trim();
 
-    const turns: ConversationTurn[] = history
-        .filter(m => m.role === 'user' || m.role === 'assistant')
-        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+    const isUiNotice = (content: string) =>
+        content.includes('⚠️ Yêu cầu đối thoại đã được hủy') ||
+        content.includes('hủy theo lệnh của bạn') ||
+        content.includes('Đã hủy yêu cầu đối thoại');
 
-    turns.push({ role: 'user', content: messageText });
+    const turns: ConversationTurn[] = [];
+    for (const m of history) {
+        if (m.status === 'canceled' || m.status === 'error' || isUiNotice(m.content)) {
+            continue;
+        }
+        if (m.role === 'user' || m.role === 'assistant') {
+            if (
+                m.role === 'user' &&
+                turns.length > 0 &&
+                turns[turns.length - 1].role === 'user' &&
+                turns[turns.length - 1].content === m.content
+            ) {
+                continue;
+            }
+            turns.push({ role: m.role, content: m.content });
+        }
+    }
+
+    if (
+        turns.length > 0 &&
+        turns[turns.length - 1].role === 'user' &&
+        turns[turns.length - 1].content === messageText
+    ) {
+        // Already in turns as the last user turn
+    } else {
+        turns.push({ role: 'user', content: messageText });
+    }
 
     const payload = {
         action: 'chat',
@@ -216,12 +259,13 @@ async function fetchConversationReply(
 
 export interface AiChatViewProps {
     initialPrompt?: string;
+    initialRoleId?: string;
     onResetPrompt?: () => void;
 }
 
-export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {}) {
+export function AiChatView({ initialPrompt, initialRoleId, onResetPrompt }: AiChatViewProps = {}) {
     const [messages, setMessages] = useState<ChatMessage[]>(loadInitialMessages);
-    const [activeRole, setActiveRole] = useState<string>('free');
+    const [activeRole, setActiveRole] = useState<string>(loadInitialRole);
     const [activeModel, setActiveModel] = useState<string>(() => {
         if (typeof window === 'undefined') return 'gpt-6.1-sol';
         try {
@@ -243,6 +287,31 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
     const chatMessagesRef = useRef<HTMLDivElement>(null);
     const activeAbortControllerRef = useRef<AbortController | null>(null);
     const lastDraftTextRef = useRef<string>('');
+    const activeRoleRef = useRef<string>(activeRole);
+    const generationIdRef = useRef<number>(0);
+    const messagesRef = useRef<ChatMessage[]>(messages);
+
+    // Keep activeRoleRef and sessionStorage in sync with activeRole
+    useEffect(() => {
+        activeRoleRef.current = activeRole;
+        if (typeof window === 'undefined') return;
+        try {
+            window.sessionStorage.setItem(AI_CHAT_ROLE_STORAGE_KEY, activeRole);
+        } catch {
+            // ignore
+        }
+    }, [activeRole]);
+
+    // Keep messagesRef and sessionStorage in sync with messages
+    useEffect(() => {
+        messagesRef.current = messages;
+        if (typeof window === 'undefined') return;
+        try {
+            window.sessionStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify(messages));
+        } catch {
+            // Ignore quota errors
+        }
+    }, [messages]);
 
     // Toggle between primary models
     function toggleModel() {
@@ -293,37 +362,34 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
         };
     }, []);
 
-    // Switch scenario role: automatically abort any in-flight request to prevent cross-scenario response leaking
+    // Switch scenario role: automatically abort any in-flight request and invalidate generation
     const switchRole = useCallback((role: ScenarioRole) => {
+        generationIdRef.current += 1;
+
         if (activeAbortControllerRef.current) {
             activeAbortControllerRef.current.abort();
             activeAbortControllerRef.current = null;
         }
         setLoading(false);
+        lastDraftTextRef.current = '';
+        activeRoleRef.current = role.id;
         setActiveRole(role.id);
+        setInput('');
 
         const greetingMsg = createInitialGreeting(role);
+        messagesRef.current = [greetingMsg];
         setMessages([greetingMsg]);
         setVoiceNotice(null);
 
         if (typeof window !== 'undefined') {
             try {
                 window.sessionStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify([greetingMsg]));
+                window.sessionStorage.setItem(AI_CHAT_ROLE_STORAGE_KEY, role.id);
             } catch {
                 // Ignore
             }
         }
     }, []);
-
-    // Save conversation history to sessionStorage so tab switches don't lose messages
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        try {
-            window.sessionStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify(messages));
-        } catch {
-            // Ignore quota errors
-        }
-    }, [messages]);
 
     // Auto-scroll ONLY internal chat message container, never scrolling the main page/window
     useEffect(() => {
@@ -335,12 +401,15 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
         }
     }, [messages, loading]);
 
-    // Send chat message with active AbortController and draft preservation
+    // Send chat message with generation guard, active AbortController and draft preservation
     const handleSend = useCallback(async (customText?: string) => {
         const textToSend = (customText || input).trim();
         if (!textToSend || loading) return; // Prevent double sending while in flight
 
         setVoiceNotice(null);
+
+        const thisRequestId = ++generationIdRef.current;
+        const thisRoleId = activeRoleRef.current;
 
         // Draft preservation: store draft for restoration upon cancel or error
         lastDraftTextRef.current = textToSend;
@@ -365,7 +434,20 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
             timestamp: Date.now()
         };
 
-        setMessages(prev => [...prev, userMsg]);
+        let currentHistory = messagesRef.current;
+        // If the immediately preceding turn was a canceled message for the same query, clean it up to prevent duplicate turns
+        if (
+            currentHistory.length >= 2 &&
+            currentHistory[currentHistory.length - 1].status === 'canceled' &&
+            currentHistory[currentHistory.length - 2].role === 'user' &&
+            currentHistory[currentHistory.length - 2].content === textToSend
+        ) {
+            currentHistory = currentHistory.slice(0, currentHistory.length - 2);
+        }
+
+        const newMessages = [...currentHistory, userMsg];
+        messagesRef.current = newMessages;
+        setMessages(newMessages);
         setLoading(true);
 
         const startTime = performance.now();
@@ -373,11 +455,16 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
         try {
             const reply = await fetchConversationReply(
                 textToSend,
-                messages,
-                activeRole,
+                currentHistory,
+                thisRoleId,
                 activeModel,
                 controller.signal
             );
+
+            // Generation guard: discard response if user switched role or initiated newer request
+            if (generationIdRef.current !== thisRequestId || activeRoleRef.current !== thisRoleId) {
+                return;
+            }
 
             const latencyMs = Math.round(performance.now() - startTime);
 
@@ -399,16 +486,25 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                 status: 'success'
             };
 
-            setMessages(prev => [...prev, assistantMsg]);
+            setMessages(prev => {
+                const next = [...prev, assistantMsg];
+                messagesRef.current = next;
+                return next;
+            });
         } catch (err) {
+            // Generation guard: do not pollute other roles or newer requests upon abort/error
+            if (generationIdRef.current !== thisRequestId || activeRoleRef.current !== thisRoleId) {
+                return;
+            }
+
             const isAbort = controller.signal.aborted || (err instanceof Error && err.name === 'AbortError');
 
             if (isAbort) {
-                // Request canceled by user or role switch
+                // Request canceled by user
                 if (!input.trim() && lastDraftTextRef.current) {
                     setInput(lastDraftTextRef.current);
                 }
-                setVoiceNotice('Đã hủy yêu cầu đối thoại. Nội dung câu hỏi đã được khôi phục vào ô nhập.');
+                setVoiceNotice('Đã hủy yêu cầu đối thoại. Nội dung câu hỏi đã được giữ lại trong ô nhập.');
 
                 const canceledMsg: ChatMessage = {
                     id: `canceled-${Date.now()}`,
@@ -419,10 +515,14 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                     status: 'canceled',
                     retryText: textToSend
                 };
-                setMessages(prev => [...prev, canceledMsg]);
+                setMessages(prev => {
+                    const next = [...prev, canceledMsg];
+                    messagesRef.current = next;
+                    return next;
+                });
             } else {
                 // Server or network error: activate resilient TOCFL local guided fallback
-                const fallbackReply = simulateLocalAiReply(textToSend, activeRole);
+                const fallbackReply = simulateLocalAiReply(textToSend, thisRoleId);
                 const fallbackMsg: ChatMessage = {
                     id: `fallback-${Date.now()}`,
                     role: 'assistant',
@@ -435,34 +535,65 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                     source: 'local-fallback',
                     status: 'success'
                 };
-                setMessages(prev => [...prev, fallbackMsg]);
+                setMessages(prev => {
+                    const next = [...prev, fallbackMsg];
+                    messagesRef.current = next;
+                    return next;
+                });
                 setVoiceNotice('Đang sử dụng phản hồi từ Gia sư Hướng dẫn Cục bộ (TOCFL Taiwan).');
             }
         } finally {
-            if (activeAbortControllerRef.current === controller) {
-                activeAbortControllerRef.current = null;
+            if (generationIdRef.current === thisRequestId && activeRoleRef.current === thisRoleId) {
+                if (activeAbortControllerRef.current === controller) {
+                    activeAbortControllerRef.current = null;
+                }
+                setLoading(false);
             }
-            setLoading(false);
         }
-    }, [input, loading, messages, activeRole, activeModel]);
+    }, [input, loading, activeModel]);
 
-    // Handle initial scenario prompt if injected from parent view
+    // Handle retry for canceled turns: cleanly clean up canceled bubble and previous turn
+    const handleRetry = useCallback((msgId: string, retryText: string) => {
+        const cur = messagesRef.current;
+        const idx = cur.findIndex(m => m.id === msgId);
+        const next = [...cur];
+        if (idx !== -1) {
+            next.splice(idx, 1);
+            if (idx > 0 && next[idx - 1].role === 'user' && next[idx - 1].content === retryText) {
+                next.splice(idx - 1, 1);
+            }
+        }
+        messagesRef.current = next;
+        setMessages(next);
+        void handleSend(retryText);
+    }, [handleSend]);
+
+    // Handle initial scenario prompt and role if injected from parent view
     useEffect(() => {
-        if (initialPrompt && initialPrompt.trim()) {
-            const prompt = initialPrompt;
+        if ((initialPrompt && initialPrompt.trim()) || initialRoleId) {
+            const prompt = (initialPrompt || '').trim();
+            const targetRoleId = initialRoleId;
             onResetPrompt?.();
             queueMicrotask(() => {
-                const lower = prompt.toLowerCase();
-                const matchedRole = SCENARIO_ROLES.find(
-                    r => r.id !== 'free' && (lower.includes(r.id) || lower.includes(r.label.slice(2)))
-                );
-                if (matchedRole) {
-                    setActiveRole(matchedRole.id);
+                let roleToActivate: ScenarioRole | undefined;
+                if (targetRoleId) {
+                    roleToActivate = SCENARIO_ROLES.find(r => r.id === targetRoleId);
                 }
-                void handleSend(prompt);
+                if (!roleToActivate && prompt) {
+                    const lower = prompt.toLowerCase();
+                    roleToActivate = SCENARIO_ROLES.find(
+                        r => r.id !== 'free' && (lower.includes(r.id) || lower.includes(r.label.slice(2).toLowerCase()))
+                    );
+                }
+                if (roleToActivate) {
+                    switchRole(roleToActivate);
+                }
+                if (prompt) {
+                    void handleSend(prompt);
+                }
             });
         }
-    }, [initialPrompt, onResetPrompt, handleSend]);
+    }, [initialPrompt, initialRoleId, onResetPrompt, handleSend, switchRole]);
 
     // Web Speech recognition
     function toggleVoiceInput() {
@@ -1143,7 +1274,7 @@ export function AiChatView({ initialPrompt, onResetPrompt }: AiChatViewProps = {
                                             <div style={{ marginTop: '8px' }}>
                                                 <button
                                                     type="button"
-                                                    onClick={() => void handleSend(m.retryText)}
+                                                    onClick={() => handleRetry(m.id, m.retryText!)}
                                                     disabled={loading}
                                                     className="button"
                                                     style={{
