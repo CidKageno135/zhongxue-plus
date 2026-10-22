@@ -17,7 +17,7 @@
  * 4. Filtering "Đã lưu" across multiple pages:
  *    A word saved from page 2 (index > 20) remains visible when filtering by "Đã lưu".
  * 5. Corpus-only word retrieval:
- *    Searching "乾杯" (cv_3306) displays the entry from the 122k database with "database" source.
+ *    Searching "乾杯" (cv_4423) displays the entry from the 122k database with "database" source.
  */
 
 import { test, expect } from '@playwright/test';
@@ -121,9 +121,11 @@ test.describe('Acceptance G5 & F06: Dictionary Contract, Pagination & Saved Word
     expect(response.ok()).toBe(true);
     const result: { source: string; results: DbDictionaryResult[] } = await response.json();
     expect(result.source).toBe('database');
-    const entry = result.results.find(word => word.id === 'cv_3306' && word.traditional === '乾杯');
+    const entry = result.results.find(word => word.id === 'cv_4423' && word.traditional === '乾杯');
     expect(entry, 'The corpus entry, rather than a curriculum fallback, must be returned').toBeDefined();
-    if (!entry) throw new Error('Corpus entry cv_3306 is absent');
+    if (!entry) throw new Error('Corpus entry cv_4423 is absent');
+    expect(entry.simplified).toBe('干杯');
+    expect(entry.pinyin).toBe('gan1 bei1');
     expect(entry.definitions.join('; ')).toMatch(/cạn ly/i);
 
     const card = page.getByRole('article').filter({
@@ -136,7 +138,7 @@ test.describe('Acceptance G5 & F06: Dictionary Contract, Pagination & Saved Word
     await expect(card.getByRole('button', { name: 'Bỏ lưu 乾杯', exact: true })).toBeVisible();
 
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('zhongxue.learning.v1') || '{}'))).toMatchObject({
-      savedWordIds: ['cv_3306'],
+      savedWordIds: ['cv_4423'],
       customWords: expect.arrayContaining([expect.objectContaining({
         id: entry.id,
         hanzi: entry.traditional,
