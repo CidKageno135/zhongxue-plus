@@ -43,6 +43,31 @@ const FAKE_DEEPSEEK_KEY = 'sk-sentinel-deepseek-secret-88888';
 const FAKE_GENERIC_KEY = 'sk-sentinel-generic-key-77777';
 const FAKE_CLIENT_KEY = 'sk-client-personal-key-11111';
 
+describe('Legacy generic credential origin binding', () => {
+  it('supports the validated configured OpenRouter origin without an execution override', () => {
+    const result = resolveUpstreamCredentials({ env: {
+      AI_BASE_URL: 'https://openrouter.ai/api/v1', AI_API_KEY: FAKE_GENERIC_KEY
+    } });
+    expect(result.isAllowed).toBe(true);
+    expect(result.apiKey).toBe(FAKE_GENERIC_KEY);
+  });
+
+  it.each(['https://agentrouter.org/v1', 'https://api.openrouter.ai/v1'])('does not transfer the generic key to another origin: %s', (requestedBaseUrl) => {
+    const result = resolveUpstreamCredentials({ requestedBaseUrl, env: {
+      AI_BASE_URL: 'https://openrouter.ai/api/v1', AI_API_KEY: FAKE_GENERIC_KEY
+    } });
+    expect(result.isAllowed).toBe(false);
+    expect(result.apiKey).toBeNull();
+  });
+
+  it('direct DeepSeek requires a dedicated direct key', () => {
+    const result = resolveUpstreamCredentials({ requestedBaseUrl: 'https://api.deepseek.com/v1', env: {
+      AI_DEEPSEEK_KEY: FAKE_DEEPSEEK_KEY, AI_DEEPSEEK_DIRECT_KEY: 'fake-direct-key'
+    } });
+    expect(result.apiKey).toBe('fake-direct-key');
+  });
+});
+
 describe('server/security.ts - Upstream Security Policy', () => {
 
   describe('1. Trusted AI Host Allowlist', () => {

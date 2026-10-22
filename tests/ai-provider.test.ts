@@ -17,6 +17,31 @@ import type { ConversationReply, AiConnectionStatus, ConversationRequestBody } f
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { EventEmitter } from 'node:events';
 
+describe('Credential boundary regressions R3/R4', () => {
+  const messages: ConversationRequestBody['messages'] = [{ role: 'user', content: '你好' }];
+
+  it.each([
+    'https://openrouter.ai.attacker.invalid/v1',
+    'https://openrouter.ai/api/v1?unsafe=1',
+    'https://openrouter.ai/api/v1#unsafe',
+    'http://openrouter.ai/api/v1'
+  ])('never dispatches a rejected configured OpenRouter URL: %s', async (baseUrl) => {
+    const fetchFn = vi.fn();
+    await executeConversation({ messages }, {
+      env: { AI_BASE_URL: baseUrl, AI_API_KEY: 'fake-generic-sentinel' }, fetchFn
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('does not send an AgentRouter DeepSeek model key to direct DeepSeek', async () => {
+    const fetchFn = vi.fn();
+    await executeConversation({ messages, baseUrl: 'https://api.deepseek.com/v1' }, {
+      env: { AI_DEEPSEEK_KEY: 'fake-agentrouter-model-key' }, fetchFn
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
 describe('A05: Sinology AI Fallback Engine (server/aiFallback.ts)', () => {
   it('covers all 15 required Taiwan everyday conversation scenarios', () => {
     const requiredKeys = [
