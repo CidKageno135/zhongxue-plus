@@ -28,8 +28,7 @@ import type {
   ApiErrorBody
 } from '../src/types.ts';
 import {
-  resolveUpstreamCredentials,
-  type ResolvedCredentials
+  resolveUpstreamCredentials
 } from './security.ts';
 import { createGuidedFallbackReply } from './aiFallback.ts';
 import { sendJson, sendError, methodNotAllowed, badRequest, payloadTooLarge } from './errors.ts';
@@ -178,23 +177,13 @@ export async function executeConversation(
   const allowLocalDev = options?.allowLocalDev ?? (env.ALLOW_LOCAL_TEST_UPSTREAM === 'true' || env.VITEST === 'true' || env.NODE_ENV === 'test');
 
   // Resolve credentials with A03 security boundary
-  let creds: ResolvedCredentials = resolveUpstreamCredentials({
+  const creds = resolveUpstreamCredentials({
     model,
     requestedBaseUrl: body.baseUrl,
     clientApiKey: body.apiKey,
     env,
     allowLocalDev
   });
-
-  // If server environment explicitly configured default AI_BASE_URL for OpenRouter with generic AI_API_KEY
-  if (!body.baseUrl && !creds.apiKey && env.AI_BASE_URL?.includes('openrouter.ai') && env.AI_API_KEY && !env.AI_AGENTROUTER_KEY) {
-    creds = {
-      ...creds,
-      apiKey: env.AI_API_KEY,
-      isAllowed: true,
-      keySource: 'server'
-    };
-  }
 
   // Calculate clamped timeout: default 12s, max 15s, min 1s
   const requestedTimeout = body.timeoutMs || (env.AI_TIMEOUT_MS ? Number(env.AI_TIMEOUT_MS) : DEFAULT_AI_TIMEOUT_MS);

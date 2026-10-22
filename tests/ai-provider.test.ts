@@ -40,6 +40,32 @@ describe('Credential boundary regressions R3/R4', () => {
     });
     expect(fetchFn).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { baseUrl: 'https://agentrouter.org/v1', env: { AI_BASE_URL: 'https://openrouter.ai/api/v1', AI_API_KEY: 'fake-openrouter-generic' } },
+    { baseUrl: 'https://api.openrouter.ai/v1', env: { AI_BASE_URL: 'https://openrouter.ai/api/v1', AI_API_KEY: 'fake-openrouter-generic' } },
+    { baseUrl: 'https://openrouter.ai/api/v1', env: { AI_API_KEY: 'fake-agentrouter-generic' } }
+  ])('never dispatches a generic key to a different configured origin: $baseUrl', async ({ baseUrl, env }) => {
+    const fetchFn = vi.fn();
+    await executeConversation({ messages, baseUrl }, { env, fetchFn });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { baseUrl: 'https://openrouter.ai/api/v1', env: { AI_BASE_URL: 'https://openrouter.ai/api/v1', AI_API_KEY: 'fake-openrouter-generic' }, key: 'fake-openrouter-generic' },
+    { baseUrl: 'https://agentrouter.org/v1', env: { AI_DEEPSEEK_KEY: 'fake-agentrouter-model' }, key: 'fake-agentrouter-model' },
+    { baseUrl: 'https://api.deepseek.com/v1', env: { AI_DEEPSEEK_KEY: 'fake-agentrouter-model', AI_DEEPSEEK_DIRECT_KEY: 'fake-direct' }, key: 'fake-direct' },
+    { baseUrl: 'https://openrouter.ai/api/v1', env: { AI_OPENROUTER_KEY: 'fake-openrouter-dedicated', AI_API_KEY: 'fake-agentrouter-generic' }, key: 'fake-openrouter-dedicated' }
+  ])('dispatches exactly once with the correct key: $key', async ({ baseUrl, env, key }) => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: '中文：你好\nPinyin: nǐ hǎo\nTiếng Việt: Xin chào\n練習：再說一次' } }]
+    }), { status: 200 }));
+    const result = await executeConversation({ messages, baseUrl, model: 'deepseek-v4-flash' }, { env, fetchFn });
+    expect(result.body).toMatchObject({ mode: 'ai' });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(fetchFn.mock.calls[0]?.[0]).toBe(`${baseUrl}/chat/completions`);
+    expect(fetchFn.mock.calls[0]?.[1]?.headers).toMatchObject({ Authorization: `Bearer ${key}` });
+  });
 });
 
 describe('A05: Sinology AI Fallback Engine (server/aiFallback.ts)', () => {

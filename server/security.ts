@@ -314,16 +314,26 @@ export function getProviderForHostname(hostname: string): AiProvider {
 export function getServerKeyForProvider(
   provider: AiProvider,
   model?: string,
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  destinationBaseUrl: string = env.AI_BASE_URL || DEFAULT_AI_BASE_URL
 ): string {
   const modelName = (model || env.AI_MODEL || '').toLowerCase();
+  // The legacy generic key belongs to the exact validated configured origin.
+  // A client changing providers (or provider aliases) must not transfer it.
+  const configured = validateUpstreamUrl(env.AI_BASE_URL || DEFAULT_AI_BASE_URL, { env });
+  const destination = validateUpstreamUrl(destinationBaseUrl, { env });
+  const genericKey = configured.valid && configured.isTrusted && configured.url &&
+    destination.valid && destination.isTrusted && destination.url &&
+    configured.url.origin === destination.url.origin &&
+    getProviderForHostname(configured.url.hostname) === provider
+    ? (env.AI_API_KEY || '').trim()
+    : '';
 
   if (provider === 'agentrouter') {
     const isSol = modelName === 'gpt-6.1-sol' || modelName.includes('sol');
     const agentRouterKey = (env.AI_AGENTROUTER_KEY || '').trim();
     const solKey = (env.AI_SOL_KEY || '').trim();
     const deepseekKey = (env.AI_DEEPSEEK_KEY || '').trim();
-    const genericKey = (env.AI_API_KEY || '').trim();
 
     if (isSol) {
       return solKey || agentRouterKey || genericKey || deepseekKey;
@@ -332,12 +342,11 @@ export function getServerKeyForProvider(
   }
 
   if (provider === 'openrouter') {
-    // F02 invariant: OpenRouter MUST ONLY use keys specifically configured for OpenRouter
-    return (env.AI_OPENROUTER_KEY || '').trim();
+    return (env.AI_OPENROUTER_KEY || '').trim() || genericKey;
   }
 
   if (provider === 'deepseek') {
-    return (env.AI_DEEPSEEK_DIRECT_KEY || env.AI_DEEPSEEK_KEY || '').trim();
+    return (env.AI_DEEPSEEK_DIRECT_KEY || '').trim();
   }
 
   return '';
@@ -432,7 +441,7 @@ export function resolveUpstreamCredentials(options: ResolveCredentialsOptions): 
       }
 
       // No client key, but destination IS trusted: inject server key strictly bound to provider (F02)
-      const serverKey = getServerKeyForProvider(provider, options.model, env);
+      const serverKey = getServerKeyForProvider(provider, options.model, env, cleanBaseUrl);
       if (serverKey) {
         return {
           apiKey: serverKey,
@@ -518,7 +527,7 @@ export function resolveUpstreamCredentials(options: ResolveCredentialsOptions): 
   if (urlValidation.isTrusted) {
     const hostname = urlValidation.url ? urlValidation.url.hostname.toLowerCase() : '';
     const provider = getProviderForHostname(hostname);
-    const serverKey = getServerKeyForProvider(provider, options.model, env);
+    const serverKey = getServerKeyForProvider(provider, options.model, env, cleanDefaultUrl);
     if (serverKey) {
       return {
         apiKey: serverKey,
