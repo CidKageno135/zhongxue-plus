@@ -178,13 +178,23 @@ export async function executeConversation(
   const allowLocalDev = options?.allowLocalDev ?? (env.ALLOW_LOCAL_TEST_UPSTREAM === 'true' || env.VITEST === 'true' || env.NODE_ENV === 'test');
 
   // Resolve credentials with A03 security boundary
-  const creds: ResolvedCredentials = resolveUpstreamCredentials({
+  let creds: ResolvedCredentials = resolveUpstreamCredentials({
     model,
     requestedBaseUrl: body.baseUrl,
     clientApiKey: body.apiKey,
     env,
     allowLocalDev
   });
+
+  // If server environment explicitly configured default AI_BASE_URL for OpenRouter with generic AI_API_KEY
+  if (!body.baseUrl && !creds.apiKey && env.AI_BASE_URL?.includes('openrouter.ai') && env.AI_API_KEY && !env.AI_AGENTROUTER_KEY) {
+    creds = {
+      ...creds,
+      apiKey: env.AI_API_KEY,
+      isAllowed: true,
+      keySource: 'server'
+    };
+  }
 
   // Calculate clamped timeout: default 12s, max 15s, min 1s
   const requestedTimeout = body.timeoutMs || (env.AI_TIMEOUT_MS ? Number(env.AI_TIMEOUT_MS) : DEFAULT_AI_TIMEOUT_MS);
@@ -229,7 +239,33 @@ export async function executeConversation(
           ? `OpenRouter (${model})`
           : `Upstream (${model})`;
 
-      if (!creds.isAllowed || !creds.apiKey) {
+      if (!creds.isAllowed) {
+        const isSecurityViolation = creds.error && (
+          creds.error.includes('Forbidden') ||
+          creds.error.includes('SSRF') ||
+          creds.error.includes('Insecure protocol') ||
+          creds.error.includes('Malformed URL') ||
+          creds.error.includes('Unsupported protocol') ||
+          creds.error.includes('Invalid protocol') ||
+          creds.error.includes('Non-standard port') ||
+          creds.baseUrl.includes('openrouter.ai') ||
+          (body.baseUrl && body.baseUrl.includes('openrouter.ai'))
+        );
+
+        const statusCode = isSecurityViolation ? 400 : 200;
+        return {
+          statusCode,
+          body: {
+            ok: false,
+            provider: isAgentRouter ? 'AgentRouter' : isOpenRouter ? 'OpenRouter' : 'Custom Provider',
+            model,
+            baseUrl: creds.baseUrl,
+            error: creds.error || (isSecurityViolation ? 'Security policy violation' : 'Chưa cấu hình API Key trong .env hoặc Cài đặt')
+          } as AiConnectionStatus
+        };
+      }
+
+      if (!creds.apiKey) {
         return {
           statusCode: 200,
           body: {
@@ -405,7 +441,47 @@ export async function executeConversation(
     const threadId = body.threadId || Date.now();
 
     // If credentials are disallowed (e.g. untrusted baseUrl without client key) or missing
-    if (!creds.isAllowed || !creds.apiKey) {
+    if (!creds.isAllowed) {
+      const isSecurityViolation = creds.error && (
+        creds.error.includes('Forbidden') ||
+        creds.error.includes('SSRF') ||
+        creds.error.includes('Insecure protocol') ||
+        creds.error.includes('Malformed URL') ||
+        creds.error.includes('Unsupported protocol') ||
+        creds.error.includes('Invalid protocol') ||
+        creds.error.includes('Non-standard port') ||
+        (body.baseUrl && (body.baseUrl.includes('openrouter.ai') || body.baseUrl.includes('deepseek.com')))
+      );
+
+      if (isSecurityViolation) {
+        return {
+          statusCode: 400,
+          body: {
+            error: {
+              code: 'BAD_REQUEST',
+              message: creds.error || 'Từ chối ủy quyền do vi phạm chính sách bảo mật.'
+            }
+          }
+        };
+      }
+
+      const fallbackReply = createGuidedFallbackReply({
+        lastUserMessage: lastMsg,
+        roleId,
+        threadId,
+        previousMessages: messages,
+        reason: 'no_key',
+        latencyMs: Date.now() - tStart,
+        note: creds.error
+      });
+
+      return {
+        statusCode: 200,
+        body: fallbackReply
+      };
+    }
+
+    if (!creds.apiKey) {
       const fallbackReply = createGuidedFallbackReply({
         lastUserMessage: lastMsg,
         roleId,
