@@ -2,11 +2,12 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bookmark, Search, X, Database, ArrowRight, Volume2, Edit3, Loader2 } from 'lucide-react';
 import type { Word } from '../types';
 import { allWords, lessons } from '../data/lessons';
+import { findWord } from '../domain/learning';
 import { WordCard } from '../components/WordCard';
 import { searchDictionary, checkBackendHealth, type DbDictionaryResult } from '../services/api';
 import { speakChinese } from '../services/speech';
 import { HandwritingPad } from '../components/HandwritingPad';
-import { normalizeVietnamese, normalizePinyin, isHanziText } from '../domain/searchNormalization';
+import { normalizeVietnamese, normalizePinyin, isHanziText, matchesQuery } from '../domain/searchNormalization';
 
 interface DictionaryViewProps {
     query: string;
@@ -127,9 +128,10 @@ export function DictionaryView({
                 }
 
                 setDbResults(res.results || []);
-                setResultTotal(res.total || 0);
-                if (res.count && res.count > 0) {
-                    setTotalCount(res.count);
+                const matches = typeof res.totalMatches === 'number' ? res.totalMatches : (res.total || 0);
+                setResultTotal(matches);
+                if (typeof res.dictionaryTotal === 'number' && res.dictionaryTotal > 0) {
+                    setTotalCount(res.dictionaryTotal);
                 }
                 setIsDbSource(res.source === 'database');
                 setOffset(0);
@@ -168,11 +170,13 @@ export function DictionaryView({
             if (res.results && res.results.length > 0) {
                 setDbResults(prev => [...prev, ...res.results]);
                 setOffset(nextOffset);
-                if (typeof res.total === 'number') {
+                if (typeof res.totalMatches === 'number') {
+                    setResultTotal(res.totalMatches);
+                } else if (typeof res.total === 'number') {
                     setResultTotal(res.total);
                 }
-                if (res.count) {
-                    setTotalCount(res.count);
+                if (typeof res.dictionaryTotal === 'number' && res.dictionaryTotal > 0) {
+                    setTotalCount(res.dictionaryTotal);
                 }
             }
         } catch {
@@ -213,21 +217,67 @@ export function DictionaryView({
         }, 2500);
     }, [savedWordIds, onToggleSave]);
 
+    // Full list of saved words across lessons & custom registry
+    const allSavedWords = savedWordIds
+        .map(id => findWord(id))
+        .filter((w): w is Word => Boolean(w));
+
     // Course words displayed when no active query
-    const displayedWords = filteredWords.filter(w => {
-        if (topicFilter === 'Tất cả') return true;
-        const parentLesson = lessons.find(l => l.words.some(lw => lw.id === w.id));
-        if (!parentLesson) return true;
-        if (topicFilter === 'A1' || topicFilter === 'A2' || topicFilter === 'B1' || topicFilter === 'B2') {
-            return parentLesson.level === topicFilter;
-        }
-        return parentLesson.category === topicFilter;
-    });
+    const displayedWords = onlySaved
+        ? allSavedWords.filter(w => {
+            if (topicFilter === 'Tất cả') return true;
+            const parentLesson = lessons.find(l => l.words.some(lw => lw.id === w.id));
+            if (!parentLesson) return topicFilter === 'Từ điển mở rộng' || w.category === topicFilter;
+            if (topicFilter === 'A1' || topicFilter === 'A2' || topicFilter === 'B1' || topicFilter === 'B2') {
+                return parentLesson.level === topicFilter;
+            }
+            return parentLesson.category === topicFilter;
+        })
+        : filteredWords.filter(w => {
+            if (topicFilter === 'Tất cả') return true;
+            const parentLesson = lessons.find(l => l.words.some(lw => lw.id === w.id));
+            if (!parentLesson) return true;
+            if (topicFilter === 'A1' || topicFilter === 'A2' || topicFilter === 'B1' || topicFilter === 'B2') {
+                return parentLesson.level === topicFilter;
+            }
+            return parentLesson.category === topicFilter;
+        });
 
     // Active results filtered by saved status if "Đã lưu" is active
-    const visibleDbResults = onlySaved
-        ? dbResults.filter(entry => checkIsSaved(entry, savedWordIds))
-        : dbResults;
+    const visibleDbResults = (() => {
+        if (!onlySaved) return dbResults;
+        const inDbSaved = dbResults.filter(entry => checkIsSaved(entry, savedWordIds));
+        const qTrim = query.trim();
+        if (!qTrim) {
+            return inDbSaved;
+        }
+
+        const matchingSavedWords = allSavedWords.filter(w => {
+            return (
+                matchesQuery(w.hanzi, qTrim) ||
+                matchesQuery(w.pinyin, qTrim) ||
+                matchesQuery(w.meaning, qTrim) ||
+                (w.example ? matchesQuery(w.example, qTrim) : false)
+            );
+        });
+
+        const mergedMap = new Map<string, DbDictionaryResult>();
+        for (const entry of inDbSaved) {
+            mergedMap.set(entry.traditional, entry);
+        }
+        for (const w of matchingSavedWords) {
+            if (!mergedMap.has(w.hanzi)) {
+                mergedMap.set(w.hanzi, {
+                    id: w.id,
+                    traditional: w.hanzi,
+                    simplified: w.hanzi,
+                    pinyin: w.pinyin,
+                    definitions: [w.meaning, w.exampleMeaning].filter(Boolean)
+                });
+            }
+        }
+        return Array.from(mergedMap.values());
+    })();
 
     return (
         <div style={{ maxWidth: '100%', overflowX: 'hidden' }}>
@@ -433,7 +483,7 @@ export function DictionaryView({
                         loading && dbResults.length === 0 ? (
                             `Đang tra cứu “${query}”...`
                         ) : resultTotal > 0 ? (
-                            `Tìm thấy ${resultTotal.toLocaleString('vi-VN')} kết quả cho “${query}” (từ ${totalCount.toLocaleString('vi-VN')} mục từ)`
+                            `Tìm thấy ${resultTotal.toLocaleString('vi-VN')} kết quả khớp cho “${query}” (từ ${totalCount.toLocaleString('vi-VN')} mục từ)`
                         ) : (
                             `Không tìm thấy kết quả cho “${query}”`
                         )
@@ -566,7 +616,7 @@ export function DictionaryView({
                                                 ))}
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                                                <h3 lang="zh-TW" className="hanzi" style={{ margin: 0, fontSize: '24px', wordBreak: 'break-word' }}>
+                                                <h3 lang="zh-TW" className="hanzi hanzi-title" style={{ margin: 0, fontSize: '24px', wordBreak: 'break-word' }}>
                                                     {entry.traditional}
                                                 </h3>
                                                 <button
@@ -608,6 +658,7 @@ export function DictionaryView({
                                 <button
                                     type="button"
                                     className="filter-button"
+                                    aria-label="Tải thêm"
                                     disabled={loadingMore || loading}
                                     onClick={handleLoadMore}
                                     style={{
@@ -633,7 +684,7 @@ export function DictionaryView({
                                         </>
                                     ) : (
                                         <>
-                                            <span>Xem thêm kết quả ({Math.min(20, resultTotal - dbResults.length)} từ tiếp theo)</span>
+                                            <span>Tải thêm ({Math.min(20, resultTotal - dbResults.length)} từ tiếp theo)</span>
                                             <ArrowRight size={14} />
                                         </>
                                     )}

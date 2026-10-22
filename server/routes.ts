@@ -159,17 +159,28 @@ export async function handleDictionaryRoute(
 
   // Case 2: Multi-tier search
   const queryStr = validated.q ?? '';
-  const { results, total } = dictionaryEngine.search(
+  const searchResult = dictionaryEngine.search(
     queryStr,
     validated.mode,
     validated.offset,
     validated.limit
   );
 
-  const response: DictionarySearchResponse = {
-    results,
-    total,
-    count: results.length,
+  const dictionaryTotal = dictionaryEngine.getTotal();
+  const totalMatches = searchResult.total;
+  const pageCount = searchResult.results.length;
+
+  const response: DictionarySearchResponse & {
+    dictionaryTotal: number;
+    totalMatches: number;
+    pageCount: number;
+  } = {
+    results: searchResult.results,
+    total: totalMatches,
+    count: pageCount,
+    dictionaryTotal,
+    totalMatches,
+    pageCount,
     offset: validated.offset,
     limit: validated.limit,
     query: queryStr,

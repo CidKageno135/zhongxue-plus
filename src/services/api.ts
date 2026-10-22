@@ -40,6 +40,14 @@ export type {
   HandwritingResponse
 };
 
+export interface DictionarySearchResult extends DictionarySearchResponse {
+  dictionaryTotal?: number;
+  totalMatches?: number;
+  pageCount?: number;
+  apiFailed?: boolean;
+  degraded?: boolean;
+}
+
 export interface BackendHealth {
   online: boolean;
   totalEntries: number;
@@ -71,6 +79,8 @@ export interface HandwritingOptions {
   language?: string;
   signal?: AbortSignal;
 }
+
+let cachedHealthTotal = 122596;
 
 /**
  * Standard same-origin API fetch helper.
@@ -127,6 +137,7 @@ export async function checkBackendHealth(
           typed.dictionary.totalEntries > 0
             ? typed.dictionary.totalEntries
             : 122596;
+        cachedHealthTotal = total;
 
         return {
           online: true,
@@ -301,13 +312,16 @@ export async function searchDictionary(
   offset = 0,
   limit = 20,
   signal?: AbortSignal
-): Promise<DictionarySearchResponse> {
+): Promise<DictionarySearchResult> {
   const trimmed = query.trim();
   if (!trimmed) {
     return {
       results: [],
       total: 0,
       count: 0,
+      dictionaryTotal: cachedHealthTotal > 0 ? cachedHealthTotal : 122596,
+      totalMatches: 0,
+      pageCount: 0,
       offset,
       limit,
       query: '',
@@ -316,6 +330,8 @@ export async function searchDictionary(
     };
   }
 
+  let backendFailed = false;
+
   try {
     const url = `/api/dictionary?q=${encodeURIComponent(trimmed)}&mode=${mode}&offset=${offset}&limit=${limit}`;
     const res = await apiFetch(url, { method: 'GET', signal });
@@ -323,12 +339,28 @@ export async function searchDictionary(
     if (res.ok) {
       const contentType = res.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
-        const data = (await res.json()) as Partial<DictionarySearchResponse>;
+        const data = (await res.json()) as Partial<DictionarySearchResult>;
         if (data && Array.isArray(data.results)) {
+          const dictTotal =
+            typeof data.dictionaryTotal === 'number' && data.dictionaryTotal > 0
+              ? data.dictionaryTotal
+              : (cachedHealthTotal > 0 ? cachedHealthTotal : 122596);
+          const totalMatches =
+            typeof data.totalMatches === 'number'
+              ? data.totalMatches
+              : (typeof data.total === 'number' ? data.total : data.results.length);
+          const pageCount =
+            typeof data.pageCount === 'number'
+              ? data.pageCount
+              : (typeof data.count === 'number' ? data.count : data.results.length);
+
           return {
             results: data.results,
-            total: typeof data.total === 'number' ? data.total : data.results.length,
-            count: typeof data.count === 'number' ? data.count : data.results.length,
+            total: totalMatches,
+            count: pageCount,
+            dictionaryTotal: dictTotal,
+            totalMatches,
+            pageCount,
             offset: typeof data.offset === 'number' ? data.offset : offset,
             limit: typeof data.limit === 'number' ? data.limit : limit,
             query: trimmed,
@@ -337,6 +369,9 @@ export async function searchDictionary(
           };
         }
       }
+      backendFailed = true;
+    } else {
+      backendFailed = true;
     }
   } catch (err: unknown) {
     // If request was actively cancelled by client AbortSignal, rethrow
@@ -346,7 +381,7 @@ export async function searchDictionary(
     ) {
       throw err;
     }
-    // Network failure: gracefully fall back to local search
+    backendFailed = true;
   }
 
   // Local offline search fallback
@@ -357,11 +392,16 @@ export async function searchDictionary(
     results: paginated,
     total: localMatches.length,
     count: paginated.length,
+    dictionaryTotal: cachedHealthTotal > 0 ? cachedHealthTotal : 122596,
+    totalMatches: localMatches.length,
+    pageCount: paginated.length,
     offset,
     limit,
     query: trimmed,
     mode,
-    source: 'local'
+    source: 'local',
+    apiFailed: backendFailed && localMatches.length === 0,
+    degraded: backendFailed
   };
 }
 

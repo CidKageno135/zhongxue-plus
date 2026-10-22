@@ -17,6 +17,9 @@ export interface DictionarySearchOptions {
 export interface DictionarySearchResult {
   results: DbDictionaryResult[];
   total: number;
+  dictionaryTotal?: number;
+  totalMatches?: number;
+  pageCount?: number;
 }
 
 export interface ParsedDictionaryEntry extends DbDictionaryResult {
@@ -596,7 +599,10 @@ export class DictionaryEngine {
 
     return {
       results: paged,
-      total
+      total,
+      dictionaryTotal: this.entries.length,
+      totalMatches: total,
+      pageCount: paged.length
     };
   }
 
