@@ -602,18 +602,19 @@ describe('A05: HTTP Route Handler Integration (server/ai.ts handleConversationRo
     req.method = method;
 
     const resHeaders: Record<string, string> = {};
-    const res = {
+    const responseMock = {
       statusCode: 200,
       writableEnded: false,
       setHeader: vi.fn((k: string, v: string) => {
         resHeaders[k.toLowerCase()] = v;
       }),
       end: vi.fn((data?: string) => {
-        res.writableEnded = true;
-        res._data = data;
+        responseMock.writableEnded = true;
+        responseMock._data = data;
       }),
       _data: '' as string | undefined
-    } as unknown as ServerResponse & { _data?: string };
+    };
+    const res = responseMock as unknown as ServerResponse & { _data?: string };
 
     return { req, res, resHeaders };
   }
