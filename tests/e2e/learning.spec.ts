@@ -37,6 +37,17 @@ test('dictionary finds accented and toneless Pinyin, unaccented Vietnamese, and 
     await expect(page.getByRole('main')).toContainText('你好');
   }
 
+  // 4b. Invariant G5: Search corpus-only word "乾杯" (not in default lessons)
+  await search.fill('乾杯');
+  await expect(page.getByRole('main')).toContainText('乾杯');
+  await expect(page.getByRole('main')).toContainText(/cạn ly/i);
+
+  // 4c. Invariant G5 / F06: Ensure CSDL badge does NOT collapse into 1 or page length
+  const dbBadge = page.locator('span', { hasText: /CSDL 122k/i });
+  await expect(dbBadge).toBeVisible();
+  await expect(dbBadge).not.toContainText('1 mục từ');
+  await expect(dbBadge).not.toContainText('20 mục từ');
+
   // 5. Verify helpful empty state when search finds no results
   await search.fill('zzzznonexistent');
   await expect(page.getByRole('main')).toContainText(/Không tìm thấy mục từ nào khớp/i);

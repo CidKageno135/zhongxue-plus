@@ -339,4 +339,39 @@ describe('searchNormalization — Subagent A07 Unit Tests', () => {
       });
     });
   });
+
+  // ==========================================================================
+  // Acceptance G5: Search Normalization Invariant Matrix for 學生
+  // ==========================================================================
+  describe('Acceptance G5: Complete Search Normalization Matrix for 學生', () => {
+    // Dictionary entry format with traditional, simplified, tone-marked/numbered pinyin, and definitions
+    const studentTarget = '學生 学生 [xue2 sheng1] [xue2 sheng5] /học sinh; sinh viên; học trò/';
+
+    const testMatrix = [
+      { type: 'Traditional Hanzi', query: '學生', expected: true },
+      { type: 'Simplified Hanzi', query: '学生', expected: true },
+      { type: 'Toneless Pinyin', query: 'xuesheng', expected: true },
+      { type: 'Accented Pinyin (single word)', query: 'xuéshēng', expected: true },
+      { type: 'Accented Pinyin (with space)', query: 'xué shēng', expected: true },
+      { type: 'Tone-numbered Pinyin (with space)', query: 'xue2 sheng1', expected: true },
+      { type: 'Tone-numbered Pinyin (without space)', query: 'xue2sheng1', expected: true },
+      { type: 'Tone-numbered Pinyin (neutral tone 5)', query: 'xue2 sheng5', expected: true },
+      { type: 'Accented Vietnamese', query: 'học sinh', expected: true },
+      { type: 'Unaccented Vietnamese', query: 'hoc sinh', expected: true },
+      { type: 'Decomposed Unicode (NFD) Pinyin', query: 'xuéshēng'.normalize('NFD'), expected: true },
+      { type: 'Decomposed Unicode (NFD) Vietnamese', query: 'học sinh'.normalize('NFD'), expected: true }
+    ];
+
+    for (const { type, query, expected } of testMatrix) {
+      it(`correctly matches ${type}: "${query}"`, () => {
+        expect(matchesQuery(studentTarget, query)).toBe(expected);
+      });
+    }
+
+    it('rejects queries for unrelated words', () => {
+      expect(matchesQuery(studentTarget, 'laoshi')).toBe(false);
+      expect(matchesQuery(studentTarget, 'thầy giáo')).toBe(false);
+      expect(matchesQuery(studentTarget, 'nihao')).toBe(false);
+    });
+  });
 });

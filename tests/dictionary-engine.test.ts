@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -10,6 +10,7 @@ import {
   pinyinNumberedToAccented,
   normalizeForSearch
 } from '../server/dictionary';
+import { createTestServer, type RunningTestServer } from './fixtures/api/test-server';
 
 describe('DictionaryEngine — Normalization Unit Functions', () => {
   it('normalizes Vietnamese diacritics and converts đ/Đ to d/D', () => {
@@ -288,5 +289,154 @@ describe('DictionaryEngine — Robust Error Handling', () => {
         fs.unlinkSync(corruptFile);
       }
     }
+  });
+});
+
+// ============================================================================
+// Acceptance G5 & F06: Contract 3-Number Separation, Corpus Integrity & Live Route
+// ============================================================================
+describe('Acceptance G5 & F06: 3-Number Contract Invariants at DictionaryEngine Level', () => {
+  beforeAll(async () => {
+    await dictionaryEngine.init();
+  });
+
+  it('verifies 3 distinct metrics on broad search: dictionaryTotal (122596), totalMatches (10622), pageCount (20)', () => {
+    const totalCorpus = dictionaryEngine.getTotal();
+    const searchRes = dictionaryEngine.search('de', 'all', 0, 20);
+
+    // 1. dictionaryTotal: total records in the entire dictionary
+    expect(totalCorpus).toBe(122596);
+
+    // 2. totalMatches: total entries matching query 'de' across all entries
+    expect(searchRes.total).toBe(10622);
+
+    // 3. pageCount: items returned in the requested page
+    expect(searchRes.results).toHaveLength(20);
+
+    // Invariant: The 3 numbers must NOT be collapsed or confused with each other
+    expect(totalCorpus).not.toBe(searchRes.total);
+    expect(totalCorpus).not.toBe(searchRes.results.length);
+    expect(searchRes.total).not.toBe(searchRes.results.length);
+  });
+
+  it('guarantees pagination offset stability and distinct items across consecutive slices', () => {
+    const p1 = dictionaryEngine.search('de', 'all', 0, 20);
+    const p2 = dictionaryEngine.search('de', 'all', 20, 20);
+    const p3 = dictionaryEngine.search('de', 'all', 40, 20);
+
+    expect(p1.total).toBe(10622);
+    expect(p2.total).toBe(10622);
+    expect(p3.total).toBe(10622);
+
+    const ids1 = new Set(p1.results.map(r => r.id));
+    const ids2 = new Set(p2.results.map(r => r.id));
+    const ids3 = new Set(p3.results.map(r => r.id));
+
+    // Zero overlap between slices
+    for (const id of ids2) {
+      expect(ids1.has(id)).toBe(false);
+    }
+    for (const id of ids3) {
+      expect(ids2.has(id)).toBe(false);
+    }
+  });
+});
+
+describe('Acceptance G5: Corpus Integrity & Non-Lesson Vocabulary (CVDICT 122k Exclusive)', () => {
+  beforeAll(async () => {
+    await dictionaryEngine.init();
+  });
+
+  it('retrieves corpus-only entry "乾杯" (cheers / cạn ly) via ID lookup and multi-tier search', () => {
+    // Search by Hanzi to find corpus entry
+    const searchHanzi = dictionaryEngine.search('乾杯', 'all', 0, 5);
+    expect(searchHanzi.results.length).toBeGreaterThan(0);
+    const firstMatch = searchHanzi.results.find(r => r.traditional === '乾杯') || searchHanzi.results[0];
+    expect(firstMatch.traditional).toBe('乾杯');
+    expect(firstMatch.definitions.some(d => d.includes('cạn ly'))).toBe(true);
+
+    // ID lookup for the real entry ID
+    const byId = dictionaryEngine.getById(firstMatch.id);
+    expect(byId).not.toBeNull();
+    expect(byId?.traditional).toBe('乾杯');
+    expect(byId?.simplified).toBe('干杯');
+    expect(byId?.pinyin).toBe('gan1 bei1');
+    expect(byId?.definitions.some(d => d.includes('cạn ly'))).toBe(true);
+
+    // Search by Pinyin
+    const searchPinyin = dictionaryEngine.search('ganbei', 'all', 0, 5);
+    expect(searchPinyin.results.some(r => r.traditional === '乾杯')).toBe(true);
+
+    // Search by Vietnamese definition
+    const searchVi = dictionaryEngine.search('cạn ly', 'all', 0, 5);
+    expect(searchVi.results.some(r => r.traditional === '乾杯')).toBe(true);
+  });
+
+  it('retrieves corpus-only entry "電腦" (computer / máy vi tính)', () => {
+    const searchHanzi = dictionaryEngine.search('電腦', 'all', 0, 5);
+    expect(searchHanzi.results.some(r => r.traditional === '電腦')).toBe(true);
+
+    const searchPinyin = dictionaryEngine.search('diannao', 'all', 0, 5);
+    expect(searchPinyin.results.some(r => r.traditional === '電腦')).toBe(true);
+  });
+});
+
+describe('Acceptance G5 & F06: Live HTTP Route /api/dictionary 3-Number Contract (F06 Reproduction)', () => {
+  let testServer: RunningTestServer;
+
+  beforeAll(async () => {
+    testServer = await createTestServer({ loadDictionary: true });
+  });
+
+  afterAll(async () => {
+    if (testServer) {
+      await testServer.close();
+    }
+  });
+
+  it('F06 Live Route Reproduction: GET /api/dictionary?q=de&limit=20 returns dictionaryTotal, totalMatches, and pageCount', async () => {
+    const res = await testServer.fetch('/api/dictionary?q=de&limit=20');
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as {
+      results: Array<unknown>;
+      total: number;
+      count: number;
+      dictionaryTotal?: number;
+      totalMatches?: number;
+      pageCount?: number;
+      source: string;
+    };
+
+    expect(body.source).toBe('database');
+    expect(body.results).toHaveLength(20);
+
+    // Invariant G5 / F06 Contract Requirement:
+    // The HTTP response must provide the 3 numbers:
+    // 1. dictionaryTotal: total entries in the entire dictionary (122,596)
+    // 2. totalMatches: total matches for query 'de' (10,622)
+    // 3. pageCount: items returned in this page (20)
+    expect(body.dictionaryTotal).toBe(122596);
+    expect(body.totalMatches ?? body.total).toBe(10622);
+    expect(body.pageCount ?? body.count).toBe(20);
+
+    // Invariant: dictionaryTotal must never equal pageCount (prevents UI badge collapse)
+    expect(body.dictionaryTotal).not.toBe(body.pageCount ?? body.count);
+  });
+
+  it('GET /api/dictionary?id=... serves corpus-only word with correct database fields', async () => {
+    const searchRes = dictionaryEngine.search('乾杯', 'all', 0, 1);
+    const targetId = searchRes.results[0]?.id || 'cv_1';
+    const res = await testServer.fetch(`/api/dictionary?id=${targetId}`);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as {
+      id: string;
+      traditional: string;
+      definitions: string[];
+    };
+
+    expect(body.traditional).toBe('乾杯');
+    expect(body.definitions.some(d => d.includes('cạn ly'))).toBe(true);
   });
 });

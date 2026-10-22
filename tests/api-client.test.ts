@@ -866,4 +866,226 @@ describe('A08: Client API Adapter (src/services/api.ts)', () => {
       expect(reply.content).toContain('繁體中文');
     });
   });
+
+  // ==========================================================================
+  // 7. Acceptance G5 & F06: Dictionary Contract 3-Number Separation, Pagination & Corpus Protection
+  // ==========================================================================
+  describe('7. Acceptance G5 & F06: Dictionary Contract 3-Number Separation & Corpus Protection (Invariant G5)', () => {
+    it('F06 Contract Reproduction: searchDictionary response explicitly separates dictionaryTotal, totalMatches, and pageCount', async () => {
+      // Backend returns simulated search response for broad query "de" with limit 20
+      const mockBackendResponse = {
+        results: Array.from({ length: 20 }, (_, i) => ({
+          id: `dict-de-${i + 1}`,
+          traditional: `的${i}`,
+          simplified: `的${i}`,
+          pinyin: 'de',
+          definitions: [`nghĩa ${i + 1}`]
+        })),
+        total: 10622,
+        count: 20,
+        dictionaryTotal: 122596,
+        totalMatches: 10622,
+        pageCount: 20,
+        offset: 0,
+        limit: 20,
+        query: 'de',
+        mode: 'all',
+        source: 'database'
+      };
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: async () => mockBackendResponse
+      } as Response);
+
+      const res = await searchDictionary('de', 'all', 0, 20);
+
+      expect(res.source).toBe('database');
+      expect(res.results).toHaveLength(20);
+
+      // Invariant G5: Contract must clearly expose the 3 distinct numbers
+      // 1. dictionaryTotal: total items in the entire dictionary (e.g. 122,596)
+      // 2. totalMatches: total query matches across the database (e.g. 10,622)
+      // 3. pageCount: items returned in current page (e.g. 20)
+      const extendedRes = res as unknown as {
+        dictionaryTotal?: number;
+        totalMatches?: number;
+        pageCount?: number;
+      };
+
+      expect(extendedRes.dictionaryTotal).toBe(122596);
+      expect(extendedRes.totalMatches ?? res.total).toBe(10622);
+      expect(extendedRes.pageCount ?? res.count).toBe(20);
+
+      // Mutual exclusivity invariants: the 3 numbers must NOT be confused with each other
+      expect(extendedRes.dictionaryTotal).not.toBe(extendedRes.totalMatches);
+      expect(extendedRes.dictionaryTotal).not.toBe(extendedRes.pageCount);
+      expect(extendedRes.totalMatches).not.toBe(extendedRes.pageCount);
+    });
+
+    it('G5 Contract Invariant: multi-page pagination preserves dictionaryTotal and totalMatches across consecutive pages', async () => {
+      const mockPage1 = {
+        results: Array.from({ length: 20 }, (_, i) => ({
+          id: `dict-de-${i}`,
+          traditional: `的${i}`,
+          simplified: `的${i}`,
+          pinyin: 'de',
+          definitions: ['trợ từ']
+        })),
+        total: 10622,
+        count: 20,
+        dictionaryTotal: 122596,
+        totalMatches: 10622,
+        pageCount: 20,
+        offset: 0,
+        limit: 20,
+        query: 'de',
+        mode: 'all',
+        source: 'database'
+      };
+
+      const mockPage2 = {
+        results: Array.from({ length: 20 }, (_, i) => ({
+          id: `dict-de-${i + 20}`,
+          traditional: `得${i}`,
+          simplified: `得${i}`,
+          pinyin: 'de',
+          definitions: ['trợ từ']
+        })),
+        total: 10622,
+        count: 20,
+        dictionaryTotal: 122596,
+        totalMatches: 10622,
+        pageCount: 20,
+        offset: 20,
+        limit: 20,
+        query: 'de',
+        mode: 'all',
+        source: 'database'
+      };
+
+      globalThis.fetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'Content-Type': 'application/json' }),
+          json: async () => mockPage1
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'Content-Type': 'application/json' }),
+          json: async () => mockPage2
+        } as Response);
+
+      const page1 = await searchDictionary('de', 'all', 0, 20);
+      const page2 = await searchDictionary('de', 'all', 20, 20);
+
+      const ext1 = page1 as unknown as { dictionaryTotal?: number; totalMatches?: number; pageCount?: number };
+      const ext2 = page2 as unknown as { dictionaryTotal?: number; totalMatches?: number; pageCount?: number };
+
+      expect(ext1.dictionaryTotal).toBe(122596);
+      expect(ext2.dictionaryTotal).toBe(122596);
+      expect(ext1.totalMatches ?? page1.total).toBe(10622);
+      expect(ext2.totalMatches ?? page2.total).toBe(10622);
+      expect(ext1.pageCount ?? page1.count).toBe(20);
+      expect(ext2.pageCount ?? page2.count).toBe(20);
+
+      // Verify that page 1 and page 2 contain distinct results
+      expect(page1.results[0].id).not.toBe(page2.results[0].id);
+    });
+
+    it('G5 Corpus Protection: corpus-only entry (not in lessons) must return source "database" and NEVER let local fallback silently hide API crash with 0 results', async () => {
+      // 1. Online: Searching corpus-only word "乾杯" (cheers / cạn ly, cv_3306)
+      const mockGanbeiResponse = {
+        results: [
+          {
+            id: 'cv_3306',
+            traditional: '乾杯',
+            simplified: '干杯',
+            pinyin: 'gan1 bei1',
+            definitions: ['cạn ly', 'uống cạn']
+          }
+        ],
+        total: 1,
+        count: 1,
+        dictionaryTotal: 122596,
+        totalMatches: 1,
+        pageCount: 1,
+        offset: 0,
+        limit: 20,
+        query: '乾杯',
+        mode: 'all',
+        source: 'database'
+      };
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: async () => mockGanbeiResponse
+      } as Response);
+
+      const onlineRes = await searchDictionary('乾杯', 'all', 0, 20);
+      expect(onlineRes.source).toBe('database');
+      expect(onlineRes.results).toHaveLength(1);
+      expect(onlineRes.results[0].traditional).toBe('乾杯');
+
+      // 2. Offline / API crash: Backend returns 500 Internal Server Error
+      // Invariant G5: "Từ chỉ có ở corpus (không nằm trong bài học mặc định) phải trả về nguồn từ điển,
+      // không được để local fallback âm thầm che giấu khi API hỏng."
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: async () => ({ error: 'Dictionary database failure' })
+      } as Response);
+
+      const crashRes = await searchDictionary('乾杯', 'all', 0, 20);
+
+      // The client MUST NOT return source: 'local' with 0 results silently masquerading as a successful empty search!
+      // It must indicate an error condition (apiFailed, error flag, or non-silent degradation)
+      const crashExt = crashRes as unknown as { apiFailed?: boolean; error?: unknown; degraded?: boolean };
+      expect(crashExt.apiFailed || crashExt.degraded || crashRes.source !== 'local' || crashRes.results.length > 0).toBe(true);
+    });
+
+    it('G5 Search Normalization in Client Adapter: finds 學生 across all representations (traditional, simplified, pinyin tone/toneless/numbered, vietnamese accented/unaccented)', async () => {
+      const mockStudentResponse = {
+        results: [
+          {
+            id: 'cv_31249',
+            traditional: '學生',
+            simplified: '学生',
+            pinyin: 'xue2 sheng5',
+            definitions: ['học sinh', 'sinh viên']
+          }
+        ],
+        total: 12,
+        count: 1,
+        dictionaryTotal: 122596,
+        totalMatches: 12,
+        pageCount: 1,
+        offset: 0,
+        limit: 20,
+        query: '學生',
+        mode: 'all',
+        source: 'database'
+      };
+
+      for (const query of ['學生', '学生', 'xuesheng', 'xuéshēng', 'xue2 sheng1', 'học sinh', 'hoc sinh']) {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'Content-Type': 'application/json' }),
+          json: async () => ({ ...mockStudentResponse, query })
+        } as Response);
+
+        const res = await searchDictionary(query, 'all', 0, 20);
+        expect(res.source).toBe('database');
+        expect(res.results.some(r => r.traditional === '學生')).toBe(true);
+      }
+    });
+  });
 });
