@@ -42,9 +42,9 @@ test.describe('E2E Storage Recovery & Large Dataset Invariants (T09)', () => {
     // On baseline: App triggers load error due to 200k limit and displays error notice
     await expect(page.getByText('Không thể đọc tiến độ đã lưu')).not.toBeVisible();
 
-    // Verify user profile loaded correctly
-    const profileText = page.getByRole('button', { name: 'Mở hồ sơ & cài đặt' }).getByText('Người học Đài Loan 600');
-    await expect(profileText).toBeVisible();
+    // Navigate to Settings to verify user profile loaded correctly
+    await page.getByRole('button', { name: 'Mở hồ sơ & cài đặt' }).click();
+    await expect(page.getByText(/Người học Đài Loan 600/)).toBeVisible();
   });
 
   test('corrupted raw data is preserved and not silently overwritten on subsequent state changes (REPRODUCES F01 recovery gap)', async ({ page }) => {
