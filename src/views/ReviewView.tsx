@@ -63,6 +63,7 @@ export function ReviewView({ state, onReview, onDictionary, onSaveWords, onNotic
           word.id.startsWith('custom-')
         : false;
 
+    // Handle SM-2 rating submission for both due reviews and Review Ahead (re-reviews on same day)
     const handleRate = useCallback(
         (rating: 'again' | 'hard' | 'good' | 'easy') => {
             if (!word || isSubmittingRef.current) return;

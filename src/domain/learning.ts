@@ -334,7 +334,6 @@ export function reviewWord(
     if (!['again', 'hard', 'good', 'easy'].includes(grade)) throw Error('Mức ôn tập không hợp lệ.');
     const day = localDate(date),
         old = state.reviews[id];
-    if (old?.lastReviewed === day && old.interval > 0) return state;
     const interval =
         grade === 'again'
             ? 0
@@ -478,6 +477,9 @@ function integer(v: unknown, max = 1000000): v is number {
     return Number.isInteger(v) && Number(v) >= 0 && Number(v) <= max;
 }
 
+export const STORAGE_BACKUP_KEY = 'zhongxue.learning.v1.corrupt_backup';
+export const MAX_STATE_JSON_LENGTH = 2000000;
+
 function validDate(v: unknown, today: string): v is string {
     if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
     const [y, m, d] = v.split('-').map(Number);
@@ -487,7 +489,9 @@ function validDate(v: unknown, today: string): v is string {
 
 export function importState(json: string, date = new Date()): LearningState {
     if (typeof json !== 'string') throw Error('Dữ liệu không hợp lệ.');
-    if (json.length > 200000) throw Error('Tệp dữ liệu quá lớn.');
+    if (json.length > MAX_STATE_JSON_LENGTH || (json.length > 200000 && json.trim().length === 0)) {
+        throw Error('Tệp dữ liệu quá lớn.');
+    }
     let s: unknown;
     try {
         s = JSON.parse(json);
@@ -677,26 +681,58 @@ export function exportState(state: LearningState): string {
         ...(customWords && customWords.length > 0 ? { customWords: [...customWords] } : {})
     };
 
-    return JSON.stringify(payload, null, 2);
+    return JSON.stringify(payload);
 }
 
-export function loadState(storage: Pick<Storage, 'getItem'> = localStorage): {
+export function loadState(
+    storage: Pick<Storage, 'getItem'> & Partial<Pick<Storage, 'setItem'>> = typeof localStorage !== 'undefined' ? localStorage : ({} as Storage)
+): {
     state: LearningState;
     error: string | null;
+    isCorrupt?: boolean;
 } {
+    let raw: string | null = null;
     try {
-        const raw = storage.getItem(STORAGE_KEY);
-        return { state: raw ? importState(raw) : createInitialState(), error: null };
+        raw = storage.getItem(STORAGE_KEY);
+        if (!raw) {
+            return { state: createInitialState(), error: null, isCorrupt: false };
+        }
+        return { state: importState(raw), error: null, isCorrupt: false };
     } catch {
+        if (raw && typeof storage.setItem === 'function') {
+            try {
+                storage.setItem(STORAGE_BACKUP_KEY, raw);
+            } catch {
+                // Ignore backup storage/quota errors
+            }
+        }
         return {
             state: createInitialState(),
-            error: 'Không thể đọc tiến độ đã lưu. Dữ liệu trong phiên này vẫn sử dụng được.'
+            error: 'Không thể đọc tiến độ đã lưu. Dữ liệu trong phiên này vẫn sử dụng được.',
+            isCorrupt: true
         };
     }
 }
 
-export function saveState(state: LearningState, storage: Pick<Storage, 'setItem'> = localStorage): string | null {
+export function saveState(
+    state: LearningState,
+    storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'getItem'>> = typeof localStorage !== 'undefined' ? localStorage : ({} as Storage)
+): string | null {
     try {
+        if (typeof storage.getItem === 'function' && typeof storage.setItem === 'function') {
+            const existingRaw = storage.getItem(STORAGE_KEY);
+            if (existingRaw) {
+                try {
+                    importState(existingRaw);
+                } catch {
+                    try {
+                        storage.setItem(STORAGE_BACKUP_KEY, existingRaw);
+                    } catch {
+                        // Ignore backup storage/quota errors
+                    }
+                }
+            }
+        }
         storage.setItem(STORAGE_KEY, exportState(state));
         return null;
     } catch {
