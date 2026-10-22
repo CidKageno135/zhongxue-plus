@@ -21,10 +21,10 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
   ],
   webServer: {
-    command: isProd ? 'npm run start' : 'npm run dev -- --port 4173',
+    command: isProd ? 'npm run build && npm run start' : 'npm run dev -- --port 4173',
     url: isProd ? `${baseURL}/api/health` : baseURL,
-    reuseExistingServer: !process.env.CI && !isProd,
-    timeout: 30000,
+    reuseExistingServer: false,
+    timeout: 120000,
     env: isProd ? { PORT: '3000', HOST: '127.0.0.1' } : {}
   },
 });

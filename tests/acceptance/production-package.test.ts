@@ -9,7 +9,8 @@
  * - Runtime start script ("npm start") must NOT depend on tools declared only in devDependencies.
  * - Production server entry must be pure JavaScript executable by standard Node.js.
  * - Production build artifact must generate both frontend assets and runnable backend server.
- * - Server must successfully boot and respond to /api/health in an isolated omit-dev environment.
+ * - Built server must boot and respond to /api/health with development binary paths removed.
+ *   This smoke test does not substitute for a separate clean npm ci --omit=dev check.
  *
  * BASELINE STATUS: These tests MUST FAIL (RED) on baseline, proving and reproducing F07.
  * B06 (Runtime Builder) will modify package.json and server build in Batch 1 to turn them GREEN.
@@ -109,24 +110,24 @@ describe('Production Package Acceptance Tests (T14 Invariant G6 / Finding F07)',
   });
 
   // ==========================================================================
-  // 3. Clean-Room Omit-Dev Startup Simulation (Reproducing F07)
+  // 3. PATH-sanitized production startup smoke check (Reproducing F07)
   // ==========================================================================
-  describe('3. Clean-Room Omit-Dev Startup Simulation (Reproducing F07)', () => {
-    it('3.1 should start production server when devDependencies are omitted (simulating npm ci --omit=dev)', async () => {
+  describe('3. PATH-sanitized production startup smoke check (Reproducing F07)', () => {
+    it('3.1 should start the built production entry with development binary paths removed', async () => {
       // Invariant G6:
-      // Production server MUST successfully start on a dedicated port in an isolated environment
-      // where devDependencies are not present on PATH.
+      // Production server MUST successfully start on a dynamically allocated port
+      // with development binary directories removed from PATH.
+      // This does not hide installed node_modules and is not clean-install evidence.
       // On baseline, this will fail immediately with code != 0 because `vite-node` is missing or fails.
       let spawned;
       try {
         spawned = await spawnProductionProcess({
-          port: 3998,
           omitDevSimulated: true,
-          timeoutMs: 4000
+          timeoutMs: 30000
         });
 
         expect(spawned).toBeDefined();
-        expect(spawned.port).toBe(3998);
+        expect(spawned.port).toBeGreaterThan(0);
 
         // Server should be reachable via health probe
         const res = await fetch(`${spawned.baseUrl}/api/health`);
@@ -136,6 +137,6 @@ describe('Production Package Acceptance Tests (T14 Invariant G6 / Finding F07)',
           await spawned.stop();
         }
       }
-    });
+    }, 35000);
   });
 });

@@ -20,10 +20,10 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
   ],
   webServer: {
-    command: 'npm run start',
+    command: 'npm run build && npm run start',
     url: `${baseURL}/api/health`,
     reuseExistingServer: false,
-    timeout: 30000,
+    timeout: 120000,
     env: {
       PORT: port,
       HOST: '127.0.0.1'

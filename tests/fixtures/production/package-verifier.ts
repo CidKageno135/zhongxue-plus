@@ -8,13 +8,14 @@
  * 1. Checks package.json dependencies vs scripts.start requirements.
  * 2. Detects forbidden runtime dependencies on devDependencies (e.g. vite-node, vitest).
  * 3. Probes standalone Node.js production server execution without dev transpilers.
- * 4. Spawns server in isolated clean-room environment (simulating npm ci --omit=dev).
+ * 4. Probes HTTP health with development binary paths removed (a startup smoke check).
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, type ChildProcess } from 'node:child_process';
+import net from 'node:net';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -100,136 +101,81 @@ export interface SpawnedProcessResult {
 }
 
 /**
- * Attempts to spawn the production server process using the configured start script.
- * If omitDevSimulated is true, strips devDependencies binary paths from PATH to simulate
- * an environment where only production dependencies were installed (npm ci --omit=dev).
+ * Runs the plain Node entry directly so cleanup owns the real server process.
+ * PATH sanitization is a smoke check, not a clean omit-dev installation.
  */
-export function spawnProductionProcess(options: SpawnProductionOptions = {}): Promise<SpawnedProcessResult> {
+export async function spawnProductionProcess(options: SpawnProductionOptions = {}): Promise<SpawnedProcessResult> {
   const projectRoot = options.projectRoot || PROJECT_ROOT;
-  const port = options.port ?? 3999;
-  const timeoutMs = options.timeoutMs ?? 5000;
-
-  return new Promise((resolve, reject) => {
-    const stdoutLines: string[] = [];
-    const stderrLines: string[] = [];
-    let isExited = false;
-    let isReady = false;
-
-    // Build environment
-    const processEnv: NodeJS.ProcessEnv = {
-      ...process.env,
-      ...options.env,
-      NODE_ENV: 'production',
-      PORT: String(port),
-      HOST: '127.0.0.1'
-    };
-
-    if (options.omitDevSimulated) {
-      // Remove node_modules/.bin from PATH to simulate omitted devDependencies
-      const currentPath = processEnv.PATH || processEnv.Path || '';
-      const sanitizedPath = currentPath
-        .split(path.delimiter)
-        .filter((entry) => !entry.includes(path.join('node_modules', '.bin')))
-        .join(path.delimiter);
-
-      processEnv.PATH = sanitizedPath;
-      processEnv.Path = sanitizedPath;
-      // Also disallow vitest/vite-node auto-resolution
-      delete processEnv.VITEST;
-    }
-
-    const isWindows = process.platform === 'win32';
-    const npmCmd = isWindows ? 'npm.cmd' : 'npm';
-
-    const child = spawn(npmCmd, ['start'], {
-      cwd: projectRoot,
-      env: processEnv,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: isWindows
+  const timeoutMs = options.timeoutMs ?? 30000;
+  const startScript = readProjectPackageJson(projectRoot).scripts?.start || '';
+  const entry = /^node\s+([\w./-]+\.m?js)$/.exec(startScript)?.[1];
+  if (!entry) throw new Error('Production harness requires a plain node <entry.js> start script.');
+  const port = options.port ?? await new Promise<number>((resolve, reject) => {
+    const reservation = net.createServer();
+    reservation.once('error', reject);
+    reservation.listen(0, '127.0.0.1', () => {
+      const address = reservation.address();
+      if (!address || typeof address === 'string') return reservation.close(() => reject(new Error('No TCP port allocated')));
+      reservation.close((error) => error ? reject(error) : resolve(address.port));
     });
-
-    const stop = (): Promise<void> => {
-      return new Promise((resStop) => {
-        if (isExited) {
-          resStop();
-          return;
-        }
-        child.kill('SIGTERM');
-        setTimeout(() => {
-          if (!isExited) {
-            child.kill('SIGKILL');
-          }
-          resStop();
-        }, 1500).unref();
-      });
-    };
-
-    child.stdout?.on('data', (chunk) => {
-      const text = chunk.toString();
-      stdoutLines.push(text);
-      if (text.includes('is running!') || text.includes('listening') || text.includes('http://')) {
-        isReady = true;
-      }
-    });
-
-    child.stderr?.on('data', (chunk) => {
-      stderrLines.push(chunk.toString());
-    });
-
-    child.on('error', (err) => {
-      isExited = true;
-      reject(err);
-    });
-
-    child.on('exit', (code, signal) => {
-      isExited = true;
-      if (!isReady) {
-        const errorMsg = [
-          `Production server exited prematurely with code ${code} (signal ${signal}).`,
-          `STDERR: ${stderrLines.join('').trim() || '(none)'}`,
-          `STDOUT: ${stdoutLines.join('').trim() || '(none)'}`
-        ].join('\n');
-        reject(new Error(errorMsg));
-      }
-    });
-
-    const timer = setTimeout(() => {
-      if (!isReady && !isExited) {
-        stop().finally(() => {
-          reject(new Error(
-            `Timeout waiting for production server to start (${timeoutMs}ms).\n` +
-            `STDERR: ${stderrLines.join('').trim()}\n` +
-            `STDOUT: ${stdoutLines.join('').trim()}`
-          ));
-        });
-      } else if (isReady) {
-        resolve({
-          child,
-          port,
-          baseUrl: `http://127.0.0.1:${port}`,
-          stdout: stdoutLines,
-          stderr: stderrLines,
-          stop,
-          waitReady: async () => {}
-        });
-      }
-    }, timeoutMs);
-
-    // Check periodically for ready flag
-    const checkInterval = setInterval(() => {
-      if (isReady) {
-        clearInterval(checkInterval);
-        clearTimeout(timer);
-        resolve({
-          child,
-          port,
-          baseUrl: `http://127.0.0.1:${port}`,
-          stdout: stdoutLines,
-          stderr: stderrLines,
-          stop,
-          waitReady: async () => {}
-        });
-      }
-    }, 100);
   });
+  const processEnv: NodeJS.ProcessEnv = {
+    ...process.env, ...options.env, NODE_ENV: 'production', PORT: String(port), HOST: '127.0.0.1'
+  };
+  if (options.omitDevSimulated) {
+    for (const key of Object.keys(processEnv).filter((key) => key.toLowerCase() === 'path')) {
+      processEnv[key] = (processEnv[key] || '').split(path.delimiter)
+        .filter((part) => !/[\\/]node_modules[\\/]\.bin(?:[\\/]|$)/i.test(part)).join(path.delimiter);
+    }
+    delete processEnv.VITEST;
+  }
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const child = spawn(process.execPath, [entry], {
+    cwd: projectRoot, env: processEnv, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true
+  });
+  child.stdout?.on('data', (chunk) => stdout.push(String(chunk)));
+  child.stderr?.on('data', (chunk) => stderr.push(String(chunk)));
+  let spawnError: Error | undefined;
+  child.once('error', (error) => { spawnError = error; });
+  let stopping: Promise<void> | undefined;
+  const stop = (): Promise<void> => stopping ??= new Promise<void>((resolve, reject) => {
+    if (child.exitCode !== null || child.signalCode !== null || !child.pid) return resolve();
+    child.once('close', () => resolve());
+    if (process.platform === 'win32') {
+      const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+      killer.once('error', reject);
+      killer.once('close', (code) => {
+        if (code !== 0 && child.exitCode === null && child.signalCode === null) reject(new Error('Could not terminate owned production process tree'));
+      });
+    } else {
+      child.kill('SIGTERM');
+      const escalation = setTimeout(() => child.kill('SIGKILL'), 1500);
+      child.once('close', () => clearTimeout(escalation));
+    }
+  });
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const diagnostics = () => `STDERR: ${stderr.join('')}\nSTDOUT: ${stdout.join('')}`;
+  const deadline = Date.now() + timeoutMs;
+  try {
+    while (Date.now() < deadline) {
+      if (spawnError) throw spawnError;
+      if (child.exitCode !== null || child.signalCode !== null) {
+        throw new Error(`Production server exited prematurely with code ${child.exitCode}.\n${diagnostics()}`);
+      }
+      try {
+        const response = await fetch(`${baseUrl}/api/health`, { signal: AbortSignal.timeout(Math.min(500, Math.max(1, deadline - Date.now()))) });
+        if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
+          await response.json();
+          return { child, port, baseUrl, stdout, stderr, stop, waitReady: async () => {} };
+        }
+        await response.body?.cancel();
+      } catch { /* Not listening yet, or health is not ready. */ }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error(`Timeout waiting for production health (${timeoutMs}ms).\n${diagnostics()}`);
+  } catch (error) {
+    await stop();
+    throw error;
+  }
 }
