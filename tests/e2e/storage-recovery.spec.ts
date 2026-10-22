@@ -42,54 +42,57 @@ test.describe('E2E Storage Recovery & Large Dataset Invariants (T09)', () => {
     // On baseline: App triggers load error due to 200k limit and displays error notice
     await expect(page.getByText('Không thể đọc tiến độ đã lưu')).not.toBeVisible();
 
-    // Navigate to Settings to verify user profile loaded correctly
+    await page.getByRole('button', { name: 'Từ điển', exact: true }).click();
+    await page.getByRole('button', { name: 'Đã lưu (600)', exact: true }).click();
+    const firstWord = page.locator('.word-card').filter({ hasText: '單詞1' }).first();
+    await expect(firstWord).toContainText(words[0].meaning);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('zhongxue.learning.v1')!));
+    expect(stored.savedWordIds).toEqual(largePayload.savedWordIds);
+    expect(stored.customWords).toEqual(words);
     await page.getByRole('button', { name: 'Mở hồ sơ & cài đặt' }).click();
     await expect(page.locator('#profile-name')).toHaveValue('Người học Đài Loan 600');
   });
 
-  test('corrupted raw data is preserved and not silently overwritten on subsequent state changes (REPRODUCES F01 recovery gap)', async ({ page }) => {
-    const brokenRaw = '{"version": 1, "profile": {"name": "Corrupt Profile"}, "savedWordIds": [TRUNCATED_CONTENT_MALFORMED...';
-
-    await page.goto('/');
-    await page.evaluate((corrupted) => {
-      localStorage.setItem('zhongxue.learning.v1', corrupted);
-    }, brokenRaw);
-
-    await page.reload();
-
-    // App should report load notice
-    await expect(page.getByText(/Không thể đọc tiến độ đã lưu/)).toBeVisible();
-
-    // User performs an action that triggers state update and saveState
-    // E.g. Click on dictionary and save a new word
-    const dictNavBtn = page.getByRole('button', { name: 'Từ điển' }).or(page.getByText('Từ điển'));
-    if (await dictNavBtn.first().isVisible()) {
-      await dictNavBtn.first().click();
-    }
-
-    // Check storage: user's original raw data MUST NOT be permanently obliterated without backup
-    const storageState = await page.evaluate(() => {
-      const current = localStorage.getItem('zhongxue.learning.v1');
-      const backupKeys = [
-        'zhongxue.learning.v1.corrupt_backup',
-        'zhongxue.learning.corrupt.backup',
-        'zhongxue.learning.backup',
-        'zhongxue.learning.v1.backup'
-      ];
-      let backup: string | null = null;
-      for (const k of backupKeys) {
-        const val = localStorage.getItem(k);
-        if (val) {
-          backup = val;
-          break;
-        }
+  for (const quotaFailure of [false, true]) {
+    test(`corrupt data pauses autosave until explicit recovery (backup quota failure: ${quotaFailure})`, async ({ page }) => {
+      const brokenRaw = '{"valuable-history": [TRUNCATED...';
+      await page.goto('/');
+      await page.evaluate(raw => {
+        localStorage.removeItem('zhongxue.learning.v1.corrupt_backup');
+        localStorage.setItem('zhongxue.learning.v1', raw);
+      }, brokenRaw);
+      if (quotaFailure) {
+        await page.addInitScript(() => {
+          const setItem = Storage.prototype.setItem;
+          Storage.prototype.setItem = function (key: string, value: string) {
+            if (key === 'zhongxue.learning.v1.corrupt_backup') {
+              throw new DOMException('Simulated full storage', 'QuotaExceededError');
+            }
+            return setItem.call(this, key, value);
+          };
+        });
       }
-      return { current, backup };
+      await page.reload();
+      const recovery = page.getByRole('alert', { name: 'Khôi phục tiến độ' });
+      await expect(recovery).toBeVisible();
+      // A real state change must remain in memory while original raw is protected.
+      await page.getByRole('button', { name: 'Mở hồ sơ & cài đặt' }).click();
+      await page.locator('#profile-name').fill('Khôi phục có xác nhận');
+      await page.getByRole('button', { name: 'Lưu cài đặt', exact: true }).click();
+      await expect(page.locator('#profile-name')).toHaveValue('Khôi phục có xác nhận');
+      expect(await page.evaluate(() => localStorage.getItem('zhongxue.learning.v1'))).toBe(brokenRaw);
+      await recovery.getByRole('button', { name: 'Giữ bản sao gốc và tiếp tục lưu' }).click();
+      if (quotaFailure) {
+        await expect(recovery).toBeVisible();
+        expect(await page.evaluate(() => localStorage.getItem('zhongxue.learning.v1'))).toBe(brokenRaw);
+        expect(await page.evaluate(() => localStorage.getItem('zhongxue.learning.v1.corrupt_backup'))).toBeNull();
+      } else {
+        await expect(recovery).not.toBeVisible();
+        expect(await page.evaluate(() => localStorage.getItem('zhongxue.learning.v1.corrupt_backup'))).toBe(brokenRaw);
+        await page.reload();
+        await page.getByRole('button', { name: 'Mở hồ sơ & cài đặt' }).click();
+        await expect(page.locator('#profile-name')).toHaveValue('Khôi phục có xác nhận');
+      }
     });
-
-    // INVARIANT: The corrupted data MUST exist either in current key or in backup key
-    // On baseline: current key was overwritten with empty state, backup is null => 100% data loss
-    const preserved = storageState.current === brokenRaw || storageState.backup === brokenRaw;
-    expect(preserved).toBe(true);
-  });
+  }
 });

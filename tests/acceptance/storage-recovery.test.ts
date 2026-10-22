@@ -3,6 +3,10 @@ import {
     saveState,
     loadState,
     STORAGE_KEY,
+    STORAGE_BACKUP_KEY,
+    createInitialState,
+    exportState,
+    MAX_STATE_JSON_LENGTH,
     clearCustomWordRegistry
 } from '../../src/domain/learning';
 
@@ -182,5 +186,46 @@ describe('T09 Acceptance: Storage Corruption Recovery & Safe Guarding (G1 Invari
             expect(loaded.error).toBeTruthy();
             expect(storage.getItem(STORAGE_KEY)).toBe(futureVersionPayload);
         });
+    });
+});
+
+
+describe('Save/read contract and recovery atomicity', () => {
+    it('rejects an oversized export and save without replacing valid raw data', () => {
+        const storage = createFreshStorage();
+        const valid = createInitialState();
+        expect(saveState(valid, storage)).toBeNull();
+        const original = storage.getItem(STORAGE_KEY);
+        const oversized = { ...valid, customWords: [{
+            id: 'cv_oversized', hanzi: '字', pinyin: 'zi', meaning: 'x'.repeat(MAX_STATE_JSON_LENGTH),
+            example: '', examplePinyin: '', exampleMeaning: '', category: '', lessonId: 'custom'
+        }] };
+        expect(() => exportState(oversized)).toThrow();
+        expect(saveState(oversized, storage)).toBeTruthy();
+        expect(storage.getItem(STORAGE_KEY)).toBe(original);
+        expect(loadState(storage).error).toBeNull();
+    });
+
+    it('refuses to replace corrupt raw if backup cannot be written', () => {
+        const storage = createFreshStorage();
+        const broken = '{valuable raw';
+        storage.setItem(STORAGE_KEY, broken);
+        const quota = { getItem: storage.getItem, setItem(key: string, value: string) {
+            if (key === STORAGE_BACKUP_KEY) throw Error('quota');
+            storage.setItem(key, value);
+        } };
+        expect(saveState(createInitialState(), quota)).toBeTruthy();
+        expect(storage.getItem(STORAGE_KEY)).toBe(broken);
+    });
+
+    it('preserves an existing different backup instead of replacing it with new corrupt raw', () => {
+        const storage = createFreshStorage();
+        storage.setItem(STORAGE_KEY, '{second valuable raw');
+        storage.setItem(STORAGE_BACKUP_KEY, '{first valuable raw');
+        loadState(storage);
+        expect(storage.getItem(STORAGE_BACKUP_KEY)).toBe('{first valuable raw');
+        expect(saveState(createInitialState(), storage)).toBeTruthy();
+        expect(storage.getItem(STORAGE_KEY)).toBe('{second valuable raw');
+        expect(storage.getItem(STORAGE_BACKUP_KEY)).toBe('{first valuable raw');
     });
 });

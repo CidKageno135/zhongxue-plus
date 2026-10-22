@@ -230,19 +230,13 @@ describe('R17 Data Reviewer Negative Controls & Falsification Suite', () => {
       }
 
       const storage = createMockStorage();
-      saveState(stateHuge, storage);
-      const rawHuge = storage.getItem(STORAGE_KEY) ?? '';
-      expect(rawHuge.length).toBeGreaterThan(MAX_STATE_JSON_LENGTH);
-
-      // Attempt loadState in fresh context
+      expect(saveState(createInitialState(), storage)).toBeNull();
+      const original = storage.getItem(STORAGE_KEY);
+      expect(() => exportState(stateHuge)).toThrow();
+      expect(saveState(stateHuge, storage)).toBeTruthy();
+      expect(storage.getItem(STORAGE_KEY)).toBe(original);
       clearCustomWordRegistry();
-      const loaded = loadState(storage);
-
-      // Must NOT wipe storage, must create backup and return clear error
-      expect(loaded.error).toBe('Không thể đọc tiến độ đã lưu. Dữ liệu trong phiên này vẫn sử dụng được.');
-      expect(loaded.isCorrupt).toBe(true);
-      expect(storage.getItem(STORAGE_KEY)).toBe(rawHuge);
-      expect(storage.getItem(STORAGE_BACKUP_KEY)).toBe(rawHuge);
+      expect(loadState(storage).error).toBeNull();
     });
   });
 
