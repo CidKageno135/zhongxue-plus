@@ -22,6 +22,15 @@ import { getServerKeyForModel } from './security.ts';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Expose __dirname and __filename globally so bundled modules (e.g. dictionary engine)
+// can resolve paths seamlessly when running as an ESM standalone server bundle.
+if (typeof (globalThis as Record<string, unknown>).__dirname === 'undefined') {
+  (globalThis as Record<string, unknown>).__dirname = __dirname;
+}
+if (typeof (globalThis as Record<string, unknown>).__filename === 'undefined') {
+  (globalThis as Record<string, unknown>).__filename = __filename;
+}
+
 /**
  * Loads .env and .env.local files if present in workspace root or project folder.
  */

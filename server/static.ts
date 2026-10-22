@@ -63,7 +63,8 @@ export const SENSITIVE_PATH_PATTERNS = [
   /(^|[/\\])package\.json/i,
   /(^|[/\\])package-lock\.json/i,
   /(^|[/\\])tsconfig.*\.json/i,
-  /(^|[/\\])\.DS_Store/i
+  /(^|[/\\])\.DS_Store/i,
+  /(^|[/\\])server([/\\]|$)/i
 ];
 
 /**
@@ -77,9 +78,16 @@ export function resolveDistDirectory(customDistPath?: string): string {
   const candidates = [
     path.resolve(cwd, 'dist'),
     path.resolve(cwd, 'projects/zhongxue-new/dist'),
+    path.resolve(__dirname, '..'),
     path.resolve(__dirname, '../dist'),
     path.resolve(__dirname, '../../dist')
   ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate) && fs.existsSync(path.join(candidate, 'index.html'))) {
+      return candidate;
+    }
+  }
 
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {

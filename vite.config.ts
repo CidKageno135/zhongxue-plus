@@ -20,7 +20,13 @@ export default defineConfig(({ mode }) => {
       include: ['tests/**/*.test.ts'],
       coverage: {
         include: ['src/domain/**', 'src/services/**', 'server/**'],
-        reporter: ['text', 'html']
+        reporter: ['text', 'html'],
+        thresholds: {
+          lines: 80,
+          functions: 80,
+          branches: 80,
+          statements: 80
+        }
       }
     }
   };
