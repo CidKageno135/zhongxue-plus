@@ -44,7 +44,7 @@ test.describe('E2E Storage Recovery & Large Dataset Invariants (T09)', () => {
 
     // Navigate to Settings to verify user profile loaded correctly
     await page.getByRole('button', { name: 'Mở hồ sơ & cài đặt' }).click();
-    await expect(page.getByText(/Người học Đài Loan 600/)).toBeVisible();
+    await expect(page.locator('#profile-name')).toHaveValue('Người học Đài Loan 600');
   });
 
   test('corrupted raw data is preserved and not silently overwritten on subsequent state changes (REPRODUCES F01 recovery gap)', async ({ page }) => {
