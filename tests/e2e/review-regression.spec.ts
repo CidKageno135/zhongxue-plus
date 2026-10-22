@@ -77,7 +77,7 @@ test.describe('ReviewView & SRS Regression Suite (Subagent A12)', () => {
 
     // Verify meaning and Pinyin are present
     await expect(page.getByRole('heading', { name: 'Xin chào', exact: true })).toBeVisible();
-    await expect(page.getByText('nǐ hǎo')).toBeVisible();
+    await expect(page.locator('.review-card').getByText('nǐ hǎo', { exact: true })).toBeVisible();
 
     // Rate Good to complete
     await page.getByRole('button', { name: /Nhớ được/ }).click();

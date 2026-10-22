@@ -54,7 +54,7 @@ test('dictionary finds accented and toneless Pinyin, unaccented Vietnamese, and 
   await expect(page.getByText(/Mẹo tra cứu hiệu quả/i)).toBeVisible();
 
   // 6. Reset search to restore full vocabulary list
-  await page.getByRole('button', { name: 'Xóa tìm kiếm' }).click();
+  await page.getByRole('button', { name: 'Xóa tìm kiếm', exact: true }).click();
   await expect(page.getByRole('main')).toContainText('你好');
 });
 

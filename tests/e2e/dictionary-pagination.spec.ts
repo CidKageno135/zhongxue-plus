@@ -22,6 +22,7 @@
 
 import { test, expect } from '@playwright/test';
 import { navigate } from './helpers';
+import type { DbDictionaryResult } from '../../src/types';
 
 test.describe('Acceptance G5 & F06: Dictionary Contract, Pagination & Saved Word Retention', () => {
   test('F06 Reproduction: UI database badge preserves "CSDL 122k: 122.596 mục từ" and does NOT mutate into page length (20) during broad search', async ({ page }) => {
@@ -111,21 +112,49 @@ test.describe('Acceptance G5 & F06: Dictionary Contract, Pagination & Saved Word
     await navigate(page, 'Từ điển');
 
     const searchInput = page.getByLabel('Tìm từ vựng');
+    const responsePromise = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/dictionary' && url.searchParams.get('q') === '乾杯';
+    });
     await searchInput.fill('乾杯');
+    const response = await responsePromise;
+    expect(response.ok()).toBe(true);
+    const result: { source: string; results: DbDictionaryResult[] } = await response.json();
+    expect(result.source).toBe('database');
+    const entry = result.results.find(word => word.id === 'cv_3306' && word.traditional === '乾杯');
+    expect(entry, 'The corpus entry, rather than a curriculum fallback, must be returned').toBeDefined();
+    if (!entry) throw new Error('Corpus entry cv_3306 is absent');
+    expect(entry.definitions.join('; ')).toMatch(/cạn ly/i);
 
-    // Verify word card appears
-    await expect(page.locator('.word-card')).toContainText('乾杯');
-    await expect(page.locator('.word-card')).toContainText(/cạn ly/i);
+    const card = page.getByRole('article').filter({
+      has: page.getByRole('heading', { name: '乾杯', exact: true })
+    });
+    await expect(card).toHaveCount(1);
+    await expect(card).toContainText(entry.pinyin);
+    await expect(card).toContainText(/cạn ly/i);
+    await card.getByRole('button', { name: 'Lưu 乾杯', exact: true }).click();
+    await expect(card.getByRole('button', { name: 'Bỏ lưu 乾杯', exact: true })).toBeVisible();
 
-    // Save word
-    await page.getByRole('button', { name: /Lưu 乾杯/i }).click();
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('zhongxue.learning.v1') || '{}'))).toMatchObject({
+      savedWordIds: ['cv_3306'],
+      customWords: expect.arrayContaining([expect.objectContaining({
+        id: entry.id,
+        hanzi: entry.traditional,
+        pinyin: entry.pinyin,
+        meaning: entry.definitions.slice(0, 3).join('; '),
+        lessonId: 'custom-dictionary'
+      })])
+    });
 
-    // Navigate to Review
+    // Restore from persisted metadata rather than merely retaining an in-memory word.
+    await page.reload();
     await navigate(page, 'Ôn tập');
     await expect(page.getByRole('main')).toContainText('1 từ đến lịch ôn');
+    const reviewCard = page.locator('.review-card');
+    await expect(reviewCard.getByRole('heading', { name: '乾杯', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Hiện đáp án', exact: true }).click();
+    await expect(reviewCard.getByRole('heading', { name: entry.definitions.slice(0, 3).join('; '), exact: true })).toBeVisible();
+    await expect(reviewCard).toContainText(entry.pinyin);
 
-    await page.getByRole('button', { name: 'Hiện đáp án' }).click();
-    await expect(page.getByRole('main')).toContainText('乾杯');
-    await expect(page.getByRole('main')).toContainText(/cạn ly/i);
   });
 });
