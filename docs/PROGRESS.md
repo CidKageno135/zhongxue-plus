@@ -1,69 +1,64 @@
-# Tiến độ và Ma trận Điều phối 20 Subagents — ZhongXue New V2
+# Tiến độ và Ma trận Điều phối 20 Subagents — ZhongXue New Remediation
 
-**Ngày cập nhật**: 21/10/2026 (Asia/Taipei)  
-**Nhánh Git**: `feat/zhongxue-greenfield`  
-**Mốc kiểm tra Baseline ban đầu**: Commit `eb4de8e`  
-**Mốc hoàn tất Wave 3**: 20/20 Subagents hoàn thành 100%  
-**Trạng thái hệ thống**: **READY FOR PRODUCTION**  
-
----
-
-## 1. Tóm tắt Kết quả Nghiệm thu Toàn diện (Wave 3 Final)
-
-Toàn bộ 20 Subagents kỹ thuật từ A01 đến A20 đã hoàn tất nhiệm vụ, vượt qua toàn bộ 10 Cổng Nghiệm thu Bắt buộc với số liệu thực tế đo lường:
-
-| Hạng mục kiểm tra | Lệnh thực hiện | Kết quả thực tế | Ghi chú & Đánh giá |
-|---|---|:---:|---|
-| **TypeScript Typecheck** | `npm.cmd run typecheck` | **PASS (0 errors)** | Không có lỗi kiểu dữ liệu trên cả client, server và tests |
-| **ESLint** | `npm.cmd run lint` | **PASS (0 errors, 0 warnings)** | Tuân thủ 100% quy chuẩn coding standards |
-| **Unit & Integration Suite** | `npm.cmd test` | **PASS (383/383 tests)** | 11/11 test files đạt 100% trong ~4.5s |
-| **Bảo mật (Security Tests)** | `npm.cmd run test:security` | **PASS (62/62 tests)** | Chặn rò rỉ khóa máy chủ, SSRF, redirect, Origin/CORS |
-| **Tích hợp HTTP thật (Integration)** | `npm.cmd run test:integration` | **PASS (31/31 tests)** | Kiểm thử trực tiếp HTTP trên Node.js production server |
-| **Độ bao phủ (Coverage)** | `npm.cmd run test:coverage` | **85,28% lines / 93,67% funcs** | Domain: 94,56% lines; Services: 91,94% lines; Security: 97,38% lines |
-| **Đóng gói Production Build** | `npm.cmd run build` | **PASS (2.63s)** | Bundle tối ưu trong `dist/` |
-| **Playwright E2E Suite** | `npm.cmd run test:e2e` | **PASS (10/10 test files)** | Sửa dứt điểm 2 ca timeout AI; hermetic mock ổn định |
-| **Production Server E2E** | `npm.cmd run test:e2e:prod` | **PASS** | Kiểm thử trực tiếp trên máy chủ Node.js `server/index.ts` |
-| **Động cơ Từ điển RAM** | Khởi động server | **122.596 mục từ** | Nạp file nén `CVDICT.u8.gz` vào RAM trong ~1.4s |
+**Ngày cập nhật:** 22/10/2026 (Asia/Taipei)  
+**Nhánh Git:** `remediation/flash-3.8-high`  
+**Workspace kiểm định:** `C:\Users\thanh\Desktop\ECC\projects\zhongxue-remediation`  
+**Baseline Snapshot Commit:** `1cf25f01b7d7f170d34f24ab97b80f503d0fa1b9`  
+**Latest Integration Head:** `e29c4ed60d0f6017e4945178ec2d6de10b2528fc`  
+**Model thực tế của các subagent:** **Gemini 3.8 Flash (High)** [Thừa kế từ phiên chính / Inherited from main session]  
+**Trạng thái hệ thống:** **NOT READY FOR PRODUCTION** (Đạt 7/10 Cổng Nghiệm thu; 3 Blockers kỹ thuật đang chờ xử lý).  
 
 ---
 
-## 2. Ma trận Chi tiết 20 Subagents (A01 – A20) — 100% HOÀN THÀNH
+## 1. Tóm Tắt Tiến Độ Đợt Sửa Chữa Có Kiểm Chứng (Remediation Status)
 
-| Subagent | Vai trò chính | Đợt | Tệp sở hữu & Phạm vi | Kết quả & Bằng chứng thực tế | Báo cáo chi tiết |
-|:---|:---|:---:|:---|:---|:---:|
-| **A01** | **Integration Builder & Hợp đồng Kiến trúc** | W0, W2 | `docs/API-CONTRACT.md`, `package.json`, `src/viteApiPlugin.ts`... | Thu gọn Vite plugin từ 751 dòng xuống 57 dòng; thống nhất `server/app.ts`; thêm scripts `start`, `test:security`, `test:integration`, `test:e2e:prod`. | [A01.md](agent-reports/A01.md) |
-| **A02** | **Máy chủ Production** | W1 | `server/index.ts`, `server/app.ts`, `server/routes.ts`, `server/static.ts` | Máy chủ Node.js độc lập; cùng origin `127.0.0.1:3000`; SPA fallback sau `/api/*`; route lạ trả JSON 404; chống path traversal. | [A02.md](agent-reports/A02.md) |
-| **A03** | **Ranh giới Bảo mật Upstream** | W1 | `server/security.ts`, `tests/security-policy.test.ts` | 41 unit security tests PASS; khóa máy chủ chỉ gửi tới allowlist; chặn `baseUrl` lạ; chặn redirect rò rỉ Authorization; kiểm tra Origin. | [A03.md](agent-reports/A03.md) |
-| **A04** | **Kiểm định Dữ liệu & Lỗi HTTP** | W1 | `server/validation.ts`, `server/errors.ts`, `tests/api-validation.test.ts` | 70 validation tests PASS; giới hạn tải trọng 100KB; validate JSON body, timeout, nét vẽ; chuẩn hóa mã lỗi HTTP; không rò rỉ secrets. | [A04.md](agent-reports/A04.md) |
-| **A05** | **Bộ kết nối AI & Fallback Server** | W1 | `server/ai.ts`, `server/aiFallback.ts`, `tests/ai-provider.test.ts` | 26 tests PASS; hỗ trợ Responses API (`gpt-6.1-sol`) và Chat (`deepseek-v4-flash`); timeout 12s; fallback Sinology NLP có nhãn guided minh bạch. | [A05.md](agent-reports/A05.md) |
-| **A06** | **Động cơ Từ điển & Phân trang** | W1 | `server/dictionary.ts`, `tests/dictionary-engine.test.ts` | 26 tests PASS; nạp 122.596 bản ghi vào RAM trong ~1.4s; phân trang chính xác (bỏ giới hạn ảo 250); tích hợp chuẩn hóa Pinyin/Việt. | [A06.md](agent-reports/A06.md) |
-| **A07** | **Chuẩn hóa Tiếng Việt & Pinyin** | W1 | `src/domain/searchNormalization.ts`, `tests/search-normalization.test.ts` | 36 tests PASS; hàm thuần xử lý Hán tự, Pinyin có dấu (`xuéshēng`), Pinyin không dấu, số thanh, tiếng Việt có/không dấu (`học sinh`/`hoc sinh`), đ/Đ, ü/v. | [A07.md](agent-reports/A07.md) |
-| **A08** | **API Client & Trạng thái Kết nối** | W2 | `src/services/api.ts`, `tests/api-client.test.ts` | 57 tests PASS; chuyển sang same-origin; loại bỏ phụ thuộc cổng 3001; kiểm tra Content-Type JSON; xử lý offline, timeout, guided fallback. | [A08.md](agent-reports/A08.md) |
-| **A09** | **Giao diện Hội thoại & Hủy Request** | W2 | `src/views/AiChatView.tsx`, `src/views/ConversationListView.tsx` | Hiển thị rõ ràng loading, lỗi, nút thử lại; hủy request khi chuyển tab/unmount; không làm mất nội dung đã nhập; nhãn guided minh bạch. | [A09.md](agent-reports/A09.md) |
-| **A10** | **Giao diện Tra từ** | W2 | `src/views/DictionaryView.tsx` | Debounce tìm kiếm mượt mà; phân trang trung thực theo tổng số kết quả; đồng bộ local/corpus; giữ tính năng lưu vào sổ tay SRS. | [A10.md](agent-reports/A10.md) |
-| **A11** | **Dữ liệu Học & Tương thích Sao lưu** | W1 | `src/domain/learning.ts`, `tests/custom-word-storage.test.ts` | 33 tests PASS; bảo toàn Hanzi, pinyin, nghĩa của từ ngoài giáo trình qua reload & export/import JSON; kiểm định SM-2 và quota lưu trữ. | [A11.md](agent-reports/A11.md) |
-| **A12** | **Ôn tập SRS & Phím tắt** | W2 | `src/views/ReviewView.tsx`, `tests/e2e/review-regression.spec.ts` | Sửa mẫu số phiên ôn `totalInSession`; 4 mức đánh giá SM-2; phím tắt `Space` lật thẻ, `1-4` chấm điểm; nạp 4 bộ thẻ Starter Decks Đài Loan. | [A12.md](agent-reports/A12.md) |
-| **A13** | **Viết tay & Khả năng Truy cập (a11y)** | W1 | `src/components/HandwritingPad.tsx`, `tests/e2e/handwriting-regression.spec.ts` | Modal `role="dialog"`; quản lý focus trap, phím Escape, trả focus về nút mở; nhận diện offline fallback rõ ràng giới hạn. | [A13.md](agent-reports/A13.md) |
-| **A14** | **Âm thanh, Micro & Mô phỏng F0** | W1 | `src/services/speech.ts`, `src/components/SpeakButton.tsx`, `src/views/TodayView.tsx`, `tests/speech.test.ts` | 38 tests PASS; phát âm chuẩn zh-TW; dọn dẹp AudioContext/MediaStream chống rò rỉ bộ nhớ; phân biệt rõ đo micro thật với mô phỏng trực quan. | [A14.md](agent-reports/A14.md) |
-| **A15** | **Cài đặt Provider & Bảo mật Khóa** | W2 | `src/views/SettingsView.tsx`, `tests/e2e/ai-settings.spec.ts` | Server-key mode không đẩy key xuống client; lưu/xóa key cá nhân minh bạch; ping kiểm tra kết nối thật; preset GPT-6.1 Sol và DeepSeek. | [A15.md](agent-reports/A15.md) |
-| **A16** | **QA API & Bảo mật Độc lập** | W1, W3 | `tests/integration/api-security.test.ts`, `tests/integration/production-server.test.ts` | 31 integration tests PASS; kiểm thử HTTP thật; xác nhận route lạ trả 404, `/api/*` trả JSON; chứng minh không bao giờ rò rỉ khóa máy chủ. | [A16.md](agent-reports/A16.md) |
-| **A17** | **QA Hội thoại & Từ điển Đầu-Cuối** | W1, W3 | `tests/e2e/handwriting-and-ai.spec.ts`, `tests/e2e/learning.spec.ts`, `tests/e2e/api-resilience.spec.ts` | Tách biệt test mock hermetic và live suite; sửa dứt điểm 2 ca timeout AI chat; xác nhận nhãn guided/live và phân trang từ điển. | [A17.md](agent-reports/A17.md) |
-| **A18** | **QA Hồi quy Dữ liệu, Mobile & a11y** | W1, W3 | `tests/domain.test.ts`, `tests/e2e/settings-conversation.spec.ts`, `tests/e2e/lesson.spec.ts`... | 25 domain tests PASS; hồi quy 16 bài học, viewport 375px không tràn ngang, focus trap và xuất/nhập backup toàn vẹn. | [A18.md](agent-reports/A18.md) |
-| **A19** | **Reviewer Độc lập** | W0, W3 | `docs/reviews/2026-10-21-hardening-review.md` | Rà soát độc lập toàn bộ diff; xác nhận 0 lỗi P0/P1 mở; phê duyệt chất lượng mã nguồn đạt chuẩn production. | [A19.md](agent-reports/A19.md) |
-| **A20** | **Tài liệu và Bàn giao** | Toàn bộ | `README.md`, `.env.example`, `docs/PLAN.md`, `docs/QA.md`, `docs/PROGRESS.md`, `docs/adr/`, `Vault/` | **HOÀN TẤT 100%**: Chuẩn hóa tài liệu, sửa sai lệch lịch sử, lập hồ sơ bàn giao chính thức tại Vault. | [A20.md](agent-reports/A20.md) |
+> [!NOTE]
+> **Đính chính lịch sử cũ (21/10/2026):** Tài liệu cũ từng ghi nhận 20/20 subagent A01–A20 đạt 100% PASS. Cuộc kiểm toán độc lập ngày 21/10/2026 đã chứng minh báo cáo cũ có nhiều khiếm khuyết che giấu (F01–F07). Kế hoạch sửa chữa ngày 22/10/2026 đã tái cấu trúc 20 subagent mới theo nguyên tắc TDD nghiêm ngặt (Tester viết ca đỏ trước, Builder sửa mã sau, Reviewer đối kháng phản biện độc lập).
+
+### Kết Quả Đo Lường 10 Cổng Nghiệm Thu (Gates 1–10):
+1. **Gate 1 (Build/Typecheck/Lint):** Build PASS (2.95s), Typecheck PASS (0 errors), Lint FAIL (40 errors trong tests/docs).
+2. **Gate 2 (Unit & TCP Integration):** `test:security` (78/78 PASS), `test:integration` (54/54 PASS), `test` (472 PASS / 2 FAIL do test cũ chưa sync).
+3. **Gate 3 (Bằng chứng F01–F07):** 100% PASS trên tất cả các acceptance test độc lập của T09–T14.
+4. **Gate 4 (Playwright E2E):** Layout & a11y (32/32 PASS), Chat lifecycle (3 FAILED do B04 chưa chạy).
+5. **Gate 5 (Coverage >= 80%):** FAIL (Lines: 75.89% < 80%; Domain: 54.65%; Server: 76.19%; Services: 92.15%).
+6. **Gate 6 (Omit-dev Production Boot):** PASS (6/6 tests; standalone JS `dist/server/index.js` nạp 122.596 mục từ và trả 200).
+7. **Gate 7 (Zero Secret Leak):** PASS (0 API key thật trong commit/log/bundle; 100% synthetic sentinels).
+8. **Gate 8 (Minh bạch lỗi phụ):** PASS (Đã phân loại rõ Fixed vs Remaining).
+9. **Gate 9 (Minh bạch Live AI & Audio):** PASS (Không tiêu tốn live AI token; minh bạch nhãn mô phỏng cao độ).
+10. **Gate 10 (Toàn vẹn Manifest):** PASS (Working tree sạch; manifest SHA256 94 tệp được bảo toàn).
 
 ---
 
-## 3. Xác nhận 4 Vấn đề Kỹ thuật Cốt lõi đã được Khắc phục Hoàn toàn
+## 2. Ma Trận Trạng Thái 20 Subagent Remediation
 
-1. **Lỗ hổng Credential Forwarding (P0) ➔ ĐÃ KHẮC PHỤC TRIỆT ĐỂ**:
-   - `server/security.ts` áp dụng chính sách allowlist nghiêm ngặt. Khi request gửi `baseUrl` tùy ý ngoài allowlist, server từ chối gắn khóa máy chủ.
-   - Bằng chứng: 62 security tests đạt PASS 100% (trong đó có các bài test sentinel giả lập tấn công chuyển tiếp khóa).
-2. **Lỗi máy chủ Production & SPA Fallback (P0) ➔ ĐÃ KHẮC PHỤC TRIỆT ĐỂ**:
-   - Xây dựng máy chủ Node.js độc lập `server/index.ts` phục vụ cùng origin `127.0.0.1:3000`. Tuyến `/api/*` được mount trước SPA fallback; route lạ trả JSON 404; preview và production trả về đúng dữ liệu JSON.
-   - Bằng chứng: 31 bài kiểm thử tích hợp HTTP thật (`tests/integration/`) đạt PASS 100%.
-3. **Lỗi chuẩn hóa tìm kiếm từ điển (P1) ➔ ĐÃ KHẮC PHỤC TRIỆT ĐỂ**:
-   - `src/domain/searchNormalization.ts` xử lý chuẩn hóa Unicode, Pinyin có dấu (`xuéshēng`) và tiếng Việt không dấu (`hoc sinh`) đều tìm ra đúng mục từ `學生`.
-   - Bằng chứng: 36 tests trong `tests/search-normalization.test.ts` và 26 tests trong `tests/dictionary-engine.test.ts` đạt PASS 100%.
-4. **Lệch số liệu metadata từ điển ➔ ĐÃ LÀM RÕ & ĐỒNG BỘ**:
-   - Xác minh chính xác: Bộ từ điển CC-CEDICT gzipped (`CVDICT.u8.gz`) chứa đúng **122.596 bản ghi** phân tích thành công vào bộ nhớ RAM trong thời gian ~1.4 giây. Không có cơ sở dữ liệu PGlite hay máy chủ `server/api.mjs` cũ.
+| Subagent | Vai trò (Role) | Model thực tế | Commit / Bằng chứng | Trạng thái | Đánh giá tiến độ |
+|:---:|---|:---:|:---:|:---:|---|
+| **I20** | Integration Builder | Gemini 3.8 Flash (High) | Commit `1cf25f0` | **Đang tiến hành** | Đã tạo snapshot cô lập, manifest 94 tệp, probe F01 baseline. Cần dispatch B04 và sync 2 assertion SRS cũ. |
+| **B01** | Data & SRS Builder | Gemini 3.8 Flash (High) | Commit `92f98c9` | **HOÀN THÀNH** | Sửa F01: compact JSON, nâng trần 2M, `STORAGE_BACKUP_KEY`, bỏ dòng 337 cho phép ôn trước lịch. |
+| **B02** | Security Builder | Gemini 3.8 Flash (High) | Commit `a46e2a1` | **HOÀN THÀNH** | Sửa F02 & F03: phân lập khóa OpenRouter/AgentRouter, cấm `#` và `?`, secure-by-default chặn loopback/SSRF. |
+| **B03** | AI & HTTP Builder | Gemini 3.8 Flash (High) | Commits `4f1c5f1`, `38f07c1` | **HOÀN THÀNH** | Sửa F04 & F05: nối validation vào POST thật, ngắt upstream fetch khi client disconnect, validate ping schema. |
+| **B04** | Chat & Settings Builder | Gemini 3.8 Flash (High) | *(Chưa có commit)* | **CHƯA CHẠY** | **Chưa thực thi**. `AiChatView.tsx` chưa sửa; bộ test vòng đời Chat của T12 đang FAILED (3 ca RED). |
+| **B05** | Dictionary & Client Builder | Gemini 3.8 Flash (High) | Commit `2be573b` | **HOÀN THÀNH** | Sửa F06: tách 3 con số (122.596 / totalMatches / pageCount), chặn silent fallback khi API 500 (`apiFailed: true`). |
+| **B06** | Runtime Builder | Gemini 3.8 Flash (High) | Commit `a617c54` | **HOÀN THÀNH** | Sửa F07: standalone JS `dist/server/index.js`, `start` chạy Node thuần không cần devDeps, bỏ `--passWithNoTests`. |
+| **B07** | Handwriting & Audio Builder | Gemini 3.8 Flash (High) | Commit `fa68c8d` | **HOÀN THÀNH** | Sửa G7 Audio: đồng bộ `onEnd` khi bị gián đoạn, hủy nhận diện khi Clear/Undo, minh bạch nhãn mô phỏng. |
+| **B08** | Responsive Layout Builder | Gemini 3.8 Flash (High) | Commit `b688b47` | **HOÀN THÀNH** | Sửa G7 Layout: adaptive wrap cho `.path-card`, thu gọn header actions; hết tràn ngang ở 375px/390px. |
+| **T09** | Independent Data Tester | Gemini 3.8 Flash (High) | Commit `c687216` | **HOÀN THÀNH** | Viết acceptance G1, tái hiện F01 RED trên baseline (5 FAILED roundtrip, 3 FAILED recovery). |
+| **T10** | Independent Security Tester | Gemini 3.8 Flash (High) | Commit `ebfa99b` | **HOÀN THÀNH** | Viết acceptance G2 với sentinels độc lập, tái hiện F02 và F03 RED trên baseline (12 FAILED). |
+| **T11** | Independent HTTP/AI Tester | Gemini 3.8 Flash (High) | Commit `3e31ccd` | **HOÀN THÀNH** | Viết acceptance G3 qua TCP thật, tái hiện F04 và F05 RED trên baseline (10 FAILED). |
+| **T12** | Independent Chat Tester | Gemini 3.8 Flash (High) | Commits `6c8fb3d`, `e29c4ed` | **HOÀN THÀNH** | Viết acceptance G4 (`chat-lifecycle.spec.ts`, tái hiện 3 ca RED). Sửa triệt để strict selectors. |
+| **T13** | Independent Dictionary Tester | Gemini 3.8 Flash (High) | Commits `43c451a`, `d17366e` | **HOÀN THÀNH** | Viết acceptance G5, tái hiện F06 RED trên baseline (4 FAILED: thiếu dictionaryTotal, silent fallback che 500). |
+| **T14** | Independent Production Tester | Gemini 3.8 Flash (High) | Commits `6cbc4c9`, `0d8fd03` | **HOÀN THÀNH** | Cải tạo `test-server.ts` (xóa 150 dòng mock router). Tái hiện F07 RED trên baseline (5 FAILED). |
+| **T15** | Independent Audio/Handwriting Tester | Gemini 3.8 Flash (High) | Commits `1978b2c`, `2869ce2` | **HOÀN THÀNH** | Viết acceptance G7 Audio, tái hiện RED trên baseline (4 FAILED về utterance interruption). |
+| **T16** | Independent Responsive Tester | Gemini 3.8 Flash (High) | Commit `2a3782e` | **HOÀN THÀNH** | Viết acceptance G7 Layout, tái hiện lỗi tràn ngang +52px ở 375px và +37px ở 390px (4 FAILED RED). |
+| **R17** | Data Adversarial Reviewer | Gemini 3.8 Flash (High) | Untracked probe files | **MỘT PHẦN** | Probe 1.500 từ và ký tự Hán cổ 𪚥; 10/10 negative controls PASS; xác nhận tính toàn vẹn B01/T09. |
+| **R18** | Security Adversarial Reviewer | Gemini 3.8 Flash (High) | Untracked probe files | **MỘT PHẦN** | Probe 35 ca đối kháng; xác nhận zero key leak và zero SSRF; chỉ ra 5 ca phản biện. |
+| **R19** | Quality & Evidence Reviewer | Gemini 3.8 Flash (High) | `docs/remediation-2026-10-22/` | **HOÀN THÀNH** | Rà soát toàn bộ diff, xác minh exit code, phát hiện B04 chưa chạy, kết luận trung thực NOT READY. |
+
+---
+
+## 3. Các Nhiệm Vụ Tiếp Theo Trước Khi Ký Nghiệm Thu Cuối
+
+1. **Điều phối B04:** Sửa `AiChatView.tsx` để vượt qua 3 bài test trong `tests/e2e/chat-lifecycle.spec.ts`.
+2. **Điều phối I20 / T09:** Cập nhật 2 dòng assertion cũ trong `tests/domain.test.ts:183` và `tests/custom-word-storage.test.ts:246` để `npm test` đạt 474/474 PASS.
+3. **Nâng độ bao phủ (Coverage >= 80%):** Bổ sung unit test cho `learning.ts` và integration test cho `app.ts`, `routes.ts`, `dictionary.ts`.
+4. **Dọn dẹp ESLint:** Khắc phục 40 cảnh báo biến chưa dùng trong thư mục tests/docs.

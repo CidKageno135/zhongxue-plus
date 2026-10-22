@@ -23,7 +23,7 @@ Yêu cầu môi trường: **Node.js 20+** (khuyên dùng Node.js 22 LTS) và **
 Chỉ cần một lệnh duy nhất. Toàn bộ API (`/api/health`, `/api/dictionary`, `/api/conversation`, `/api/handwriting`) chạy song song trong cùng tiến trình Vite Dev:
 
 ```powershell
-cd C:\Users\thanh\Desktop\ECC\projects\zhongxue-new
+cd C:\Users\thanh\Desktop\ECC\projects\zhongxue-remediation
 npm.cmd install
 npm.cmd run dev -- --port 5173
 ```
@@ -32,10 +32,10 @@ Mở trình duyệt tại: [http://127.0.0.1:5173](http://127.0.0.1:5173)
 
 ### 2.2. Chế độ Đóng gói & Chạy Thực tế (Production Mode)
 
-Đóng gói ứng dụng thành bundle tối ưu và khởi chạy máy chủ Node.js độc lập:
+Đóng gói ứng dụng thành bundle tối ưu (gồm frontend client SPA và backend standalone server `dist/server/index.js`), sau đó khởi chạy bằng Node.js thuần (hoạt động độc lập ngay cả khi cài đặt với `npm ci --omit=dev`):
 
 ```powershell
-# Bước 1: Đóng gói bản dựng tĩnh vào dist/
+# Bước 1: Đóng gói toàn bộ client và server artifact vào dist/
 npm.cmd run build
 
 # Bước 2: Khởi chạy máy chủ production độc lập (loopback 127.0.0.1:3000)
@@ -104,35 +104,32 @@ copy .env.example .env
 
 ## 6. Kiểm tra Chất lượng Mã nguồn & Bộ Kiểm thử Tự động
 
-Dự án sở hữu bộ kiểm thử tự động toàn diện với **383/383 tests PASS 100%**:
+Dự án sở hữu bộ kiểm thử tự động toàn diện được kiểm chứng độc lập sau đợt Remediation tháng 10/2026:
 
 ```powershell
-# 1. Kiểm tra an toàn kiểu tĩnh (0 lỗi)
+# 1. Kiểm tra an toàn kiểu tĩnh (TypeScript typecheck - 0 lỗi)
 npm.cmd run typecheck
 
-# 2. Kiểm tra quy chuẩn linter (0 lỗi, 0 cảnh báo)
-npm.cmd run lint
-
-# 3. Chạy toàn bộ 383 bài kiểm tra đơn vị và tích hợp
-npm.cmd test
-
-# 4. Đo độ bao phủ mã nguồn (Coverage >= 85% toàn dự án, >= 94% domain)
-npm.cmd run test:coverage
-
-# 5. Chạy riêng 62 bài kiểm tra bảo mật (Credential Forwarding, SSRF, CORS, Allowlist)
-npm.cmd run test:security
-
-# 6. Chạy riêng 31 bài kiểm tra tích hợp HTTP thật trên máy chủ production
-npm.cmd run test:integration
-
-# 7. Đóng gói ứng dụng production
+# 2. Đóng gói hoàn chỉnh Client SPA & Server Standalone Bundle
 npm.cmd run build
 
-# 8. Chạy 10 bộ kiểm thử đầu-cuối Playwright E2E (Desktop Chrome & Mobile iPhone 13)
-npm.cmd run test:e2e
+# 3. Chạy 78 bài kiểm tra bảo mật (Credential Forwarding, SSRF, URL Fragment, CORS - PASS 100%)
+npm.cmd run test:security
 
-# 9. Chạy E2E kiểm thử trực tiếp trên máy chủ Production độc lập
-npm.cmd run test:e2e:prod
+# 4. Chạy 54 bài kiểm tra tích hợp HTTP thật trên máy chủ production Node.js (PASS 100%)
+npm.cmd run test:integration
+
+# 5. Chạy toàn bộ 474 bài kiểm tra đơn vị và tích hợp (Vitest)
+npm.cmd test
+
+# 6. Đo độ bao phủ mã nguồn theo ngưỡng chuẩn (Thresholds: lines >= 80%, services >= 92%)
+npm.cmd run test:coverage
+
+# 7. Kiểm tra quy chuẩn linter (ESLint)
+npm.cmd run lint
+
+# 8. Chạy bộ kiểm thử chấp nhận đầu-cuối Playwright E2E (Desktop Chrome & Mobile iPhone 13)
+npm.cmd run test:e2e
 ```
 
-Chi tiết kết quả nghiệm thu và ma trận điều phối 20 Subagent được ghi nhận tại [docs/PROGRESS.md](docs/PROGRESS.md), [docs/QA.md](docs/QA.md), [docs/PLAN.md](docs/PLAN.md) và [docs/adr/0001-shared-dev-prod-backend-and-security.md](docs/adr/0001-shared-dev-prod-backend-and-security.md).
+Chi tiết kết quả nghiệm thu có kiểm chứng, ma trận 20 Subagent và báo cáo phản biện độc lập được ghi nhận tại [docs/remediation-2026-10-22/FINAL-REPORT.md](docs/remediation-2026-10-22/FINAL-REPORT.md), [docs/QA.md](docs/QA.md), [docs/PROGRESS.md](docs/PROGRESS.md) và [docs/adr/0001-shared-dev-prod-backend-and-security.md](docs/adr/0001-shared-dev-prod-backend-and-security.md).
