@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { navigate } from './helpers';
 
 test.describe('E2E Storage Recovery & Large Dataset Invariants (T09)', () => {
   test('large dataset of 600 words (>200k chars) loads completely on page refresh without error notice (REPRODUCES F01)', async ({ page }) => {
@@ -42,8 +43,9 @@ test.describe('E2E Storage Recovery & Large Dataset Invariants (T09)', () => {
     // On baseline: App triggers load error due to 200k limit and displays error notice
     await expect(page.getByText('Không thể đọc tiến độ đã lưu')).not.toBeVisible();
 
-    await page.getByRole('button', { name: 'Từ điển', exact: true }).click();
+    await navigate(page, 'Từ điển');
     await page.getByRole('button', { name: 'Đã lưu (600)', exact: true }).click();
+    await expect(page.locator('.word-card')).toHaveCount(words.length);
     const firstWord = page.locator('.word-card').filter({ has: page.getByRole('heading', { name: '單詞1', exact: true }) });
     await expect(firstWord).toHaveCount(1);
     await expect(firstWord).toContainText(words[0].meaning);
