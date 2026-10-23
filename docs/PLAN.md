@@ -1,3 +1,5 @@
+> **SUPERSEDED — 23/10/2026 (Asia/Taipei):** Tài liệu dưới đây được giữ làm lịch sử, không phải kết quả nghiệm thu mã hiện tại. Các kết luận của đợt cũ đã được kiểm chứng độc lập giới hạn lại; xem [báo cáo sửa trực tiếp của Codex](CODEX-FIX-REPORT.md). Đợt mới: **PASS TRONG PHẠM VI ĐÃ KIỂM CHỨNG** trên source/test `fcc2b23`; số liệu và giới hạn nằm trong báo cáo hiện hành.
+
 # Kế hoạch Triển khai & Kết quả Nghiệm thu 20 Subagents — ZhongXue New V2
 
 **Ngày hoàn tất**: 21/10/2026 (Asia/Taipei)  

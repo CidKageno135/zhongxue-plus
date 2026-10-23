@@ -1,3 +1,5 @@
+> **SUPERSEDED — 23/10/2026 (Asia/Taipei):** Tài liệu dưới đây được giữ làm lịch sử, không phải kết quả nghiệm thu mã hiện tại. Các kết luận của đợt cũ đã được kiểm chứng độc lập giới hạn lại; xem [báo cáo sửa trực tiếp của Codex](../CODEX-FIX-REPORT.md). Đợt mới: **PASS TRONG PHẠM VI ĐÃ KIỂM CHỨNG** trên source/test `fcc2b23`; số liệu và giới hạn nằm trong báo cáo hiện hành.
+
 # BÁO CÁO TỔNG THỂ ĐỢT SỬA CHỮA CÓ KIỂM CHỨNG ZHONGXUE NEW
 **Dự án:** ZhongXue 中學 — Taiwan Mandarin Learning Application  
 **Kế hoạch điều phối:** `Vault/project/handoffs/2026-10-22-zhongxue-flash-3.8-high-remediation.md`  
