@@ -4,8 +4,10 @@ import react from '@vitejs/plugin-react';
 import { zhongxueApiPlugin } from './src/viteApiPlugin';
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-  Object.assign(process.env, env);
+  if (mode !== 'test') {
+    const env = loadEnv(mode, process.cwd(), '');
+    Object.assign(process.env, env);
+  }
 
   return {
     plugins: [react(), zhongxueApiPlugin()],
@@ -17,7 +19,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     test: {
-      include: ['tests/**/*.test.ts'],
+      include: ['tests/**/*.test.{ts,tsx}'],
       coverage: {
         include: ['src/domain/**', 'src/services/**', 'server/**'],
         reporter: ['text', 'html'],
@@ -31,4 +33,3 @@ export default defineConfig(({ mode }) => {
     }
   };
 });
-

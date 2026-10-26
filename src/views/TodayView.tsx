@@ -3,7 +3,7 @@ import { ArrowRight, Bookmark, Mic, Pencil } from 'lucide-react';
 import type { Lesson, Word } from '../types';
 import type { LearningState } from '../domain/learning';
 import type { Route } from '../components/Sidebar';
-import { lessons } from '../data/lessons';
+import { lessons, allWords } from '../data/lessons';
 import { getStats, getWeeklyProgress, getQuizAccuracy, getDueWords, getCompetencyRadar } from '../domain/learning';
 import { getWordEtymology, getTodayRadical } from '../data/etymologyData';
 import { captureMicrophonePitch, stopSpeaking } from '../services/speech';
@@ -174,7 +174,8 @@ export function TodayView({
         }
     }
 
-    const totalVocabCoverage = Math.min(100, Math.round((stats.learnedWords / 40) * 100));
+    const totalCurriculumWords = allWords.length;
+    const totalVocabCoverage = Math.min(100, Math.round((stats.learnedWords / totalCurriculumWords) * 100));
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -624,8 +625,8 @@ export function TodayView({
                     {/* Core Progress Meter */}
                     <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                            <span>Độ phủ từ vựng giáo trình A1–A2</span>
-                            <strong style={{ color: 'var(--jade-emerald)' }}>{stats.learnedWords} / 40 từ ({totalVocabCoverage}%)</strong>
+                            <span>Độ phủ từ vựng giáo trình A1–B2</span>
+                            <strong style={{ color: 'var(--jade-emerald)' }}>{stats.learnedWords} / {totalCurriculumWords} từ ({totalVocabCoverage}%)</strong>
                         </div>
                         <div style={{ width: '100%', height: '6px', borderRadius: '9999px', background: 'var(--surface-container)', overflow: 'hidden' }}>
                             <div style={{ height: '100%', width: `${Math.max(8, totalVocabCoverage)}%`, background: 'var(--jade-emerald)', borderRadius: '9999px' }} />

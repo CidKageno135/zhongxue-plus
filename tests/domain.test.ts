@@ -154,7 +154,7 @@ describe('learning integrity and curriculum', () => {
     });
     it('has 80 contextual words and valid branching scenarios', () => {
         expect(allWords).toHaveLength(80);
-        expect(scenarios).toHaveLength(3);
+        expect(scenarios).toHaveLength(6);
         for (const l of lessons) {
             expect(l.words.length).toBeGreaterThanOrEqual(5);
             expect(l.grammar.length).toBeGreaterThan(0);
@@ -251,7 +251,7 @@ describe('SM-2 hard rating, custom dictionary words, analytics and offline handw
             expect(ety.sinoViet.length).toBeGreaterThan(0);
             expect(ety.decomposition.length).toBeGreaterThan(0);
         }
-        expect(STARTER_DECKS).toHaveLength(4);
+        expect(STARTER_DECKS).toHaveLength(6);
         expect(getTodayRadical().radical).toBeTruthy();
 
         const oneStrokeHorizontal = fallbackClientHandwriting([[[20, 120, 220], [120, 120, 120], [0, 50, 100]]]);

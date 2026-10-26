@@ -82,7 +82,7 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
 
     // Verify 1 stroke drawn and candidate '一' appears
     await expect(dialog.getByText('1 nét đã vẽ')).toBeVisible();
-    await expect(dialog.getByRole('button', { name: '一' })).toBeVisible({ timeout: 5000 });
+    await expect(dialog.getByRole('button', { name: '一', exact: true })).toBeVisible({ timeout: 5000 });
     await expect(undoBtn).toBeEnabled();
     await expect(clearBtn).toBeEnabled();
 
@@ -96,17 +96,17 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
 
     // Verify 2 strokes drawn and candidate '二' appears
     await expect(dialog.getByText('2 nét đã vẽ')).toBeVisible();
-    await expect(dialog.getByRole('button', { name: '二' })).toBeVisible({ timeout: 5000 });
+    await expect(dialog.getByRole('button', { name: '二', exact: true })).toBeVisible({ timeout: 5000 });
 
     // Test Undo last stroke: should revert back to 1 stroke and '一'
     await undoBtn.click();
     await expect(dialog.getByText('1 nét đã vẽ')).toBeVisible();
-    await expect(dialog.getByRole('button', { name: '一' })).toBeVisible({ timeout: 5000 });
+    await expect(dialog.getByRole('button', { name: '一', exact: true })).toBeVisible({ timeout: 5000 });
 
     // Test Clear canvas: should revert to 0 strokes and empty candidates
     await clearBtn.click();
     await expect(dialog.getByText('0 nét đã vẽ')).toBeVisible();
-    await expect(dialog.getByRole('button', { name: '一' })).not.toBeVisible();
+    await expect(dialog.getByRole('button', { name: '一', exact: true })).not.toBeVisible();
     await expect(undoBtn).toBeDisabled();
     await expect(clearBtn).toBeDisabled();
 
@@ -148,12 +148,12 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
     }
 
     // Verify client fallback recognizer seamlessly delivers '一' despite backend failure
-    await expect(dialog.getByRole('button', { name: '一' })).toBeVisible({ timeout: 6000 });
+    await expect(dialog.getByRole('button', { name: '一', exact: true })).toBeVisible({ timeout: 6000 });
     // Verify offline transparency notice is presented with exact label
     await expect(dialog.getByText(/Chế độ ngoại tuyến: Nhận diện theo hình học nét/)).toBeVisible({ timeout: 6000 });
 
     // Selecting candidate populates dictionary query and closes modal cleanly
-    const candidateBtn = dialog.getByRole('button', { name: '一' });
+    const candidateBtn = dialog.getByRole('button', { name: '一', exact: true });
     await candidateBtn.click();
     await expect(dialog).not.toBeVisible();
 
@@ -203,7 +203,7 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
     await page.waitForTimeout(1600);
 
     // Invariant: Canvas must remain cleared and candidate buttons must NOT appear
-    await expect(dialog.getByRole('button', { name: '一' })).not.toBeVisible();
+    await expect(dialog.getByRole('button', { name: '一', exact: true })).not.toBeVisible();
     await expect(dialog.getByText('0 nét đã vẽ')).toBeVisible();
     await expect(clearBtn).toBeDisabled();
 
@@ -253,7 +253,7 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
       await page.mouse.up();
     }
 
-    await expect(dialog.getByRole('button', { name: '一' })).toBeVisible({ timeout: 5000 });
+    await expect(dialog.getByRole('button', { name: '一', exact: true })).toBeVisible({ timeout: 5000 });
 
     const secondRequest = page.waitForRequest(request =>
       request.url().endsWith('/api/handwriting') && request.postDataJSON()?.strokes?.length === 2
@@ -281,7 +281,7 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
 
     // Invariant: Stale candidate '二' from stroke 2 must NOT appear; '1 nét đã vẽ' must remain
     await expect(dialog.getByText('1 nét đã vẽ')).toBeVisible();
-    await expect(dialog.getByRole('button', { name: '二' })).not.toBeVisible();
+    await expect(dialog.getByRole('button', { name: '二', exact: true })).not.toBeVisible();
 
     await page.keyboard.press('Escape');
   });
@@ -323,7 +323,7 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
     await triggerBtn.click();
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText('0 nét đã vẽ')).toBeVisible();
-    await expect(dialog.getByRole('button', { name: '一' })).not.toBeVisible();
+    await expect(dialog.getByRole('button', { name: '一', exact: true })).not.toBeVisible();
 
     await page.keyboard.press('Escape');
   });
@@ -342,7 +342,7 @@ test.describe('HandwritingPad Regression Suite (Subagent A13)', () => {
       await page.mouse.up();
     }
 
-    await expect(dialog.getByRole('button', { name: '一' })).toBeVisible({ timeout: 5000 });
+    await expect(dialog.getByRole('button', { name: '一', exact: true })).toBeVisible({ timeout: 5000 });
 
     const closeBtn = page.getByRole('button', { name: 'Đóng bảng viết tay' });
     const clearBtn = page.getByRole('button', { name: 'Xóa hết' });

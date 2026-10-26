@@ -27,7 +27,7 @@ import {
     getActivityHeatmap
 } from '../domain/learning';
 import { Button } from '../components/Button';
-import { lessons } from '../data/lessons';
+import { lessons, allWords } from '../data/lessons';
 import type { HealthResponse, AiConnectionStatus } from '../types';
 
 interface SettingsViewProps {
@@ -394,6 +394,18 @@ export function SettingsView({ state, setState, onRestoreState, notify }: Settin
             title: 'Khảo Cổ Chữ Hán',
             unlocked: reviewEntries.length >= 10,
             status: reviewEntries.length >= 10 ? 'Đã mở khóa ✓' : `${reviewEntries.length} / 10 thẻ SRS`
+        },
+        {
+            icon: '🏦',
+            title: 'Tiến Bước Đài Loan B1',
+            unlocked: b1Done >= 1 || stats.completedLessons >= 9,
+            status: b1Done >= 1 || stats.completedLessons >= 9 ? 'Đã mở khóa ✓' : `${b1Done} / ${b1Lessons.length} bài B1`
+        },
+        {
+            icon: '🔬',
+            title: 'Hội Nhập Chuyên Sâu B2',
+            unlocked: b2Done >= 1 || stats.learnedWords >= 60,
+            status: b2Done >= 1 || stats.learnedWords >= 60 ? 'Đã mở khóa ✓' : `${stats.learnedWords} / 60 từ chuyên sâu`
         }
     ];
     const unlockedCount = badges.filter(b => b.unlocked).length;
@@ -449,7 +461,7 @@ export function SettingsView({ state, setState, onRestoreState, notify }: Settin
                             <div>
                                 <div style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>Chữ Phồn thể nạp</div>
                                 <strong style={{ fontSize: '15px' }}>
-                                    {stats.learnedWords} / 40 ({Math.min(100, Math.round((stats.learnedWords / 40) * 100))}%)
+                                    {stats.learnedWords} / {allWords.length} ({Math.min(100, Math.round((stats.learnedWords / allWords.length) * 100))}%)
                                 </strong>
                             </div>
                         </div>

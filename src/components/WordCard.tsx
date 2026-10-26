@@ -1,6 +1,8 @@
 import { Bookmark } from 'lucide-react';
 import type { Word } from '../types';
 import { SpeakButton } from './SpeakButton';
+import { getWordEtymology } from '../data/etymologyData';
+import { speakChinese as speak } from '../services/speech';
 
 interface WordCardProps {
     word: Word;
@@ -10,6 +12,8 @@ interface WordCardProps {
 
 export function WordCard({ word, saved, onSave }: WordCardProps) {
     const characters = Array.from(word.hanzi);
+    const etymology = getWordEtymology(word.id, word.hanzi);
+
     return (
         <article className="word-card">
             <div className="row between">
@@ -29,7 +33,9 @@ export function WordCard({ word, saved, onSave }: WordCardProps) {
                         <div
                             key={idx}
                             className="tianzige-box"
-                            style={{ width: '40px', height: '40px', borderRadius: '6px', flexShrink: 0 }}
+                            onClick={() => speak(char)}
+                            title={`Chữ ${char} — bấm để nghe phát âm`}
+                            style={{ width: '40px', height: '40px', borderRadius: '6px', flexShrink: 0, cursor: 'pointer' }}
                         >
                             <div className="tianzige-crosshair-h" />
                             <div className="tianzige-crosshair-v" />
@@ -44,6 +50,16 @@ export function WordCard({ word, saved, onSave }: WordCardProps) {
             </div>
 
             <p className="pinyin">{word.pinyin}</p>
+
+            <div className="word-etymology-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', margin: '4px 0 6px' }}>
+                <span className="badge-pill badge-gold" style={{ fontSize: '11px' }}>
+                    Hán-Việt: {etymology.sinoViet}
+                </span>
+                <span className="badge-pill badge-neutral" style={{ fontSize: '11px' }}>
+                    Bộ {etymology.radical} ({etymology.strokes} nét)
+                </span>
+            </div>
+
             <p className="word-meaning">{word.meaning}</p>
             <div className="word-example">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>

@@ -8,9 +8,10 @@ import { loadScenarioDraft, saveScenarioDraft, type ScenarioDraft } from '../dom
 interface ScenarioFlowProps {
     scenario: Scenario;
     onClose: () => void;
+    onStartAiChat?: (scenario: Scenario) => void;
 }
 
-export function ScenarioFlow({ scenario, onClose }: ScenarioFlowProps) {
+export function ScenarioFlow({ scenario, onClose, onStartAiChat }: ScenarioFlowProps) {
     const existingDraft = loadScenarioDraft();
     const isMatchingDraft = existingDraft && existingDraft.scenarioId === scenario.id;
 
@@ -84,7 +85,7 @@ export function ScenarioFlow({ scenario, onClose }: ScenarioFlowProps) {
                     type="button"
                     className="button button-primary"
                     style={{ padding: '5px 12px', fontSize: '12px', borderRadius: '999px' }}
-                    onClick={onClose}
+                    onClick={() => (onStartAiChat ? onStartAiChat(scenario) : onClose())}
                 >
                     💬 Chat tự do cùng AI
                 </button>

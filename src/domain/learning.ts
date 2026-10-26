@@ -31,6 +31,8 @@ export interface LearningState {
     customWords?: Word[];
 }
 
+export type LearnerState = LearningState | { completedLessonIds: string[] };
+
 export const STORAGE_KEY = 'zhongxue.learning.v1';
 export const CUSTOM_WORDS_KEY = 'zhongxue.custom_words.v1';
 export const MAX_VOCAB_SIZE = 150000;
@@ -404,7 +406,8 @@ export function updateProfile(state: LearningState, profile: Partial<LearningSta
     return { ...state, profile: { name: next.name.trim(), dailyGoal: next.dailyGoal } };
 }
 
-const SIMP_TO_TRAD_MAP: Record<string, string> = {
+export const SIMP_TO_TRAD_MAP: Record<string, string> = {
+    // Existing base mappings
     '发': '發', '学': '學', '门': '門', '车': '車', '电': '電', '机': '機', '话': '話',
     '国': '國', '见': '見', '听': '聽', '说': '說', '读': '讀', '写': '寫', '会': '會',
     '个': '個', '这': '這', '那': '那', '点': '點', '开': '開', '关': '關', '问': '問',
@@ -414,10 +417,18 @@ const SIMP_TO_TRAD_MAP: Record<string, string> = {
     '验': '驗', '务': '務', '账': '帳', '户': '戶', '证': '證', '卡': '卡', '约': '約',
     '线': '線', '导': '導', '专': '專', '长': '長', '实': '實', '习': '習', '难': '難',
     '复': '複', '单': '單', '双': '雙', '两': '兩', '进': '進', '出': '出', '过': '過',
-    '还': '還', '动': '動', '作': '作', '认': '認', '识': '識', '给': '給', '带': '帶'
+    '还': '還', '动': '動', '作': '作', '认': '認', '识': '識', '给': '給', '带': '帶',
+
+    // B1 & B2 expansion & everyday common characters
+    '银': '銀', '汇': '匯', '驾': '駕', '风': '風', '历': '歷', '试': '試', '节': '節',
+    '凤': '鳳', '统': '統', '签': '簽', '润': '潤', '创': '創', '税': '稅', '劳': '勞',
+    '权': '權', '规': '規', '额': '額', '讲': '講', '观': '觀', '响': '響', '趋': '趨',
+    '势': '勢', '总': '總', '结': '結', '条': '條', '办': '辦', '护': '護', '页': '頁',
+    '骑': '騎', '际': '際', '卢': '盧', '丽': '麗', '软': '軟', '团': '團', '队': '隊',
+    '沟': '溝', '词': '詞', '传': '傳', '厂': '廠', '领': '領', '制': '製', '报': '報'
 };
 
-const CROSS_STRAIT_SYNONYMS: Record<string, string> = {
+export const CROSS_STRAIT_SYNONYMS: Record<string, string> = {
     '地铁': '捷運',
     '出租车': '計程車',
     '打车': '叫計程車',
@@ -425,7 +436,7 @@ const CROSS_STRAIT_SYNONYMS: Record<string, string> = {
     '硬件': '硬體',
     '内存': '記憶體',
     '硬盘': '硬碟',
-    '芯片': '晶圓',
+    '芯片': '晶片',
     '盒饭': '便當',
     '方便面': '泡麵',
     '土豆': '馬鈴薯',
@@ -433,8 +444,48 @@ const CROSS_STRAIT_SYNONYMS: Record<string, string> = {
     '猕猴桃': '奇異果',
     '酸奶': '優格',
     '西红柿': '番茄',
-    '勺子': '湯匙'
+    '勺子': '湯匙',
+    '面试': '面試',
+    '简历': '履歷',
+    '簡歷': '履歷',
+    '合同': '合約',
+    '摩托车': '機車',
+    '摩托車': '機車'
 };
+
+export const CROSS_STRAIT_NOTES: Record<string, string> = {
+    '芯片': 'Đài Loan dùng「晶片」(jīngpiàn); Đại lục thường gọi là「芯片」(xīnpiàn).',
+    '晶片': 'Đài Loan dùng「晶片」(jīngpiàn); Đại lục thường gọi là「芯片」(xīnpiàn).',
+    '简历': 'Đài Loan dùng「履歷」(lǚlì) cho CV xin việc; Đại lục thường dùng「簡歷」(jiǎnlì).',
+    '簡歷': 'Đài Loan dùng「履歷」(lǚlì) cho CV xin việc; Đại lục thường dùng「簡歷」(jiǎnlì).',
+    '履歷': 'Đài Loan dùng「履歷」(lǚlì) cho CV xin việc; Đại lục thường dùng「簡歷」(jiǎnlì).',
+    '合同': 'Đài Loan ưu tiên dùng「合約」(héyuē) trong giao dịch thương mại; Đại lục thường dùng「合同」(hétong).',
+    '合約': 'Đài Loan ưu tiên dùng「合約」(héyuē) trong giao dịch thương mại; Đại lục thường dùng「合同」(hétong).',
+    '摩托车': 'Đài Loan gọi xe máy là「機車」(jīchē); Đại lục thường gọi là「摩托車」(mótuōchē).',
+    '摩托車': 'Đài Loan gọi xe máy là「機車」(jīchē); Đại lục thường gọi là「摩托車」(mótuōchē).',
+    '機車': 'Đài Loan gọi xe máy là「機車」(jīchē); Đại lục thường gọi là「摩托車」(mótuōchē).'
+};
+
+export const CROSS_STRAIT_SYNONYM_NOTES = CROSS_STRAIT_NOTES;
+
+export function getLearnerTocflLevel(state: LearnerState): {
+    level: 'A1' | 'A2' | 'B1' | 'B2';
+    label: string;
+} {
+    const completed = Array.isArray(state?.completedLessonIds) ? state.completedLessonIds : [];
+    const hasAny = (ids: string[]) => ids.some(id => completed.includes(id));
+
+    if (hasAny(['lesson-13', 'lesson-14', 'lesson-15', 'lesson-16']) || completed.length >= 12) {
+        return { level: 'B2', label: 'TOCFL B2 · Trung cấp 2' };
+    }
+    if (hasAny(['lesson-9', 'lesson-10', 'lesson-11', 'lesson-12']) || completed.length >= 8) {
+        return { level: 'B1', label: 'TOCFL B1 · Trung cấp 1' };
+    }
+    if (hasAny(['lesson-5', 'lesson-6', 'lesson-7', 'lesson-8']) || completed.length >= 4) {
+        return { level: 'A2', label: 'TOCFL A2 · Sơ cấp 2' };
+    }
+    return { level: 'A1', label: 'TOCFL A1 · Sơ cấp 1' };
+}
 
 export function convertSimpToTrad(text: string): string {
     let result = text;

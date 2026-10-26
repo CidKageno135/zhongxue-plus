@@ -4,6 +4,8 @@ export interface CharacterDecomposition {
     sinoViet: string;
     meaning: string;
     ruleNote?: string;
+    radical?: string;
+    strokes?: number;
 }
 
 export interface WordEtymology {
@@ -26,6 +28,9 @@ export interface StarterDeck {
     desc: string;
     lessonIds: string[];
     wordIds: string[];
+    title?: string;
+    subtitle?: string;
+    icon?: string;
 }
 
 export interface DailyRadical {
@@ -577,6 +582,535 @@ export const etymologyMap: Record<string, WordEtymology> = {
             { char: '一', pinyin: 'yí', sinoViet: 'Nhất', meaning: 'Một', ruleNote: 'Y ↔ NH' },
             { char: '次', pinyin: 'cì', sinoViet: 'Thứ', meaning: 'Lần, lượt', ruleNote: 'C ↔ TH' }
         ]
+    },
+    // --- TOCFL B1 (Lesson 9 - 12) ---
+    'lesson-9-word-1': {
+        wordId: 'lesson-9-word-1',
+        sinoViet: 'NGÂN HÀNG',
+        radical: '金',
+        radicalName: 'Bộ Kim #167 · 8 nét',
+        strokes: 14,
+        toneClass: 'Thanh 2 ↗ + Thanh 2 ↗',
+        cognateTip: 'Yín ➔ Ngân (tiền bạc, ngân sách); Háng ➔ Hàng (tiệm buôn, hãng kinh doanh). Ngân hàng là nơi lưu trữ và lưu thông tiền tệ.',
+        decomposition: [
+            { char: '銀', radical: '金', strokes: 14, pinyin: 'yín', sinoViet: 'Ngân', meaning: 'Bạc trắng, tiền tệ ngân quỹ', ruleNote: 'Y ↔ NG (yín ➔ ngân)' },
+            { char: '行', radical: '行', strokes: 6, pinyin: 'háng', sinoViet: 'Hàng', meaning: 'Nơi kinh doanh, hãng buôn', ruleNote: 'H ↔ H (háng ➔ hàng)' }
+        ]
+    },
+    'lesson-9-word-2': {
+        wordId: 'lesson-9-word-2',
+        sinoViet: 'KHAI HỘ',
+        radical: '門',
+        radicalName: 'Bộ Môn #169 · 8 nét',
+        strokes: 12,
+        toneClass: 'Thanh 1 ˉ + Thanh 4 ˋ',
+        cognateTip: 'Kāi ➔ Khai (mở ra, khai trương); Hù ➔ Hộ (hộ gia đình, tài khoản định danh). Khai hộ = mở tài khoản ngân hàng.',
+        decomposition: [
+            { char: '開', radical: '門', strokes: 12, pinyin: 'kāi', sinoViet: 'Khai', meaning: 'Mở rộng cửa, khởi tạo', ruleNote: 'K ↔ KH (kāi ➔ khai)' },
+            { char: '戶', radical: '戶', strokes: 4, pinyin: 'hù', sinoViet: 'Hộ', meaning: 'Cửa một cánh, tài khoản khách hàng', ruleNote: 'H ↔ H (hù ➔ hộ)' }
+        ]
+    },
+    'lesson-9-word-3': {
+        wordId: 'lesson-9-word-3',
+        sinoViet: 'ẤN CHƯƠNG',
+        radical: '卩',
+        radicalName: 'Bộ Tiết #26 · 2 nét',
+        strokes: 6,
+        toneClass: 'Thanh 4 ˋ + Thanh 1 ˉ',
+        cognateTip: 'Yìn ➔ Ấn (con dấu, đóng dấu, in ấn); Zhāng ➔ Chương (văn chương, huy hiệu biểu trưng). Ở Đài Loan con dấu có giá trị pháp lý tương đương chữ ký.',
+        decomposition: [
+            { char: '印', radical: '卩', strokes: 6, pinyin: 'yìn', sinoViet: 'Ấn', meaning: 'Đóng dấu niêm phong, dấu in', ruleNote: 'Y ↔ Â (yìn ➔ ấn)' },
+            { char: '章', radical: '立', strokes: 11, pinyin: 'zhāng', sinoViet: 'Chương', meaning: 'Con dấu chức danh, huy hiệu', ruleNote: 'ZH ↔ CH (zhāng ➔ chương)' }
+        ]
+    },
+    'lesson-9-word-4': {
+        wordId: 'lesson-9-word-4',
+        sinoViet: 'CƯ LƯU CHỨNG',
+        radical: '尸',
+        radicalName: 'Bộ Thi #44 · 3 nét',
+        strokes: 8,
+        toneClass: 'Thanh 1 ˉ + Thanh 2 ↗ + Thanh 4 ˋ',
+        cognateTip: 'Jū ➔ Cư (an cư, cư trú); Liú ➔ Lưu (lưu trú, ở lại); Zhèng ➔ Chứng (chứng chỉ, giấy tờ). Cư lưu chứng = Thẻ cư trú ARC (Alien Resident Certificate).',
+        decomposition: [
+            { char: '居', radical: '尸', strokes: 8, pinyin: 'jū', sinoViet: 'Cư', meaning: 'Ở lại, định cư', ruleNote: 'J ↔ C (jū ➔ cư)' },
+            { char: '留', radical: '田', strokes: 10, pinyin: 'liú', sinoViet: 'Lưu', meaning: 'Giữ lại, lưu lại dài hạn', ruleNote: 'L ↔ L (liú ➔ lưu)' },
+            { char: '證', radical: '言', strokes: 19, pinyin: 'zhèng', sinoViet: 'Chứng', meaning: 'Bằng chứng, giấy tờ chứng nhận', ruleNote: 'ZH ↔ CH (zhèng ➔ chứng)' }
+        ]
+    },
+    'lesson-9-word-5': {
+        wordId: 'lesson-9-word-5',
+        sinoViet: 'HỐI KHOẢN',
+        radical: '匚',
+        radicalName: 'Bộ Phương #22 · 2 nét',
+        strokes: 13,
+        toneClass: 'Thanh 4 ˋ + Thanh 3 ˇ',
+        cognateTip: 'Huì ➔ Hối (hối đoái, quy tụ dòng tiền qua ngân hàng); Kuǎn ➔ Khoản (tiền bạc, khoản chi trả). Hối khoản = chuyển khoản ngân hàng, kiều hối quốc tế.',
+        decomposition: [
+            { char: '匯', radical: '匚', strokes: 13, pinyin: 'huì', sinoViet: 'Hối', meaning: 'Quy tụ tiền tệ, luân chuyển dòng tiền', ruleNote: 'H ↔ H (huì ➔ hối)' },
+            { char: '款', radical: '欠', strokes: 12, pinyin: 'kuǎn', sinoViet: 'Khoản', meaning: 'Khoản tiền, số tiền giao dịch', ruleNote: 'K ↔ KH (kuǎn ➔ khoản)' }
+        ]
+    },
+    'lesson-10-word-1': {
+        wordId: 'lesson-10-word-1',
+        sinoViet: 'CƠ XA',
+        radical: '木',
+        radicalName: 'Bộ Mộc #75 · 4 nét',
+        strokes: 16,
+        toneClass: 'Thanh 1 ˉ + Thanh 1 ˉ',
+        cognateTip: 'Jī ➔ Cơ (động cơ cơ giới); Chē ➔ Xa (xe cộ, xa mã). Cơ xa là thuật ngữ tiếng Đài thông dụng nhất chỉ xe gắn máy / xe scooter.',
+        decomposition: [
+            { char: '機', radical: '木', strokes: 16, pinyin: 'jī', sinoViet: 'Cơ', meaning: 'Máy móc, động cơ cơ giới', ruleNote: 'J ↔ C (jī ➔ cơ)' },
+            { char: '車', radical: '車', strokes: 7, pinyin: 'chē', sinoViet: 'Xa', meaning: 'Xe cộ, phương tiện bánh lăn', ruleNote: 'CH ↔ X (chē ➔ xa)' }
+        ]
+    },
+    'lesson-10-word-2': {
+        wordId: 'lesson-10-word-2',
+        sinoViet: 'AN TOÀN MẠO',
+        radical: '宀',
+        radicalName: 'Bộ Miên #40 · 3 nét',
+        strokes: 6,
+        toneClass: 'Thanh 1 ˉ + Thanh 2 ↗ + Thanh 4 ˋ',
+        cognateTip: 'Ān ➔ An (an toàn, bình an); Quán ➔ Toàn (hoàn toàn, vẹn toàn); Mào ➔ Mạo (mũ đội đầu: mũ mạo). An toàn mạo = Mũ bảo hiểm bắt buộc khi đi xe máy.',
+        decomposition: [
+            { char: '安', radical: '宀', strokes: 6, pinyin: 'ān', sinoViet: 'An', meaning: 'Yên ổn, bình an', ruleNote: 'A ↔ A (ān ➔ an)' },
+            { char: '全', radical: '入', strokes: 6, pinyin: 'quán', sinoViet: 'Toàn', meaning: 'Trọn vẹn, không sứt mẻ', ruleNote: 'Q ↔ T (quán ➔ toàn)' },
+            { char: '帽', radical: '巾', strokes: 12, pinyin: 'mào', sinoViet: 'Mạo', meaning: 'Mũ che đầu bảo vệ', ruleNote: 'M ↔ M (mào ➔ mạo)' }
+        ]
+    },
+    'lesson-10-word-3': {
+        wordId: 'lesson-10-word-3',
+        sinoViet: 'GIA DU TRẠM',
+        radical: '力',
+        radicalName: 'Bộ Lực #19 · 2 nét',
+        strokes: 5,
+        toneClass: 'Thanh 1 ˉ + Thanh 2 ↗ + Thanh 4 ˋ',
+        cognateTip: 'Jiā ➔ Gia (gia tăng, thêm vào); Yóu ➔ Du (dầu mỡ, nhiên liệu xăng dầu); Zhàn ➔ Trạm (trạm dừng chân). Gia du trạm = Trạm cấp xăng dầu.',
+        decomposition: [
+            { char: '加', radical: '力', strokes: 5, pinyin: 'jiā', sinoViet: 'Gia', meaning: 'Tăng thêm, gia nạp', ruleNote: 'J ↔ G (jiā ➔ gia)' },
+            { char: '油', radical: '水', strokes: 8, pinyin: 'yóu', sinoViet: 'Du', meaning: 'Nhiên liệu lỏng, xăng dầu', ruleNote: 'Y ↔ D (yóu ➔ du)' },
+            { char: '站', radical: '立', strokes: 10, pinyin: 'zhàn', sinoViet: 'Trạm', meaning: 'Điểm dừng xe, trạm tiếp nhiên liệu', ruleNote: 'ZH ↔ TR (zhàn ➔ trạm)' }
+        ]
+    },
+    'lesson-10-word-4': {
+        wordId: 'lesson-10-word-4',
+        sinoViet: 'GIÁ CHIẾU',
+        radical: '馬',
+        radicalName: 'Bộ Mã #187 · 10 nét',
+        strokes: 15,
+        toneClass: 'Thanh 4 ˋ + Thanh 4 ˋ',
+        cognateTip: 'Jià ➔ Giá (cầm cương lái xe ngựa: giá ngự); Zhào ➔ Chiếu (giấy phép chứng nhận: chấp chiếu, hộ chiếu). Giá chiếu = Giấy phép lái xe / Bằng lái xe.',
+        decomposition: [
+            { char: '駕', radical: '馬', strokes: 15, pinyin: 'jià', sinoViet: 'Giá', meaning: 'Điều khiển xe cộ, cầm lái', ruleNote: 'J ↔ GI (jià ➔ giá)' },
+            { char: '照', radical: '火', strokes: 13, pinyin: 'zhào', sinoViet: 'Chiếu', meaning: 'Giấy chứng nhận có ảnh chụp', ruleNote: 'ZH ↔ CH (zhào ➔ chiếu)' }
+        ]
+    },
+    'lesson-10-word-5': {
+        wordId: 'lesson-10-word-5',
+        sinoViet: 'PHONG CẢNH',
+        radical: '風',
+        radicalName: 'Bộ Phong #182 · 9 nét',
+        strokes: 9,
+        toneClass: 'Thanh 1 ˉ + Thanh 3 ˇ',
+        cognateTip: 'Fēng ➔ Phong (gió trời mát mẻ); Jǐng ➔ Cảnh (quang cảnh non nước). Phong cảnh tiếng Việt tương đồng 100% âm Hán-Việt với nghĩa cảnh quan thiên nhiên.',
+        decomposition: [
+            { char: '風', radical: '風', strokes: 9, pinyin: 'fēng', sinoViet: 'Phong', meaning: 'Gió trời, phong khí tự nhiên', ruleNote: 'F ↔ PH (fēng ➔ phong)' },
+            { char: '景', radical: '日', strokes: 12, pinyin: 'jǐng', sinoViet: 'Cảnh', meaning: 'Ánh nắng rọi sáng cảnh vật đẹp', ruleNote: 'J ↔ C (jǐng ➔ cảnh)' }
+        ]
+    },
+    'lesson-11-word-1': {
+        wordId: 'lesson-11-word-1',
+        sinoViet: 'LÝ LỊCH',
+        radical: '尸',
+        radicalName: 'Bộ Thi #44 · 3 nét',
+        strokes: 15,
+        toneClass: 'Thanh 3 ˇ + Thanh 4 ˋ',
+        cognateTip: 'Lǚ ➔ Lý (bước chân đi thực địa, lý trình); Lì ➔ Lịch (từng trải qua: lịch sử, lịch duyệt). Lý lịch biểu (lǚlì biǎo) = Bản sơ yếu lý lịch / CV xin việc.',
+        decomposition: [
+            { char: '履', radical: '尸', strokes: 15, pinyin: 'lǚ', sinoViet: 'Lý', meaning: 'Giày dép, bước chân từng dẫm qua', ruleNote: 'L ↔ L (lǚ ➔ lý)' },
+            { char: '歷', radical: '止', strokes: 16, pinyin: 'lì', sinoViet: 'Lịch', meaning: 'Trải qua tháng ngày, dòng thời gian', ruleNote: 'L ↔ L (lì ➔ lịch)' }
+        ]
+    },
+    'lesson-11-word-2': {
+        wordId: 'lesson-11-word-2',
+        sinoViet: 'DIỆN THÍ',
+        radical: '面',
+        radicalName: 'Bộ Diện #176 · 9 nét',
+        strokes: 9,
+        toneClass: 'Thanh 4 ˋ + Thanh 4 ˋ',
+        cognateTip: 'Miàn ➔ Diện (mặt đối mặt, diện kiến); Shì ➔ Thí (thử thách, thi cử: khảo thí). Diện thí = Buổi phỏng vấn trực tiếp người tìm việc.',
+        decomposition: [
+            { char: '面', radical: '面', strokes: 9, pinyin: 'miàn', sinoViet: 'Diện', meaning: 'Gặp gỡ trực diện, đối mặt', ruleNote: 'M ↔ D (miàn ➔ diện)' },
+            { char: '試', radical: '言', strokes: 13, pinyin: 'shì', sinoViet: 'Thí', meaning: 'Khảo sát năng lực qua vấn đáp', ruleNote: 'SH ↔ TH (shì ➔ thí)' }
+        ]
+    },
+    'lesson-11-word-3': {
+        wordId: 'lesson-11-word-3',
+        sinoViet: 'KINH NGHIỆM',
+        radical: '糸',
+        radicalName: 'Bộ Mịch #120 · 6 nét',
+        strokes: 13,
+        toneClass: 'Thanh 1 ˉ + Thanh 4 ˋ',
+        cognateTip: 'Jīng ➔ Kinh (kinh qua, trải dọc suốt con đường sự nghiệp); Yàn ➔ Nghiệm (kiểm nghiệm thực tiễn). Kinh nghiệm tích lũy qua năm tháng làm việc.',
+        decomposition: [
+            { char: '經', radical: '糸', strokes: 13, pinyin: 'jīng', sinoViet: 'Kinh', meaning: 'Trải qua con đường, mạch thẳng', ruleNote: 'J ↔ K (jīng ➔ kinh)' },
+            { char: '驗', radical: '馬', strokes: 23, pinyin: 'yàn', sinoViet: 'Nghiệm', meaning: 'Kiểm nghiệm, chứng thực qua thực tiễn', ruleNote: 'Y ↔ NGH (yàn ➔ nghiệm)' }
+        ]
+    },
+    'lesson-11-word-4': {
+        wordId: 'lesson-11-word-4',
+        sinoViet: 'TÂN THỦY',
+        radical: '艸',
+        radicalName: 'Bộ Thảo #140 · 6 nét',
+        strokes: 17,
+        toneClass: 'Thanh 1 ˉ + Thanh 3 ˇ',
+        cognateTip: 'Xīn ➔ Tân (củi đun: tân thảo); Shuǐ ➔ Thủy (nước uống). Cổ nhân gọi tiền trang trải củi đuốc nước uống hàng ngày là "tân thủy" ➔ nghĩa là tiền lương đãi ngộ.',
+        decomposition: [
+            { char: '薪', radical: '艸', strokes: 17, pinyin: 'xīn', sinoViet: 'Tân', meaning: 'Củi đun, tiền thù lao nuôi sống', ruleNote: 'X ↔ T (xīn ➔ tân)' },
+            { char: '水', radical: '水', strokes: 4, pinyin: 'shuǐ', sinoViet: 'Thủy', meaning: 'Nước uống, nhu cầu căn bản đời sống', ruleNote: 'SH ↔ TH (shuǐ ➔ thủy)' }
+        ]
+    },
+    'lesson-11-word-5': {
+        wordId: 'lesson-11-word-5',
+        sinoViet: 'CHUYÊN TRƯỜNG',
+        radical: '寸',
+        radicalName: 'Bộ Thốn #41 · 3 nét',
+        strokes: 11,
+        toneClass: 'Thanh 1 ˉ + Thanh 2 ↗',
+        cognateTip: 'Zhuān ➔ Chuyên (chuyên tâm nghiên cứu sâu); Cháng ➔ Trường (sở trường, điểm mạnh vượt trội). Chuyên trường = Năng lực chuyên môn / Sở trường mũi nhọn.',
+        decomposition: [
+            { char: '專', radical: '寸', strokes: 11, pinyin: 'zhuān', sinoViet: 'Chuyên', meaning: 'Tập trung chuyên sâu một lĩnh vực', ruleNote: 'ZH ↔ CH (zhuān ➔ chuyên)' },
+            { char: '長', radical: '長', strokes: 8, pinyin: 'cháng', sinoViet: 'Trường', meaning: 'Sở trường, điểm sáng tài năng', ruleNote: 'CH ↔ TR (cháng ➔ trường)' }
+        ]
+    },
+    'lesson-12-word-1': {
+        wordId: 'lesson-12-word-1',
+        sinoViet: 'TRUNG THU TIẾT',
+        radical: '丨',
+        radicalName: 'Bộ Cổn #2 · 1 nét',
+        strokes: 4,
+        toneClass: 'Thanh 1 ˉ + Thanh 1 ˉ + Thanh 2 ↗',
+        cognateTip: 'Zhōng ➔ Trung (ở giữa); Qiū ➔ Thu (tiết thu); Jié ➔ Tiết (lễ hội tiết mùa). Trung thu tiết = Ngày Tết Trung thu rằm tháng 8 âm lịch.',
+        decomposition: [
+            { char: '中', radical: '丨', strokes: 4, pinyin: 'zhōng', sinoViet: 'Trung', meaning: 'Chính giữa mùa thu 3 tháng', ruleNote: 'ZH ↔ TR (zhōng ➔ trung)' },
+            { char: '秋', radical: '禾', strokes: 9, pinyin: 'qiū', sinoViet: 'Thu', meaning: 'Mùa thu mát mẻ, lúa chín', ruleNote: 'Q ↔ TH (qiū ➔ thu)' },
+            { char: '節', radical: '竹', strokes: 13, pinyin: 'jié', sinoViet: 'Tiết', meaning: 'Đốt tre, ngày hội truyền thống', ruleNote: 'J ↔ T (jié ➔ tiết)' }
+        ]
+    },
+    'lesson-12-word-2': {
+        wordId: 'lesson-12-word-2',
+        sinoViet: 'KHẢO NHỤC',
+        radical: '火',
+        radicalName: 'Bộ Hỏa #86 · 4 nét',
+        strokes: 10,
+        toneClass: 'Thanh 3 ˇ + Thanh 4 ˋ',
+        cognateTip: 'Kǎo ➔ Khảo (nung nóng trên lửa đỏ: nướng); Ròu ➔ Nhục (thịt động vật). Khảo nhục = Tiệc nướng thịt BBQ ngoài trời, nét văn hóa đặc sắc đêm Trung thu Đài Loan.',
+        decomposition: [
+            { char: '烤', radical: '火', strokes: 10, pinyin: 'kǎo', sinoViet: 'Khảo', meaning: 'Nướng chín trên than lửa', ruleNote: 'K ↔ KH (kǎo ➔ khảo)' },
+            { char: '肉', radical: '肉', strokes: 6, pinyin: 'ròu', sinoViet: 'Nhục', meaning: 'Miếng thịt tươi', ruleNote: 'R ↔ NH (ròu ➔ nhục)' }
+        ]
+    },
+    'lesson-12-word-3': {
+        wordId: 'lesson-12-word-3',
+        sinoViet: 'PHƯỢNG LÊ TÔ',
+        radical: '鳥',
+        radicalName: 'Bộ Điểu #196 · 11 nét',
+        strokes: 14,
+        toneClass: 'Thanh 4 ˋ + Thanh 2 ↗ + Thanh 1 ˉ',
+        cognateTip: 'Fènglí ➔ Phượng lê (tiếng Mân Nam phát âm là "ông-lâi" 旺來 mang ý tài lộc đến nhà); Sū ➔ Tô (vỏ bánh thơm giòn xốp). Bánh dứa đặc sản số 1 Đài Loan.',
+        decomposition: [
+            { char: '鳳', radical: '鳥', strokes: 14, pinyin: 'fèng', sinoViet: 'Phượng', meaning: 'Chim phượng hoàng quý phái', ruleNote: 'F ↔ PH (fèng ➔ phượng)' },
+            { char: '梨', radical: '木', strokes: 11, pinyin: 'lí', sinoViet: 'Lê', meaning: 'Cây ăn trái thanh ngọt', ruleNote: 'L ↔ L (lí ➔ lê)' },
+            { char: '酥', radical: '酉', strokes: 12, pinyin: 'sū', sinoViet: 'Tô', meaning: 'Bánh xốp giòn làm từ bột và bơ sữa', ruleNote: 'S ↔ T (sū ➔ tô)' }
+        ]
+    },
+    'lesson-12-word-4': {
+        wordId: 'lesson-12-word-4',
+        sinoViet: 'TRUYỀN THỐNG',
+        radical: '亻',
+        radicalName: 'Bộ Nhân #9 · 2 nét',
+        strokes: 13,
+        toneClass: 'Thanh 2 ↗ + Thanh 3 ˇ',
+        cognateTip: 'Chuán ➔ Truyền (truyền nối, lưu truyền qua thế hệ); Tǒng ➔ Thống (mối tơ liên kết, thống nhất). Truyền thống là những tập quán quý báu được trao truyền lại.',
+        decomposition: [
+            { char: '傳', radical: '亻', strokes: 13, pinyin: 'chuán', sinoViet: 'Truyền', meaning: 'Trao lại cho đời sau gìn giữ', ruleNote: 'CH ↔ TR (chuán ➔ truyền)' },
+            { char: '統', radical: '糸', strokes: 12, pinyin: 'tǒng', sinoViet: 'Thống', meaning: 'Mối nối các thế hệ liên tục', ruleNote: 'T ↔ TH (tǒng ➔ thống)' }
+        ]
+    },
+    'lesson-12-word-5': {
+        wordId: 'lesson-12-word-5',
+        sinoViet: 'NHIỆT TÌNH',
+        radical: '灬',
+        radicalName: 'Bộ Hỏa #86 · 4 nét',
+        strokes: 15,
+        toneClass: 'Thanh 4 ˋ + Thanh 2 ↗',
+        cognateTip: 'Rè ➔ Nhiệt (nóng ấm, nồng hậu); Qíng ➔ Tình (tình người, chân tình). Người dân Đài Loan nổi tiếng thế giới bởi tấm lòng hiếu khách nhiệt tình.',
+        decomposition: [
+            { char: '熱', radical: '灬', strokes: 15, pinyin: 'rè', sinoViet: 'Nhiệt', meaning: 'Hơi ấm bốc lên, nồng nhiệt', ruleNote: 'R ↔ NH (rè ➔ nhiệt)' },
+            { char: '情', radical: '忄', strokes: 11, pinyin: 'qíng', sinoViet: 'Tình', meaning: 'Tình cảm nảy sinh từ trái tim', ruleNote: 'Q ↔ T (qíng ➔ tình)' }
+        ]
+    },
+    // --- TOCFL B2 (Lesson 13 - 16) ---
+    'lesson-13-word-1': {
+        wordId: 'lesson-13-word-1',
+        sinoViet: 'HỢP ƯỚC',
+        radical: '口',
+        radicalName: 'Bộ Khẩu #30 · 3 nét',
+        strokes: 6,
+        toneClass: 'Thanh 2 ↗ + Thanh 1 ˉ',
+        cognateTip: 'Hé ➔ Hợp (hòa hợp, cùng nhau nhất trí); Yuē ➔ Ước (giao ước, cam kết). Hợp ước (héyuē) là từ ngữ chuẩn mực trong thương mại chỉ văn bản hợp đồng pháp lý.',
+        decomposition: [
+            { char: '合', radical: '口', strokes: 6, pinyin: 'hé', sinoViet: 'Hợp', meaning: 'Hòa hợp, ăn khớp các bên', ruleNote: 'H ↔ H (hé ➔ hợp)' },
+            { char: '約', radical: '糸', strokes: 9, pinyin: 'yuē', sinoViet: 'Ước', meaning: 'Sợi dây ràng buộc lời hứa, giao ước', ruleNote: 'Y ↔ Ư (yuē ➔ ước)' }
+        ]
+    },
+    'lesson-13-word-2': {
+        wordId: 'lesson-13-word-2',
+        sinoViet: 'HỢP TÁC',
+        radical: '口',
+        radicalName: 'Bộ Khẩu #30 · 3 nét',
+        strokes: 6,
+        toneClass: 'Thanh 2 ↗ + Thanh 4 ˋ',
+        cognateTip: 'Hé ➔ Hợp (kết hợp sức mạnh); Zuò ➔ Tác (thao tác, hành động làm việc). Hợp tác kinh doanh là phối hợp chung tay kiến tạo giá trị đôi bên.',
+        decomposition: [
+            { char: '合', radical: '口', strokes: 6, pinyin: 'hé', sinoViet: 'Hợp', meaning: 'Cùng chung ý chí và định hướng', ruleNote: 'H ↔ H (hé ➔ hợp)' },
+            { char: '作', radical: '亻', strokes: 7, pinyin: 'zuò', sinoViet: 'Tác', meaning: 'Bắt tay thực hiện công việc', ruleNote: 'Z ↔ T (zuò ➔ tác)' }
+        ]
+    },
+    'lesson-13-word-3': {
+        wordId: 'lesson-13-word-3',
+        sinoViet: 'ĐIỀU KIỆN',
+        radical: '木',
+        radicalName: 'Bộ Mộc #75 · 4 nét',
+        strokes: 11,
+        toneClass: 'Thanh 2 ↗ + Thanh 4 ˋ',
+        cognateTip: 'Tiáo ➔ Điều (nhánh nhỏ, từng điều khoản); Jiàn ➔ Kiện (sự kiện, yếu tố riêng rẽ). Điều kiện là tiêu chí căn bản cần đáp ứng trong thỏa thuận thương vụ.',
+        decomposition: [
+            { char: '條', radical: '木', strokes: 11, pinyin: 'tiáo', sinoViet: 'Điều', meaning: 'Từng cành nhánh nhỏ, điều mục văn bản', ruleNote: 'T ↔ Đ (tiáo ➔ điều)' },
+            { char: '件', radical: '亻', strokes: 6, pinyin: 'jiàn', sinoViet: 'Kiện', meaning: 'Mỗi một yếu tố, sự kiện xác định', ruleNote: 'J ↔ K (jiàn ➔ kiện)' }
+        ]
+    },
+    'lesson-13-word-4': {
+        wordId: 'lesson-13-word-4',
+        sinoViet: 'THIÊM ƯỚC',
+        radical: '竹',
+        radicalName: 'Bộ Trúc #118 · 6 nét',
+        strokes: 19,
+        toneClass: 'Thanh 1 ˉ + Thanh 1 ˉ',
+        cognateTip: 'Qiān ➔ Thiêm (thẻ tre khắc tên, ký tên xác nhận); Yuē ➔ Ước (giao ước hợp đồng). Thiêm ước = Ký kết hợp đồng正式簽約.',
+        decomposition: [
+            { char: '簽', radical: '竹', strokes: 19, pinyin: 'qiān', sinoViet: 'Thiêm', meaning: 'Cây bút tre ghi tên ký duyệt', ruleNote: 'Q ↔ TH (qiān ➔ thiêm)' },
+            { char: '約', radical: '糸', strokes: 9, pinyin: 'yuē', sinoViet: 'Ước', meaning: 'Lời ước thề pháp lý ràng buộc đôi bên', ruleNote: 'Y ↔ Ư (yuē ➔ ước)' }
+        ]
+    },
+    'lesson-13-word-5': {
+        wordId: 'lesson-13-word-5',
+        sinoViet: 'LỢI NHUẬN',
+        radical: '刀',
+        radicalName: 'Bộ Đao #18 · 2 nét',
+        strokes: 7,
+        toneClass: 'Thanh 4 ˋ + Thanh 4 ˋ',
+        cognateTip: 'Lì ➔ Lợi (thu hoạch lúa tốt, có lãi); Rùn ➔ Nhuận (ẩm ướt, mỡ màu, sinh sôi nảy nở). Lợi nhuận là phần thặng dư tài chính thu được sau đầu tư sản xuất.',
+        decomposition: [
+            { char: '利', radical: '刀', strokes: 7, pinyin: 'lì', sinoViet: 'Lợi', meaning: 'Lưỡi liềm gặt lúa trĩu bông, ích lợi', ruleNote: 'L ↔ L (lì ➔ lợi)' },
+            { char: '潤', radical: '水', strokes: 15, pinyin: 'rùn', sinoViet: 'Nhuận', meaning: 'Dòng nước thấm nhuần tài lộc sinh sôi', ruleNote: 'R ↔ NH (rùn ➔ nhuận)' }
+        ]
+    },
+    'lesson-14-word-1': {
+        wordId: 'lesson-14-word-1',
+        sinoViet: 'TINH PHIẾN',
+        radical: '日',
+        radicalName: 'Bộ Nhật #72 · 4 nét',
+        strokes: 12,
+        toneClass: 'Thanh 1 ˉ + Thanh 4 ˋ',
+        cognateTip: 'Jīng ➔ Tinh (ba mặt trời tỏa sáng rực rỡ, tinh thể silicon thuần khiết); Piàn ➔ Phiến (phiến đá mỏng, lát wafer bán dẫn). Tinh phiến = vi mạch bán dẫn / microchip.',
+        decomposition: [
+            { char: '晶', radical: '日', strokes: 12, pinyin: 'jīng', sinoViet: 'Tinh', meaning: 'Tinh thể pha lê trong suốt tinh khiết', ruleNote: 'J ↔ T (jīng ➔ tinh)' },
+            { char: '片', radical: '片', strokes: 4, pinyin: 'piàn', sinoViet: 'Phiến', meaning: 'Lát mỏng vi mạch cắt từ wafer', ruleNote: 'P ↔ PH (piàn ➔ phiến)' }
+        ]
+    },
+    'lesson-14-word-2': {
+        wordId: 'lesson-14-word-2',
+        sinoViet: 'BÁN ĐẠO THỂ',
+        radical: '十',
+        radicalName: 'Bộ Thập #24 · 2 nét',
+        strokes: 5,
+        toneClass: 'Thanh 4 ˋ + Thanh 3 ˇ + Thanh 3 ˇ (Biến điệu 4 + 2 + 3)',
+        cognateTip: 'Bàn ➔ Bán (một nửa); Dǎo ➔ Đạo (dẫn truyền electron); Tǐ ➔ Thể (vật thể chất liệu). Bán đạo thể = Chất bán dẫn semiconductor, ngành công nghiệp trụ cột của Đài Loan.',
+        decomposition: [
+            { char: '半', radical: '十', strokes: 5, pinyin: 'bàn', sinoViet: 'Bán', meaning: 'Phân nửa, trạng thái trung gian', ruleNote: 'B ↔ B (bàn ➔ bán)' },
+            { char: '導', radical: '寸', strokes: 15, pinyin: 'dǎo', sinoViet: 'Đạo', meaning: 'Dẫn dắt, tải dẫn dòng điện', ruleNote: 'D ↔ Đ (dǎo ➔ đạo)' },
+            { char: '體', radical: '骨', strokes: 23, pinyin: 'tǐ', sinoViet: 'Thể', meaning: 'Thân thể, chất thể vật chất', ruleNote: 'T ↔ TH (tǐ ➔ thể)' }
+        ]
+    },
+    'lesson-14-word-3': {
+        wordId: 'lesson-14-word-3',
+        sinoViet: 'SÁNG TÂN',
+        radical: '刀',
+        radicalName: 'Bộ Đao #18 · 2 nét',
+        strokes: 12,
+        toneClass: 'Thanh 4 ˋ + Thanh 1 ˉ',
+        cognateTip: 'Chuàng ➔ Sáng (sáng tạo, khai mở nhát gươm đầu tiên); Xīn ➔ Tân (mới mẻ đột phá). Sáng tân = Đổi mới sáng tạo (innovation), động lực duy trì ngôi vương công nghệ.',
+        decomposition: [
+            { char: '創', radical: '刀', strokes: 12, pinyin: 'chuàng', sinoViet: 'Sáng', meaning: 'Vung dao khai mở lối đi độc đáo', ruleNote: 'CH ↔ S (chuàng ➔ sáng)' },
+            { char: '新', radical: '斤', strokes: 13, pinyin: 'xīn', sinoViet: 'Tân', meaning: 'Chặt cây lấy gỗ thơm tươi mới', ruleNote: 'X ↔ T (xīn ➔ tân)' }
+        ]
+    },
+    'lesson-14-word-4': {
+        wordId: 'lesson-14-word-4',
+        sinoViet: 'KHOA KỸ',
+        radical: '禾',
+        radicalName: 'Bộ Hòa #115 · 5 nét',
+        strokes: 9,
+        toneClass: 'Thanh 1 ˉ + Thanh 4 ˋ',
+        cognateTip: 'Kē ➔ Khoa (khoa cử, hệ thống đo lường lý tính); Jì ➔ Kỹ (kỹ thuật, tài khéo léo). Khoa kỹ = Khoa học kỹ thuật / Công nghệ cao (High-tech).',
+        decomposition: [
+            { char: '科', radical: '禾', strokes: 9, pinyin: 'kē', sinoViet: 'Khoa', meaning: 'Đong đếm sản lượng chuẩn mực', ruleNote: 'K ↔ KH (kē ➔ khoa)' },
+            { char: '技', radical: '扌', strokes: 7, pinyin: 'jì', sinoViet: 'Kỹ', meaning: 'Tài hoa khéo léo của đôi bàn tay', ruleNote: 'J ↔ K (jì ➔ kỹ)' }
+        ]
+    },
+    'lesson-14-word-5': {
+        wordId: 'lesson-14-word-5',
+        sinoViet: 'NGHIÊN PHÁT',
+        radical: '石',
+        radicalName: 'Bộ Thạch #112 · 5 nét',
+        strokes: 9,
+        toneClass: 'Thanh 2 ↗ + Thanh 1 ˉ',
+        cognateTip: 'Yán ➔ Nghiên (mài giũa đá cho bóng mịn, nghiên cứu thấu đáo); Fā ➔ Phát (phóng tên đi xa, phát minh tiến bộ). Nghiên phát = Hoạt động R&D (Nghiên cứu & Phát triển).',
+        decomposition: [
+            { char: '研', radical: '石', strokes: 9, pinyin: 'yán', sinoViet: 'Nghiên', meaning: 'Mài phẳng phiến đá, suy xét tinh tường', ruleNote: 'Y ↔ NGH (yán ➔ nghiên)' },
+            { char: '發', radical: '癶', strokes: 12, pinyin: 'fā', sinoViet: 'Phát', meaning: 'Phát xạ, đơm hoa kết trái thành công', ruleNote: 'F ↔ PH (fā ➔ phát)' }
+        ]
+    },
+    'lesson-15-word-1': {
+        wordId: 'lesson-15-word-1',
+        sinoViet: 'BÁO THUẾ',
+        radical: '土',
+        radicalName: 'Bộ Thổ #32 · 3 nét',
+        strokes: 12,
+        toneClass: 'Thanh 4 ˋ + Thanh 4 ˋ',
+        cognateTip: 'Bào ➔ Báo (khai báo tường trình thực tế); Shuì ➔ Thuế (phần trích nộp ngân sách quốc gia). Báo thuế = việc khai nộp thuế thu nhập cá nhân hàng năm vào tháng 5 tại Đài Loan.',
+        decomposition: [
+            { char: '報', radical: '土', strokes: 12, pinyin: 'bào', sinoViet: 'Báo', meaning: 'Trình báo nghĩa vụ đối với xã hội', ruleNote: 'B ↔ B (bào ➔ báo)' },
+            { char: '稅', radical: '禾', strokes: 12, pinyin: 'shuì', sinoViet: 'Thuế', meaning: 'Trích một phần mùa màng nộp công quỹ', ruleNote: 'SH ↔ TH (shuì ➔ thuế)' }
+        ]
+    },
+    'lesson-15-word-2': {
+        wordId: 'lesson-15-word-2',
+        sinoViet: 'LAO BẢO',
+        radical: '力',
+        radicalName: 'Bộ Lực #19 · 2 nét',
+        strokes: 12,
+        toneClass: 'Thanh 2 ↗ + Thanh 3 ˇ',
+        cognateTip: 'Láo ➔ Lao (lao động đổ mồ hôi dốc sức); Bǎo ➔ Bảo (bảo vệ quyền lợi, bảo hiểm). Lao bảo là Bảo hiểm Lao động bắt buộc, bảo đảm quyền lợi khi có rủi ro.',
+        decomposition: [
+            { char: '勞', radical: '力', strokes: 12, pinyin: 'láo', sinoViet: 'Lao', meaning: 'Dùng hết sức lực cống hiến lao động', ruleNote: 'L ↔ L (láo ➔ lao)' },
+            { char: '保', radical: '亻', strokes: 9, pinyin: 'bǎo', sinoViet: 'Bảo', meaning: 'Che chở, đùm bọc người làm việc', ruleNote: 'B ↔ B (bǎo ➔ bảo)' }
+        ]
+    },
+    'lesson-15-word-3': {
+        wordId: 'lesson-15-word-3',
+        sinoViet: 'QUYỀN ÍCH',
+        radical: '木',
+        radicalName: 'Bộ Mộc #75 · 4 nét',
+        strokes: 22,
+        toneClass: 'Thanh 2 ↗ + Thanh 4 ˋ',
+        cognateTip: 'Quán ➔ Quyền (cán cân công lý bảo vệ con người); Yì ➔ Ích (nước tràn chén, phúc lợi thặng dư). Quyền ích = Các quyền lợi chính đáng được luật pháp bảo vệ.',
+        decomposition: [
+            { char: '權', radical: '木', strokes: 22, pinyin: 'quán', sinoViet: 'Quyền', meaning: 'Quả cân thăng bằng công lý, quyền bính', ruleNote: 'Q ↔ Q (quán ➔ quyền)' },
+            { char: '益', radical: '皿', strokes: 10, pinyin: 'yì', sinoViet: 'Ích', meaning: 'Dòng nước tràn ra mang lại lợi lộc', ruleNote: 'Y ↔ I (yì ➔ ích)' }
+        ]
+    },
+    'lesson-15-word-4': {
+        wordId: 'lesson-15-word-4',
+        sinoViet: 'QUY ĐỊNH',
+        radical: '見',
+        radicalName: 'Bộ Kiến #147 · 7 nét',
+        strokes: 11,
+        toneClass: 'Thanh 1 ˉ + Thanh 4 ˋ',
+        cognateTip: 'Guī ➔ Quy (dụng cụ com-pa tạo đường chuẩn mực: quy củ); Dìng ➔ Định (ấn định dưới mái nhà vững chãi). Quy định = Điều lệ và nguyên tắc bắt buộc tuân thủ.',
+        decomposition: [
+            { char: '規', radical: '見', strokes: 11, pinyin: 'guī', sinoViet: 'Quy', meaning: 'Com-pa vạch giới hạn chuẩn mực đạo lý', ruleNote: 'G ↔ Q (guī ➔ quy)' },
+            { char: '定', radical: '宀', strokes: 8, pinyin: 'dìng', sinoViet: 'Định', meaning: 'An định vững chãi, không xê dịch', ruleNote: 'D ↔ Đ (dìng ➔ định)' }
+        ]
+    },
+    'lesson-15-word-5': {
+        wordId: 'lesson-15-word-5',
+        sinoViet: 'KHẤU TRỪ NGẠCH',
+        radical: '扌',
+        radicalName: 'Bộ Thủ #64 · 3 nét',
+        strokes: 6,
+        toneClass: 'Thanh 4 ˋ + Thanh 2 ↗ + Thanh 2 ↗',
+        cognateTip: 'Kòu ➔ Khấu (giữ lại bớt, khấu trừ chiết khấu); Chú ➔ Trừ (loại bỏ ra ngoài); É ➔ Ngạch (hạn ngạch tài chính). Khấu trừ ngạch = Mức giảm trừ gia cảnh thuế thu nhập.',
+        decomposition: [
+            { char: '扣', radical: '扌', strokes: 6, pinyin: 'kòu', sinoViet: 'Khấu', meaning: 'Dùng tay giữ lại bớt, giảm trừ', ruleNote: 'K ↔ KH (kòu ➔ khấu)' },
+            { char: '除', radical: '阜', strokes: 10, pinyin: 'chú', sinoViet: 'Trừ', meaning: 'Bỏ đi phần phụ, trừ khử gánh nặng', ruleNote: 'CH ↔ TR (chú ➔ trừ)' },
+            { char: '額', radical: '頁', strokes: 18, pinyin: 'é', sinoViet: 'Ngạch', meaning: 'Hạn ngạch số tiền được khấu trừ trần', ruleNote: 'E ↔ NG (é ➔ ngạch)' }
+        ]
+    },
+    'lesson-16-word-1': {
+        wordId: 'lesson-16-word-1',
+        sinoViet: 'DIỄN GIẢNG',
+        radical: '水',
+        radicalName: 'Bộ Thủy #85 · 4 nét',
+        strokes: 14,
+        toneClass: 'Thanh 3 ˇ + Thanh 3 ˇ (Biến điệu 2 ↗ + 3 ˇ)',
+        cognateTip: 'Yǎn ➔ Diễn (mở rộng dòng chảy tư duy ra trước đám đông); Jiǎng ➔ Giảng (nói giải thích đạo lý). Diễn giảng = Bài thuyết trình chuyên đề trước công chúng.',
+        decomposition: [
+            { char: '演', radical: '水', strokes: 14, pinyin: 'yǎn', sinoViet: 'Diễn', meaning: 'Dòng nước tuôn chảy, trình diễn luận điểm', ruleNote: 'Y ↔ D (yǎn ➔ diễn)' },
+            { char: '講', radical: '言', strokes: 17, pinyin: 'jiǎng', sinoViet: 'Giảng', meaning: 'Lời nói phân tích thấu đáo, diễn giải', ruleNote: 'J ↔ GI (jiǎng ➔ giảng)' }
+        ]
+    },
+    'lesson-16-word-2': {
+        wordId: 'lesson-16-word-2',
+        sinoViet: 'QUAN ĐIỂM',
+        radical: '見',
+        radicalName: 'Bộ Kiến #147 · 7 nét',
+        strokes: 25,
+        toneClass: 'Thanh 1 ˉ + Thanh 3 ˇ',
+        cognateTip: 'Guān ➔ Quan (dõi mắt nhìn sâu trông rộng); Diǎn ➔ Điểm (tọa độ góc nhìn xác định). Quan điểm = Lập trường và góc độ nhìn nhận một vấn đề khoa học.',
+        decomposition: [
+            { char: '觀', radical: '見', strokes: 25, pinyin: 'guān', sinoViet: 'Quan', meaning: 'Phóng tầm mắt quan sát toàn cảnh', ruleNote: 'G ↔ Q (guān ➔ quan)' },
+            { char: '點', radical: '黑', strokes: 17, pinyin: 'diǎn', sinoViet: 'Điểm', meaning: 'Dấu chấm định vị, điểm tựa góc nhìn', ruleNote: 'D ↔ Đ (diǎn ➔ điểm)' }
+        ]
+    },
+    'lesson-16-word-3': {
+        wordId: 'lesson-16-word-3',
+        sinoViet: 'ẢNH HƯỞNG',
+        radical: '彡',
+        radicalName: 'Bộ Sam #59 · 3 nét',
+        strokes: 15,
+        toneClass: 'Thanh 3 ˇ + Thanh 3 ˇ (Biến điệu 2 ↗ + 3 ˇ)',
+        cognateTip: 'Yǐng ➔ Ảnh (bóng của vật); Xiǎng ➔ Hưởng (tiếng vang vọng lại). Cổ ngữ "như bóng theo hình, như vang ứng tiếng" ➔ Tác động lan tỏa sâu sắc và tất yếu.',
+        decomposition: [
+            { char: '影', radical: '彡', strokes: 15, pinyin: 'yǐng', sinoViet: 'Ảnh', meaning: 'Bóng in trên mặt đất theo sát hình hài', ruleNote: 'Y ↔ A (yǐng ➔ ảnh)' },
+            { char: '響', radical: '音', strokes: 21, pinyin: 'xiǎng', sinoViet: 'Hưởng', meaning: 'Âm vang dội lại mạnh mẽ trong không gian', ruleNote: 'X ↔ H (xiǎng ➔ hưởng)' }
+        ]
+    },
+    'lesson-16-word-4': {
+        wordId: 'lesson-16-word-4',
+        sinoViet: 'XU THẾ',
+        radical: '走',
+        radicalName: 'Bộ Tẩu #156 · 7 nét',
+        strokes: 17,
+        toneClass: 'Thanh 1 ˉ + Thanh 4 ˋ',
+        cognateTip: 'Qū ➔ Xu (sải bước chân chạy nhanh theo hướng); Shì ➔ Thế (sức mạnh thời cuộc). Xu thế = Chiều hướng và trào lưu biến chuyển tất yếu của thời đại.',
+        decomposition: [
+            { char: '趨', radical: '走', strokes: 17, pinyin: 'qū', sinoViet: 'Xu', meaning: 'Sải bước rảo chân lao tới đích', ruleNote: 'Q ↔ X (qū ➔ xu)' },
+            { char: '勢', radical: '力', strokes: 13, pinyin: 'shì', sinoViet: 'Thế', meaning: 'Sức mạnh vận động của hoàn cảnh', ruleNote: 'SH ↔ TH (shì ➔ thế)' }
+        ]
+    },
+    'lesson-16-word-5': {
+        wordId: 'lesson-16-word-5',
+        sinoViet: 'TỔNG KẾT',
+        radical: '糸',
+        radicalName: 'Bộ Mịch #120 · 6 nét',
+        strokes: 17,
+        toneClass: 'Thanh 3 ˇ + Thanh 2 ↗',
+        cognateTip: 'Zǒng ➔ Tổng (thâu tóm gom mọi mối dây); Jié ➔ Kết (thắt nút gút lại trọn vẹn). Tổng kết = Đúc kết toàn bộ ý kiến để rút ra kết luận cốt lõi.',
+        decomposition: [
+            { char: '總', radical: '糸', strokes: 17, pinyin: 'zǒng', sinoViet: 'Tổng', meaning: 'Buộc gộp mọi sợi tơ lại một mối', ruleNote: 'Z ↔ T (zǒng ➔ tổng)' },
+            { char: '結', radical: '糸', strokes: 12, pinyin: 'jié', sinoViet: 'Kết', meaning: 'Thắt nút dây trọn vẹn, khép lại', ruleNote: 'J ↔ K (jié ➔ kết)' }
+        ]
     }
 };
 
@@ -654,6 +1188,42 @@ export const STARTER_DECKS: StarterDeck[] = [
             'lesson-6-word-1', 'lesson-6-word-2', 'lesson-6-word-3', 'lesson-6-word-4', 'lesson-6-word-5',
             'lesson-7-word-1', 'lesson-7-word-2', 'lesson-7-word-3', 'lesson-7-word-4', 'lesson-7-word-5',
             'lesson-8-word-1', 'lesson-8-word-2', 'lesson-8-word-3', 'lesson-8-word-4', 'lesson-8-word-5'
+        ]
+    },
+    {
+        id: 'deck-tocfl-b1',
+        title: 'TOCFL B1 · Đời sống & Công việc (20 từ)',
+        titleZh: 'B1 職場生活精選',
+        titleVi: 'TOCFL B1 · Đời sống & Công việc (20 từ)',
+        subtitle: 'Ngân hàng, thuê xe máy, phỏng vấn & lễ hội Đài Loan',
+        icon: '🏦',
+        badge: 'TOCFL B1',
+        badgeClass: 'badge-vermilion',
+        desc: 'Ngân hàng, thuê xe máy, phỏng vấn & lễ hội Đài Loan',
+        lessonIds: ['lesson-9', 'lesson-10', 'lesson-11', 'lesson-12'],
+        wordIds: [
+            'lesson-9-word-1', 'lesson-9-word-2', 'lesson-9-word-3', 'lesson-9-word-4', 'lesson-9-word-5',
+            'lesson-10-word-1', 'lesson-10-word-2', 'lesson-10-word-3', 'lesson-10-word-4', 'lesson-10-word-5',
+            'lesson-11-word-1', 'lesson-11-word-2', 'lesson-11-word-3', 'lesson-11-word-4', 'lesson-11-word-5',
+            'lesson-12-word-1', 'lesson-12-word-2', 'lesson-12-word-3', 'lesson-12-word-4', 'lesson-12-word-5'
+        ]
+    },
+    {
+        id: 'deck-tocfl-b2',
+        title: 'TOCFL B2 · Thương mại & Bán dẫn (20 từ)',
+        titleZh: 'B2 商務半導體',
+        titleVi: 'TOCFL B2 · Thương mại & Bán dẫn (20 từ)',
+        subtitle: 'Hợp đồng, công nghệ bán dẫn, thuế & thuyết trình chuyên đề',
+        icon: '🔬',
+        badge: 'TOCFL B2',
+        badgeClass: 'badge-jade',
+        desc: 'Hợp đồng, công nghệ bán dẫn, thuế & thuyết trình chuyên đề',
+        lessonIds: ['lesson-13', 'lesson-14', 'lesson-15', 'lesson-16'],
+        wordIds: [
+            'lesson-13-word-1', 'lesson-13-word-2', 'lesson-13-word-3', 'lesson-13-word-4', 'lesson-13-word-5',
+            'lesson-14-word-1', 'lesson-14-word-2', 'lesson-14-word-3', 'lesson-14-word-4', 'lesson-14-word-5',
+            'lesson-15-word-1', 'lesson-15-word-2', 'lesson-15-word-3', 'lesson-15-word-4', 'lesson-15-word-5',
+            'lesson-16-word-1', 'lesson-16-word-2', 'lesson-16-word-3', 'lesson-16-word-4', 'lesson-16-word-5'
         ]
     }
 ];

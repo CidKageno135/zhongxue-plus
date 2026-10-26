@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowRight, Sparkles, MessageSquare, Bot } from 'lucide-react';
 import type { Scenario } from '../types';
 import { scenarios } from '../data/lessons';
@@ -7,12 +7,17 @@ import { AiChatView } from './AiChatView';
 
 interface ConversationListViewProps {
     onSelectScenario: (s: Scenario) => void;
+    initialRoleId?: string;
+    initialPrompt?: string;
 }
 
-const SCENARIO_AI_PROMPTS: Record<string, string> = {
+export const SCENARIO_AI_PROMPTS: Record<string, string> = {
     tea: '老闆你好！我想點一杯珍珠奶茶，請問甜度和冰塊可以怎麼選？',
     mrt: '不好意思，請問最近的捷運站在哪裡？可以用悠遊卡搭乘嗎？',
-    store: '你好！我買這些東西，不用袋子，請問可以刷卡嗎？'
+    store: '你好！我買這些東西，不用袋子，請問可以刷卡嗎？',
+    bank: '你好！我想辦理開戶和申請提款卡，請問需要準備居留證和印章嗎？',
+    clinic: '護理師您好，我要掛號看診，這是我的健保卡，我從昨天開始發燒頭痛。',
+    interview: '面試官您好！我在軟體開發領域有三年工作經驗，很高興今天來參加面試。'
 };
 
 interface ExtendedRoleplayCard {
@@ -82,9 +87,17 @@ const EXTENDED_ROLEPLAYS: ExtendedRoleplayCard[] = [
     }
 ];
 
-export function ConversationListView({ onSelectScenario }: ConversationListViewProps) {
-    const [activePrompt, setActivePrompt] = useState<string | undefined>(undefined);
-    const [activeRoleId, setActiveRoleId] = useState<string | undefined>(undefined);
+export function ConversationListView({ onSelectScenario, initialRoleId, initialPrompt }: ConversationListViewProps) {
+    const [activePrompt, setActivePrompt] = useState<string | undefined>(initialPrompt);
+    const [activeRoleId, setActiveRoleId] = useState<string | undefined>(initialRoleId);
+
+    useEffect(() => {
+        if (initialRoleId || initialPrompt) {
+            if (typeof document !== 'undefined') {
+                document.querySelector('.ai-chat-container')?.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+    }, [initialRoleId, initialPrompt]);
 
     function startAiPractice(s: Scenario) {
         const prompt = SCENARIO_AI_PROMPTS[s.id] || `你好！我想練習「${s.title}」的情境對話。`;

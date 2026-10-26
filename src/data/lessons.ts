@@ -1,6 +1,13 @@
 import type { Lesson, Word, Scenario } from '../types';
 export type { Lesson, Word, Scenario } from '../types';
 
+declare module '../types' {
+    interface Scenario {
+        subtitle?: string;
+        badge?: string;
+    }
+}
+
 type Seed = [string, string, string, string, string, string];
 
 const seeds: {
@@ -578,5 +585,269 @@ export const scenarios: Scenario[] = [
         ['不用，謝謝。', 'Bú yòng, xièxie.', 'Không cần, cảm ơn.'],
         ['一共八十元，現金還是刷卡？', 'Yígòng bāshí yuán, xiànjīn háishì shuā kǎ?', 'Tổng cộng 80 tệ, tiền mặt hay thẻ?'],
         ['我用現金，請給我發票。', 'Wǒ yòng xiànjīn, qǐng gěi wǒ fāpiào.', 'Tôi dùng tiền mặt, xin cho tôi hóa đơn.']
-    )
+    ),
+    {
+        id: 'bank',
+        title: 'Mở tài khoản ngân hàng & Chuyển tiền',
+        subtitle: 'Xuất trình thẻ cư trú ARC, con dấu và điền tờ khai',
+        description: 'Xuất trình thẻ cư trú ARC, con dấu và điền tờ khai',
+        badge: 'Tài chính B1',
+        level: 'Tài chính B1',
+        icon: '🏦',
+        start: 'start',
+        nodes: {
+            start: {
+                id: 'start',
+                speaker: '櫃檯行員 (Nhân viên giao dịch)',
+                hanzi: '您好！請問今天需要辦理什麼業務？有帶居留證和印章嗎？',
+                pinyin: 'Nín hǎo! Qǐngwèn jīntiān xūyào bànlǐ shénme yèwù? Yǒu dài jūliúzhèng hé yìnzhāng ma?',
+                meaning: 'Xin chào! Xin hỏi hôm nay bạn muốn làm thủ tục gì? Bạn có mang theo thẻ cư trú (ARC) và con dấu không?',
+                choices: [
+                    {
+                        text: '您好，我想開戶並且設定跨行轉帳，居留證和印章我都帶了。',
+                        pinyin: 'Nín hǎo, wǒ xiǎng kāihù bìngqiě shèdìng kuà háng zhuǎnzhàng, jūliúzhèng hé yìnzhāng wǒ dōu dài le.',
+                        meaning: 'Chào bạn, tôi muốn mở tài khoản và cài đặt chuyển tiền liên ngân hàng, thẻ cư trú và con dấu tôi đều mang đủ rồi.',
+                        next: 'follow',
+                        feedback: 'Rất xuất sắc! Trình bày mục đích mở tài khoản và chuẩn bị đủ ARC kèm con dấu theo đúng quy trình ngân hàng Đài Loan.',
+                        correct: true
+                    },
+                    {
+                        text: '不好意思，我是第一次在臺灣開戶，請問外國人一定要印章嗎？',
+                        pinyin: 'Bù hǎoyìsi, wǒ shì dì yí cì zài Táiwān kāihù, qǐngwèn wàiguórén yídìng yào yìnzhāng ma?',
+                        meaning: 'Ngại quá, đây là lần đầu tôi mở tài khoản tại Đài Loan, xin hỏi người nước ngoài bắt buộc phải có con dấu không?',
+                        next: 'clarify',
+                        feedback: 'Thắc mắc rất thực tế! Đa số ngân hàng Đài Loan chấp nhận chữ ký thay con dấu cho người nước ngoài, hãy nghe nhân viên giải thích.',
+                        correct: true
+                    },
+                    {
+                        text: '我想存錢，可是我沒有任何證件。',
+                        pinyin: 'Wǒ xiǎng cún qián, kěshì wǒ méiyǒu rènhé zhèngjiàn.',
+                        meaning: 'Tôi muốn gửi tiền, nhưng tôi không có giấy tờ gì cả.',
+                        next: 'start',
+                        feedback: 'Tại Đài Loan, mở tài khoản hoặc giao dịch bắt buộc phải có ARC (居留證) và hộ chiếu hợp lệ. Hãy chọn câu trả lời có xuất trình giấy tờ nhé.',
+                        correct: false
+                    }
+                ]
+            },
+            clarify: {
+                id: 'clarify',
+                speaker: '櫃檯行員 (Nhân viên giao dịch)',
+                hanzi: '沒關係，外國朋友也可以用親筆簽名代替印章。請先幫我填寫這份開戶申請書。',
+                pinyin: 'Méi guānxì, wàiguó péngyǒu yě kěyǐ yòng qīnbǐ qiānmíng dàitì yìnzhāng. Qǐng xiān bāng wǒ tiánxiě zhè fèn kāihù shēnqǐngshū.',
+                meaning: 'Không sao đâu, bạn bè nước ngoài cũng có thể dùng chữ ký tay thay cho con dấu. Phiền bạn điền vào mẫu đơn xin mở tài khoản này trước.',
+                choices: [
+                    {
+                        text: '好的，我都填好了，順便想申請晶片金融卡和網路銀行。',
+                        pinyin: 'Hǎo de, wǒ dōu tián hǎo le, shùnbiàn xiǎng shēnqǐng jīngpiàn jīnróng kǎ hé wǎnglù yínháng.',
+                        meaning: 'Vâng, tôi điền xong rồi, nhân tiện tôi muốn đăng ký thẻ ATM và Internet Banking luôn.',
+                        next: 'follow',
+                        feedback: 'Tuyệt vời! Xin cấp luôn thẻ ATM và app ngân hàng số (網銀) giúp sinh hoạt tại Đài Loan thuận tiện hơn.',
+                        correct: true
+                    }
+                ]
+            },
+            follow: {
+                id: 'follow',
+                speaker: '櫃檯行員 (Nhân viên giao dịch)',
+                hanzi: '好的，資料都確認無誤。請在密碼機上設定六位數的金融卡密碼。',
+                pinyin: 'Hǎo de, zīliào dōu quèrèn wúwù. Qǐng zài mìmǎ jī shàng shèdìng liù wèi shù de jīnróng kǎ mìmǎ.',
+                meaning: 'Được rồi, thông tin đã đối chiếu chính xác. Mời bạn cài đặt mật khẩu thẻ ATM 6 chữ số trên máy bấm mật khẩu.',
+                choices: [
+                    {
+                        text: '密碼設定完成了，請問這張卡今天就能開卡並在ATM領錢嗎？',
+                        pinyin: 'Mìmǎ shèdìng wánchéng le, qǐngwèn zhè zhāng kǎ jīntiān jiù néng kāi kǎ bìngqiě zài ATM lǐng qián ma?',
+                        meaning: 'Tôi đã đặt mật khẩu xong, xin hỏi thẻ này hôm nay kích hoạt luôn và rút tiền ở cây ATM được chưa ạ?',
+                        next: 'done',
+                        feedback: 'Câu hỏi kiểm tra rất chuẩn và thực tế trước khi rời quầy giao dịch.',
+                        correct: true
+                    }
+                ]
+            },
+            done: {
+                id: 'done',
+                speaker: '櫃檯行員 (Nhân viên giao dịch)',
+                hanzi: '沒問題，已經為您開卡成功！存摺、金融卡和居留證請收好，祝您在臺灣生活順心！',
+                pinyin: 'Méi wèntí, yǐjīng wèi nín kāi kǎ chénggōng! Cúnzhé, jīnróng kǎ hé jūliúzhèng qǐng shōu hǎo, zhù nín zài Táiwān shēnghuó shùnxīn!',
+                meaning: 'Không thành vấn đề, đã kích hoạt thẻ thành công cho bạn! Sổ tiết kiệm, thẻ ATM và thẻ cư trú xin giữ kỹ, chúc bạn sinh sống thuận lợi tại Đài Loan!',
+                choices: [],
+                end: true
+            }
+        }
+    },
+    {
+        id: 'clinic',
+        title: 'Đăng ký khám bệnh với thẻ BHYT',
+        subtitle: 'Quầy掛號 (Guàhào), thẻ 健保卡 và mô tả triệu chứng',
+        description: 'Quầy掛號 (Guàhào), thẻ 健保卡 và mô tả triệu chứng',
+        badge: 'Y tế A2–B1',
+        level: 'Y tế A2–B1',
+        icon: '🏥',
+        start: 'start',
+        nodes: {
+            start: {
+                id: 'start',
+                speaker: '診所櫃檯人員 (Nhân viên quầy phòng khám)',
+                hanzi: '您好，請問第一次來嗎？請出示健保卡，並告訴我哪裡不舒服？',
+                pinyin: 'Nín hǎo, qǐngwèn dì yí cì lái ma? Qǐng chūshì jiànbǎokǎ, bìng gàosù wǒ nǎlǐ bù shūfú?',
+                meaning: 'Chào bạn, bạn đến lần đầu phải không? Xin xuất trình thẻ BHYT và cho tôi biết bạn thấy khó chịu ở đâu?',
+                choices: [
+                    {
+                        text: '您好，我是初診。這幾天喉嚨很痛而且有點發燒，這是我的健保卡。',
+                        pinyin: 'Nín hǎo, wǒ shì chūzhěn. Zhè jǐ tiān hóulóng hěn tòng érqiě yǒudiǎn fāshāo, zhè shì wǒ de jiànbǎokǎ.',
+                        meaning: 'Chào bạn, tôi khám lần đầu (chūzhěn). Mấy hôm nay họng tôi đau buốt và hơi sốt, đây là thẻ BHYT của tôi.',
+                        next: 'follow',
+                        feedback: 'Chính xác! Dùng đúng từ "初診" (khám lần đầu), miêu tả triệu chứng rõ ràng và đưa thẻ BHYT (健保卡).',
+                        correct: true
+                    },
+                    {
+                        text: '不好意思，我剛拿到居留證，健保卡還在辦理中，這樣可以看診嗎？',
+                        pinyin: 'Bù hǎoyìsi, wǒ gāng nádào jūliúzhèng, jiànbǎokǎ hái zài bànlǐ zhōng, zhèyàng kěyǐ kànzhěn ma?',
+                        meaning: 'Ngại quá, tôi vừa nhận thẻ cư trú, thẻ BHYT vẫn đang làm, như vậy có khám được không?',
+                        next: 'clarify',
+                        feedback: 'Tình huống rất phổ biến của người mới sang Đài Loan. Quầy sẽ hướng dẫn khám tự chi trả tạm thời hoặc dùng giấy hẹn BHYT.',
+                        correct: true
+                    },
+                    {
+                        text: '我不知道，我只要買感冒藥。',
+                        pinyin: 'Wǒ bù zhīdào, wǒ zhǐ yào mǎi gǎnmàoyào.',
+                        meaning: 'Tôi không biết, tôi chỉ muốn mua thuốc cảm.',
+                        next: 'start',
+                        feedback: 'Tại phòng khám Đài Loan cần làm thủ tục đăng ký (掛號) để bác sĩ chẩn đoán, hoặc đến tiệm thuốc (藥局) nếu chỉ mua thuốc không kê đơn.',
+                        correct: false
+                    }
+                ]
+            },
+            clarify: {
+                id: 'clarify',
+                speaker: '診所櫃檯人員 (Nhân viên quầy phòng khám)',
+                hanzi: '可以的，您可以先自費掛號，拿到健保卡後七天內帶收據回來退費喔！',
+                pinyin: 'Kěyǐ de, nín kěyǐ xiān zìfèi guàhào, nádào jiànbǎokǎ hòu qī tiān nèi dài shōujù huílái tuìfèi ō!',
+                meaning: 'Được chứ, bạn có thể tự chi trả phí đăng ký trước, trong vòng 7 ngày sau khi có thẻ BHYT mang biên lai quay lại để được hoàn tiền nhé!',
+                choices: [
+                    {
+                        text: '太好了，謝謝你！那請幫我掛號，我這兩天一直咳嗽流鼻水。',
+                        pinyin: 'Tài hǎo le, xièxie nǐ! Nà qǐng bāng wǒ guàhào, wǒ zhè liǎng tiān yìzhí késou liú bíshuǐ.',
+                        meaning: 'Tốt quá, cảm ơn bạn! Vậy xin giúp tôi đăng ký khám, hai ngày nay tôi ho và chảy nước mũi liên tục.',
+                        next: 'follow',
+                        feedback: 'Tuyệt vời! Bổ sung triệu chứng bệnh hô hấp chuẩn xác để y tá xếp số vào phòng khám thích hợp.',
+                        correct: true
+                    }
+                ]
+            },
+            follow: {
+                id: 'follow',
+                speaker: '診所櫃檯人員 (Nhân viên quầy phòng khám)',
+                hanzi: '掛號費是兩百元。請問您之前有對任何藥物過敏嗎？',
+                pinyin: 'Guàhàofèi shì liǎng bǎi yuán. Qǐngwèn nín zhīqián yǒu duì rènhé yàowù guòmǐn ma?',
+                meaning: 'Phí đăng ký là 200 Đài tệ. Xin hỏi trước đây bạn có dị ứng với loại thuốc nào không?',
+                choices: [
+                    {
+                        text: '沒有藥物過敏。請問我是在第二診間外面等候叫號嗎？',
+                        pinyin: 'Méiyǒu yàowù guòmǐn. Qǐngwèn wǒ shì zài dì èr zhěnjiān wàimiàn děnghòu jiàohào ma?',
+                        meaning: 'Tôi không dị ứng thuốc. Xin hỏi tôi đợi gọi số ở bên ngoài phòng khám số 2 phải không?',
+                        next: 'done',
+                        feedback: 'Rất chuẩn! Trả lời thông tin tiền sử dị ứng và xác nhận vị trí phòng khám/số thứ tự.',
+                        correct: true
+                    }
+                ]
+            },
+            done: {
+                id: 'done',
+                speaker: '診所櫃檯人員 (Nhân viên quầy phòng khám)',
+                hanzi: '對的，您的號碼是二十三號，螢幕顯示號碼時請進診間。祝您早日康復！',
+                pinyin: 'Duì de, nín de hàomǎ shì èrshísān hào, yíngmù xiǎnshì hàomǎ shí qǐng jìn zhěnjiān. Zhù nín zǎorì kāngfù!',
+                meaning: 'Đúng rồi, số của bạn là số 23, khi màn hình hiển thị số thì mời bạn vào phòng khám. Chúc bạn sớm bình phục!',
+                choices: [],
+                end: true
+            }
+        }
+    },
+    {
+        id: 'interview',
+        title: 'Phỏng vấn công nghệ & Đàm phán lương',
+        subtitle: 'Giới thiệu chuyên môn, kinh nghiệm và kỳ vọng đãi ngộ',
+        description: 'Giới thiệu chuyên môn, kinh nghiệm và kỳ vọng đãi ngộ',
+        badge: 'Sự nghiệp B1–B2',
+        level: 'Sự nghiệp B1–B2',
+        icon: '💼',
+        start: 'start',
+        nodes: {
+            start: {
+                id: 'start',
+                speaker: '面試主管 (Trưởng bộ phận tuyển dụng)',
+                hanzi: '你好，請先做兩分鐘的自我介紹，並分享你在前一份工作中最有成就感的專案。',
+                pinyin: 'Nǐ hǎo, qǐng xiān zuò liǎng fēnzhōng de zìwǒ jièshào, bìng fēnxiǎng nǐ zài qián yí fèn gōngzuò zhōng zuì yǒu chéngjiùgǎn de zhuān\'àn.',
+                meaning: 'Chào bạn, xin mời bạn tự giới thiệu bản thân trong 2 phút và chia sẻ dự án mà bạn cảm thấy tâm đắc nhất ở công việc trước.',
+                choices: [
+                    {
+                        text: '您好，我有三年全端開發經驗。之前主導電商系統重構，將載入速度提升了40%，我擅長React與後端架構。',
+                        pinyin: 'Nín hǎo, wǒ yǒu sān nián quánduān kāifā jīngyàn. Zhīqián zhǔdǎo diànshāng xìtǒng chónggòu, jiāng zǎirù sùdù tíshēng le bǎifēnzhī sìshí, wǒ shàncháng React yǔ hòuduān jiàgòu.',
+                        meaning: 'Chào anh/chị, tôi có 3 năm kinh nghiệm phát triển full-stack. Trước đây tôi phụ trách tái cấu trúc hệ thống thương mại điện tử, giúp tăng 40% tốc độ tải trang, tôi có thế mạnh về React và kiến trúc backend.',
+                        next: 'follow',
+                        feedback: 'Rất chuyên nghiệp! Trả lời gãy gọn, nêu rõ số năm kinh nghiệm, thành tích định lượng (40%) và công nghệ sở trường.',
+                        correct: true
+                    },
+                    {
+                        text: '主管您好，請問今天會著重在技術架構討論，還是團隊協作與跨部門溝通的經驗？',
+                        pinyin: 'Zhǔguǎn nín hǎo, qǐngwèn jīntiān huì zhuózhòng zài jìshù jiàgòu tǎolùn, háishì tuánduì xiézuò yǔ kuà bùmén gōutōng de jīngyàn?',
+                        meaning: 'Chào sếp/trưởng bộ phận, xin hỏi hôm nay buổi phỏng vấn sẽ tập trung vào kiến trúc kỹ thuật hay là kỹ năng phối hợp nhóm và giao tiếp liên phòng ban?',
+                        next: 'clarify',
+                        feedback: 'Kỹ năng làm rõ mục tiêu (clarification) xuất sắc, giúp bạn định vị câu trả lời trúng trọng tâm mong đợi của người phỏng vấn.',
+                        correct: true
+                    },
+                    {
+                        text: '我履歷上都有寫，你們應該看過了吧？',
+                        pinyin: 'Wǒ lǚlì shàng dōu yǒu xiě, nǐmen yīnggāi kànguò le ba?',
+                        meaning: 'Trong CV tôi viết hết rồi, các bạn chắc đã xem qua rồi chứ?',
+                        next: 'start',
+                        feedback: 'Trong văn hóa công sở Đài Loan, thái độ khiêm nhường và tôn trọng là tối quan trọng. Không nên trả lời cộc lốc hoặc bảo nhà tuyển dụng tự xem CV.',
+                        correct: false
+                    }
+                ]
+            },
+            clarify: {
+                id: 'clarify',
+                speaker: '面試主管 (Trưởng bộ phận tuyển dụng)',
+                hanzi: '我們兩者都很重視，你可以先談談技術挑戰，再聊聊你如何與產品經理及設計師協作。',
+                pinyin: 'Wǒmen liǎngzhě dōu hěn zhòngshì, nǐ kěyǐ xiān tántán jìshù tiǎozhàn, zài liáoliáo nǐ rúhé yǔ chǎnpǐn jīnglǐ jí shèjìshī xiézuò.',
+                meaning: 'Chúng tôi đều coi trọng cả hai, bạn có thể nói về thách thức kỹ thuật trước, sau đó chia sẻ cách bạn phối hợp với PM và Designer.',
+                choices: [
+                    {
+                        text: '好的！我們團隊採用Agile敏捷開發，我曾帶領三人小組如期交付核心API，並保持良好的跨組溝通。',
+                        pinyin: 'Hǎo de! Wǒmen tuánduì cǎiyòng Agile mǐnjié kāifā, wǒ céng dàilǐng sān rén xiǎozǔ rúqí jiāofù héxīn API, bìng bǎochí liánghǎo de kuà zǔ gōutōng.',
+                        meaning: 'Vâng! Đội ngũ của chúng tôi áp dụng mô hình Agile, tôi từng dẫn dắt nhóm 3 người bàn giao API cốt lõi đúng hạn và duy trì kênh trao đổi liên phòng ban rất tốt.',
+                        next: 'follow',
+                        feedback: 'Tuyệt vời! Kết nối nhuần nhuyễn giữa năng lực kỹ thuật và kỹ năng mềm dẫn dắt đội ngũ.',
+                        correct: true
+                    }
+                ]
+            },
+            follow: {
+                id: 'follow',
+                speaker: '人資主管 (Trưởng phòng Nhân sự HR)',
+                hanzi: '表現非常優異。請問你目前的待遇與對這份職缺的期望薪資大概是多少？',
+                pinyin: 'Biǎoxiàn fēicháng yōuyì. Qǐngwèn nǐ mùqián de dàiyù yǔ duì zhè fèn zhíquē de qīwàng xīnzī dàgài shì duōshǎo?',
+                meaning: 'Thể hiện rất ấn tượng. Xin hỏi mức đãi ngộ hiện tại của bạn và mức lương kỳ vọng cho vị trí này là khoảng bao nhiêu?',
+                choices: [
+                    {
+                        text: '考量到專案職責與貴公司的發展，我期望保障年薪落在九十萬到一百萬台幣之間，包含年終與績效獎金。',
+                        pinyin: 'Kǎoliáng dào zhuān\'àn zhízé yǔ guì gōngsī de fǎzhǎn, wǒ qīwàng bǎozhàng niánxīn luò zài jiǔshí wàn dào yībǎi wàn Táibì zhī jiān, bāohán niánzhōng yǔ jìxiào jiǎngjīn.',
+                        meaning: 'Cân nhắc trách nhiệm dự án và quy mô phát triển của quý công ty, tôi kỳ vọng mức thu nhập năm cam kết trong khoảng 900.000 đến 1.000.000 NTD, bao gồm lương tháng 13/thưởng Tết và thưởng hiệu suất.',
+                        next: 'done',
+                        feedback: 'Đàm phán lương vô cùng khéo léo! Đưa ra khoảng lương năm (年薪) phù hợp với chuẩn ngành công nghệ thông tin tại Đài Loan.',
+                        correct: true
+                    }
+                ]
+            },
+            done: {
+                id: 'done',
+                speaker: '人資主管 (Trưởng phòng Nhân sự HR)',
+                hanzi: '這個範圍符合我們的薪資結構，我們預計下週五前寄發正式錄取通知（Offer Letter），期待與你共事！',
+                pinyin: 'Zhège fànwéi fúhé wǒmen de xīnzī jiégòu, wǒmen yùjì xià zhōu wǔ qián jì fā zhèngshì lùqǔ tōngzhī (Offer Letter), qīdài yǔ nǐ gòngshì!',
+                meaning: 'Khoảng lương này hoàn toàn phù hợp với khung lương của chúng tôi, chúng tôi dự kiến sẽ gửi thư mời nhận việc chính thức (Offer Letter) trước thứ Sáu tuần tới, rất mong được làm việc cùng bạn!',
+                choices: [],
+                end: true
+            }
+        }
+    }
 ];

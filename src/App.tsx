@@ -25,7 +25,7 @@ import { LessonFlow } from './views/LessonFlow';
 import { ScenarioFlow } from './views/ScenarioFlow';
 import { ReviewView } from './views/ReviewView';
 import { DictionaryView } from './views/DictionaryView';
-import { ConversationListView } from './views/ConversationListView';
+import { ConversationListView, SCENARIO_AI_PROMPTS } from './views/ConversationListView';
 import { SettingsView } from './views/SettingsView';
 import './styles.css';
 
@@ -35,6 +35,7 @@ export default function App() {
     const [route, setRoute] = useState<Route>('today');
     const [lesson, setLesson] = useState<Lesson | null>(null);
     const [scenario, setScenario] = useState<Scenario | null>(null);
+    const [aiChatSeed, setAiChatSeed] = useState<{ roleId?: string; prompt?: string }>({});
     const [query, setQuery] = useState('');
     const [onlySaved, setOnlySaved] = useState(false);
     const [notice, setNotice] = useState(loaded.error ?? (loaded.isCorrupt ? 'Không thể đọc tiến độ đã lưu. Dữ liệu trong phiên này vẫn sử dụng được.' : ''));
@@ -158,6 +159,14 @@ export default function App() {
                                 setScenario(null);
                                 setRoute('conversation');
                             }}
+                            onStartAiChat={s => {
+                                setAiChatSeed({
+                                    roleId: s.id,
+                                    prompt: SCENARIO_AI_PROMPTS[s.id] || `你好！我想練習「${s.title}」的情境對話。`
+                                });
+                                setScenario(null);
+                                setRoute('conversation');
+                            }}
                         />
                     ) : (
                         <>
@@ -204,6 +213,9 @@ export default function App() {
 
                             {route === 'conversation' && (
                                 <ConversationListView
+                                    key={aiChatSeed.roleId ?? 'default'}
+                                    initialRoleId={aiChatSeed.roleId}
+                                    initialPrompt={aiChatSeed.prompt}
                                     onSelectScenario={s => setScenario(s)}
                                 />
                             )}
