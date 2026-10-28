@@ -4,7 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isAllowedOrigin, getCorsHeaders } from '../server/security.ts';
-import vercelHandler, { config as vercelConfig } from '../api/index.ts';
+import vercelHandler, { config as vercelConfig } from '../server/vercel.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,8 +83,8 @@ describe('Vercel Deployment & Serverless Readiness', () => {
     });
   });
 
-  describe('2. vercel.json Configuration Contract', () => {
-    it('defines valid vercel.json with dist outputDirectory, dictionary includeFiles, and SPA/API rewrites', () => {
+  describe('2. vercel.json & Pure ESM Serverless Bundle Contract', () => {
+    it('defines valid vercel.json with dist outputDirectory, dictionary includeFiles, and regex $1 rewrites', () => {
       const vercelJsonPath = path.resolve(PROJECT_ROOT, 'vercel.json');
       expect(fs.existsSync(vercelJsonPath)).toBe(true);
 
@@ -92,15 +92,24 @@ describe('Vercel Deployment & Serverless Readiness', () => {
       expect(config.outputDirectory).toBe('dist');
       expect(JSON.stringify(config.functions)).toContain('data/dictionary/**');
       expect(Array.isArray(config.rewrites)).toBe(true);
-      expect(config.rewrites.length).toBeGreaterThanOrEqual(2);
+      expect(config.rewrites[0].destination).toBe('/api/vercel?__zhongxue_path=$1');
     });
 
-    it('exports bodyParser: false in api/index.ts config so raw request stream validation remains intact', () => {
+    it('bundles api/vercel.js as self-contained pure JavaScript with zero .ts import specifiers', () => {
+      const compiledBundlePath = path.resolve(PROJECT_ROOT, 'api/vercel.js');
+      expect(fs.existsSync(compiledBundlePath)).toBe(true);
+
+      const code = fs.readFileSync(compiledBundlePath, 'utf-8');
+      expect(code).not.toMatch(/from\s+['"][^'"]+\.ts['"]/);
+      expect(code).toContain('vercelApiHandler');
+    });
+
+    it('exports bodyParser: false in server/vercel.ts config so raw request stream validation remains intact', () => {
       expect(vercelConfig?.api?.bodyParser).toBe(false);
     });
   });
 
-  describe('3. Serverless Entrypoint (api/index.ts) Route Dispatching', () => {
+  describe('3. Serverless Entrypoint Route Dispatching', () => {
     it('serves GET /api/health via direct and Vercel-rewritten paths', async () => {
       const directRes = await invokeServerlessHandler('/api/health');
       expect(directRes.status).toBe(200);
@@ -109,7 +118,7 @@ describe('Vercel Deployment & Serverless Readiness', () => {
       expect(directData.dictionary.loaded).toBe(true);
       expect(directData.dictionary.totalEntries).toBeGreaterThan(100000);
 
-      const rewrittenRes = await invokeServerlessHandler('/api/index?__zhongxue_path=health');
+      const rewrittenRes = await invokeServerlessHandler('/api/vercel?__zhongxue_path=health');
       expect(rewrittenRes.status).toBe(200);
       const rewrittenData = rewrittenRes.json() as { status: string };
       expect(rewrittenData.status).toBe('ok');
@@ -117,7 +126,7 @@ describe('Vercel Deployment & Serverless Readiness', () => {
 
     it('serves GET /api/dictionary search via Vercel-rewritten path preserving query parameters', async () => {
       const res = await invokeServerlessHandler(
-        '/api/index?__zhongxue_path=dictionary&q=%E5%AD%B8%E7%94%9F&mode=all&limit=5'
+        '/api/vercel?__zhongxue_path=dictionary&q=%E5%AD%B8%E7%94%9F&mode=all&limit=5'
       );
       expect(res.status).toBe(200);
       const data = res.json() as { results: Array<{ traditional: string }>; totalMatches: number };
@@ -130,7 +139,7 @@ describe('Vercel Deployment & Serverless Readiness', () => {
       const prevVercelUrl = process.env.VERCEL_URL;
       process.env.VERCEL_URL = 'zhongxue-plus.vercel.app';
       try {
-        const okRes = await invokeServerlessHandler('/api/index?__zhongxue_path=conversation', {
+        const okRes = await invokeServerlessHandler('/api/vercel?__zhongxue_path=conversation', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -147,7 +156,7 @@ describe('Vercel Deployment & Serverless Readiness', () => {
         expect(typeof okData.content).toBe('string');
         expect(okData.content.length).toBeGreaterThan(0);
 
-        const forbiddenRes = await invokeServerlessHandler('/api/index?__zhongxue_path=conversation', {
+        const forbiddenRes = await invokeServerlessHandler('/api/vercel?__zhongxue_path=conversation', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -169,7 +178,7 @@ describe('Vercel Deployment & Serverless Readiness', () => {
     });
 
     it('returns JSON 404 for unknown /api/* routes via rewritten path', async () => {
-      const res = await invokeServerlessHandler('/api/index?__zhongxue_path=does-not-exist');
+      const res = await invokeServerlessHandler('/api/vercel?__zhongxue_path=does-not-exist');
       expect(res.status).toBe(404);
       const data = res.json() as { error?: { code?: string } };
       expect(data.error?.code).toBe('NOT_FOUND');
