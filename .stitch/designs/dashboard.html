@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-background" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZhongXue 中學 · Nhật ký thực địa Đài Loan</title>
+<!-- Google Fonts: Newsreader (Editorial Serif), Be Vietnam Pro (Readable VN Body), Public Sans (Clean Label/UI) -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&amp;family=Public+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Theme Configuration -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-background": "#1b1c17",
+            "tertiary-fixed-dim": "#ffb4a9",
+            "tertiary-container": "#904b42",
+            "inverse-on-surface": "#f3f1e9",
+            "surface-bright": "#fbf9f1",
+            "secondary-fixed": "#ffdbd1",
+            "outline": "#6f7974",
+            "primary-fixed-dim": "#89d5ba",
+            "outline-variant": "#bec9c3",
+            "error": "#ba1a1a",
+            "on-secondary-fixed-variant": "#80290f",
+            "primary-fixed": "#a4f2d6",
+            "on-tertiary-fixed": "#3a0906",
+            "on-surface": "#1b1c17",
+            "surface-variant": "#e4e3db",
+            "secondary-container": "#fe8765",
+            "on-primary-fixed-variant": "#00513f",
+            "surface-container-lowest": "#ffffff",
+            "on-primary-container": "#9be9cd",
+            "primary": "#00513f",
+            "surface-container-low": "#f6f4ec",
+            "surface-dim": "#dcdad2",
+            "surface-container": "#f0eee6",
+            "on-primary": "#ffffff",
+            "on-error-container": "#93000a",
+            "error-container": "#ffdad6",
+            "on-primary-fixed": "#002117",
+            "tertiary": "#73342c",
+            "primary-container": "#176b55",
+            "background": "#fbf9f1",
+            "tertiary-fixed": "#ffdad5",
+            "on-secondary-fixed": "#3b0900",
+            "secondary": "#a04024",
+            "on-tertiary-container": "#ffcec7",
+            "inverse-surface": "#30312c",
+            "surface-container-high": "#eae8e0",
+            "on-surface-variant": "#3f4944",
+            "on-tertiary": "#ffffff",
+            "on-secondary-container": "#742006",
+            "on-tertiary-fixed-variant": "#73342c",
+            "secondary-fixed-dim": "#ffb5a0",
+            "inverse-primary": "#89d5ba",
+            "surface-tint": "#166b55",
+            "surface-container-highest": "#e4e3db",
+            "on-secondary": "#ffffff",
+            "on-error": "#ffffff",
+            "surface": "#fbf9f1"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "fontFamily": {
+            "headline": ["Newsreader", "serif"],
+            "display": ["Newsreader", "serif"],
+            "body": ["Be Vietnam Pro", "sans-serif"],
+            "label": ["Public Sans", "sans-serif"]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    /* Traditional stamp seal style */
+    .stamp-seal {
+      background-color: #a04024;
+      box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.45);
+    }
+    ruby {
+      ruby-position: over;
+    }
+    rt {
+      font-family: 'Public Sans', sans-serif;
+      font-size: 0.65em;
+      letter-spacing: 0.04em;
+      color: #3f4944;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body min-h-screen selection:bg-primary selection:text-surface-container-lowest antialiased">
+<!-- ==================== SIDEBAR ==================== -->
+<aside class="fixed left-0 top-0 bottom-0 h-full w-72 z-40 flex flex-col justify-between px-6 py-8 bg-surface-container-low border-r border-outline-variant shrink-0">
+<!-- Brand / Editorial Header -->
+<div class="flex flex-col gap-6">
+<div class="flex items-center gap-3">
+<!-- Vermilion Square Seal Icon -->
+<div class="stamp-seal w-11 h-11 rounded-lg flex items-center justify-center text-surface-container-lowest font-headline font-bold text-2xl tracking-tight select-none shadow-sm shrink-0">
+          中
+        </div>
+<div>
+<span class="font-headline text-2xl font-bold tracking-tight text-primary block leading-tight">ZhongXue 中學</span>
+<span class="font-body text-xs font-medium text-on-surface-variant tracking-normal block mt-0.5">Nhật ký thực địa Đài Loan</span>
+</div>
+</div>
+<!-- Quick Action / Notebook CTA -->
+<button class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-surface-container-high hover:bg-surface-container text-primary font-body text-sm font-medium border border-outline-variant/60 transition-colors duration-150 group">
+<span class="material-symbols-outlined text-[18px] text-primary group-hover:rotate-90 transition-transform duration-200">add</span>
+<span>Ghi chú mới</span>
+</button>
+<!-- Main Navigation Menu -->
+<nav class="flex flex-col gap-1.5 mt-2">
+<!-- Tab 1: Hôm nay (Active) -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-primary bg-surface-container-high font-semibold transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">today</span>
+<span class="font-body text-sm">Hôm nay</span>
+<span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary"></span>
+</a>
+<!-- Tab 2: Lộ trình -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant font-normal hover:bg-surface-container hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]">map</span>
+<span class="font-body text-sm">Lộ trình</span>
+</a>
+<!-- Tab 3: Ôn tập -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant font-normal hover:bg-surface-container hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]">psychology</span>
+<span class="font-body text-sm">Ôn tập</span>
+</a>
+<!-- Tab 4: Từ điển -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant font-normal hover:bg-surface-container hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]">menu_book</span>
+<span class="font-body text-sm">Từ điển</span>
+</a>
+<!-- Tab 5: Hội thoại -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant font-normal hover:bg-surface-container hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]">forum</span>
+<span class="font-body text-sm">Hội thoại</span>
+</a>
+<!-- Tab 6: Tiến độ -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant font-normal hover:bg-surface-container hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]">insights</span>
+<span class="font-body text-sm">Tiến độ</span>
+</a>
+</nav>
+</div>
+<!-- Sidebar Bottom: Learner Profile & Auxiliary Links -->
+<div class="pt-6 border-t border-outline-variant flex flex-col gap-4">
+<!-- Learner info card -->
+<div class="flex items-center gap-3 p-2 rounded-lg bg-surface-container/60">
+<div class="w-9 h-9 rounded-full bg-secondary text-on-secondary font-headline font-semibold flex items-center justify-center text-sm shadow-sm shrink-0">
+          MA
+        </div>
+<div class="flex flex-col min-w-0">
+<span class="font-body text-xs font-semibold text-on-surface truncate">Minh Anh</span>
+<span class="font-label text-[11px] text-primary flex items-center gap-1">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>
+            Học viên mới · A1
+          </span>
+</div>
+</div>
+<!-- Footer Tabs -->
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant font-normal hover:bg-surface-container hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+<span class="font-body text-xs font-medium">Cài đặt</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant font-normal hover:bg-surface-container hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">help</span>
+<span class="font-body text-xs font-medium">Trợ giúp</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- ==================== TOP NAVIGATION BAR ==================== -->
+<header class="sticky top-0 z-30 flex justify-between items-center w-full px-10 h-16 ml-72 max-w-[calc(100%-18rem)] bg-background border-b border-outline-variant">
+<!-- Breadcrumb & Context -->
+<div class="flex items-center gap-3 text-sm">
+<span class="font-headline text-lg italic text-on-surface">Không gian học tập</span>
+<span class="text-outline-variant text-xs font-light">/</span>
+<span class="text-primary font-medium font-body text-sm">Hôm nay</span>
+</div>
+<!-- Date, Weather & Trailing Icon Actions -->
+<div class="flex items-center gap-5">
+<div class="hidden lg:flex items-center gap-2 text-xs text-on-surface-variant font-label bg-surface-container-low px-3 py-1.5 rounded-full border border-outline-variant/50">
+<span class="material-symbols-outlined text-[15px] text-secondary">cloud</span>
+<span>Thứ Năm, 24 tháng 10 · Đài Bắc 23°C êm dịu</span>
+</div>
+<div class="flex items-center gap-1">
+<button class="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-150" title="Đánh dấu trang">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+<button class="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-150 relative" title="Thông báo">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-secondary"></span>
+</button>
+<div class="h-4 w-px bg-outline-variant mx-1"></div>
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-150">
+<span class="material-symbols-outlined text-[16px]">settings</span>
+<span>Cài đặt</span>
+</button>
+</div>
+</div>
+</header>
+<!-- ==================== MAIN CONTENT CANVAS ==================== -->
+<main class="ml-72 p-10 max-w-[1400px] flex flex-col gap-9 pb-16">
+<!-- 1. Editorial Greeting -->
+<section class="flex flex-col gap-1.5 border-b border-outline-variant pb-6">
+<h1 class="font-headline text-3xl md:text-4xl font-semibold text-on-background tracking-tight">
+        Mỗi ngày một chút, gần Đài Loan hơn.
+      </h1>
+<p class="font-body text-sm md:text-base text-on-surface-variant max-w-2xl leading-relaxed">
+        Chào buổi sáng, Minh Anh. Bạn đã sẵn sàng mở đầu hành trình với một tách trà sữa ấm áp chưa?
+      </p>
+</section>
+<!-- 2. Asymmetric Main Section: Hero Card + Sidebar Widgets -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Left Main Hero Banner (7 cols) -->
+<div class="lg:col-span-7 bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden flex flex-col justify-between">
+<div class="grid grid-cols-1 md:grid-cols-12">
+<!-- Lesson Information & Key Character Spotlight (7 cols) -->
+<div class="p-7 md:col-span-7 flex flex-col justify-between">
+<div>
+<div class="flex items-center gap-2 mb-3">
+<span class="px-2.5 py-0.5 rounded text-[11px] font-label font-semibold tracking-wider text-secondary bg-secondary-fixed/50 uppercase">
+                  BÀI HỌC ĐẦU TIÊN · 01
+                </span>
+<span class="text-xs text-on-surface-variant">· Đài Bắc</span>
+</div>
+<h2 class="font-headline text-2xl font-bold text-on-background tracking-tight mb-4">
+                Một ly trà, một cuộc trò chuyện
+              </h2>
+<!-- Highlighted Phrase with Ruby / Pinyin -->
+<div class="p-4 rounded-lg bg-surface-container-low border border-outline-variant/60 my-2">
+<div class="text-xs text-on-surface-variant font-label mb-1.5 flex items-center justify-between">
+<span>MẪU CÂU CỐT LÕI</span>
+<button class="text-primary hover:text-primary-container inline-flex items-center gap-1 text-[11px] font-medium transition-colors" title="Nghe phát âm">
+<span class="material-symbols-outlined text-[15px]">volume_up</span>
+                    Nghe mẫu
+                  </button>
+</div>
+<div class="py-1">
+<ruby class="font-headline text-3xl font-medium text-on-surface tracking-wide">
+                    我<rt>wǒ</rt>
+                    要<rt>yào</rt>
+                    一<rt>yī</rt>
+                    杯<rt>bēi</rt>
+                    珍<rt>zhēn</rt>
+                    珠<rt>zhū</rt>
+                    奶<rt>nǎi</rt>
+                    茶<rt>chá</rt>
+</ruby>
+</div>
+<p class="font-body text-xs text-on-surface-variant mt-3 border-t border-outline-variant/40 pt-2 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-primary">translate</span>
+<span class="font-medium text-on-surface">Tôi muốn một ly trà sữa trân châu</span>
+</p>
+</div>
+<!-- Metadata Chips -->
+<div class="flex flex-wrap items-center gap-3 text-xs text-on-surface-variant mt-4 font-label">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-primary">school</span>
+                  Cấp độ A1
+                </span>
+<span class="w-1 h-1 rounded-full bg-outline"></span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-primary">schedule</span>
+                  8 phút
+                </span>
+<span class="w-1 h-1 rounded-full bg-outline"></span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-primary">format_quote</span>
+                  5 từ vựng thực tế
+                </span>
+</div>
+</div>
+<!-- Action Button -->
+<div class="mt-6 pt-4 border-t border-outline-variant/50 flex items-center gap-3">
+<button class="flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-3 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-body text-sm font-semibold transition-colors duration-150 shadow-sm">
+<span>Bắt đầu học ngay</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+<button class="w-11 h-11 rounded-lg border border-outline-variant flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-150" title="Xem trước âm thanh">
+<span class="material-symbols-outlined text-[20px]">hearing</span>
+</button>
+</div>
+</div>
+<!-- Seamless Illustrated Scene from prompt image https://lh3.googleusercontent.com/aida-public/AB6AXuDN3_0Nv59C2J4NuF6B-cPQ9Ox_tbf3Zzs4GtftpbjVb4d3fdidJknw5R28jCOf70tdXvu6ttVSgHgNWMD8IVyg9ak8OYhQDI75GH4mDLQVaCqMN_4tEJEhbAK1nb-gs_CY8Ah9P6URXKqpiOJuEZJaT4zWfBjxY9OXny4RiZC29AJl7tBoCWy13q0V4A31F_EYpTN_K0egOgrNgtmXuITtWeXc5NgvF5K9vEdzIBhRDLLiVpnYNTSM7GGgMg_UPNvvu5ZndFtpaBs (5 cols) -->
+<div class="md:col-span-5 h-64 md:h-auto min-h-[300px] relative overflow-hidden bg-surface-container-high border-t md:border-t-0 md:border-l border-outline-variant">
+<img alt="Ấm áp tiệm trà sữa Chun Shui Tang Đài Loan giữa con ngõ phố cổ" class="w-full h-full object-cover object-center transform hover:scale-105 transition-transform duration-500 ease-out" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDN3_0Nv59C2J4NuF6B-cPQ9Ox_tbf3Zzs4GtftpbjVb4d3fdidJknw5R28jCOf70tdXvu6ttVSgHgNWMD8IVyg9ak8OYhQDI75GH4mDLQVaCqMN_4tEJEhbAK1nb-gs_CY8Ah9P6URXKqpiOJuEZJaT4zWfBjxY9OXny4RiZC29AJl7tBoCWy13q0V4A31F_EYpTN_K0egOgrNgtmXuITtWeXc5NgvF5K9vEdzIBhRDLLiVpnYNTSM7GGgMg_UPNvvu5ZndFtpaBs"/>
+<div class="absolute bottom-3 right-3 bg-on-background/70 backdrop-blur-sm text-surface-container-lowest font-label text-[10px] px-2 py-0.5 rounded tracking-wide">
+              Vĩnh Khang Nhai · 永康街
+            </div>
+</div>
+</div>
+</div>
+<!-- Right Column: Goal & Word of the Day (5 cols) -->
+<div class="lg:col-span-5 flex flex-col gap-6">
+<!-- Card 1: Daily Goal Card (Honest Zero Initial Progress) -->
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-primary">target</span>
+<span class="font-body text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Mục tiêu hôm nay</span>
+</div>
+<span class="font-label text-sm font-semibold text-primary">0 / 15 phút</span>
+</div>
+<!-- Progress Bar - Honest 0% -->
+<div class="w-full bg-surface-container rounded-full h-2 overflow-hidden border border-outline-variant/30">
+<div class="bg-primary h-full rounded-full transition-all duration-300" style="width: 0%;"></div>
+</div>
+<div class="flex items-start gap-3 p-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40">
+<span class="material-symbols-outlined text-[18px] text-secondary shrink-0 mt-0.5">spa</span>
+<p class="font-body text-xs text-on-surface-variant leading-relaxed">
+              Chưa có áp lực nào cả. Chỉ cần <span class="text-on-surface font-medium">8 phút</span> của bài học đầu tiên là bạn đã hoàn thành hơn nửa chặng đường hôm nay.
+            </p>
+</div>
+</div>
+<!-- Card 2: Word of the Day (Từ vựng của ngày) -->
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm flex flex-col gap-4">
+<div class="flex items-center justify-between border-b border-outline-variant/60 pb-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-secondary">stylus</span>
+<span class="font-body text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Từ vựng của ngày</span>
+</div>
+<div class="flex items-center gap-1">
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors" title="Phát âm">
+<span class="material-symbols-outlined text-[18px]">volume_up</span>
+</button>
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors" title="Lưu vào sổ tay">
+<span class="material-symbols-outlined text-[18px]">bookmark_add</span>
+</button>
+</div>
+</div>
+<!-- Character Display -->
+<div class="flex items-baseline gap-4 pt-1">
+<div class="font-headline text-5xl font-medium text-primary tracking-wide">
+              謝謝
+            </div>
+<div class="flex flex-col">
+<span class="font-label text-base font-semibold text-on-surface tracking-wide">xièxie</span>
+<span class="font-body text-xs text-on-surface-variant">Âm Hán Việt: <em class="font-normal">Tạ tạ</em></span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-label text-xs font-semibold px-2 py-0.5 rounded bg-surface-container text-on-surface">Nghĩa</span>
+<span class="font-body text-sm font-medium text-on-surface">Cảm ơn, cám ơn</span>
+</div>
+<!-- Cultural Fieldnote / Practical usage tip -->
+<div class="p-3 rounded-lg bg-surface-container-low border-l-2 border-secondary text-xs text-on-surface-variant font-body leading-relaxed">
+<strong class="font-semibold text-on-surface">Ghi chú đời sống:</strong> Người Đài Loan thường nói <span class="font-medium text-primary">謝謝</span> bạn rất nhỏ nhẹ khi vừa nhận hóa đơn, nhận trà sữa hoặc khi tài xế xe buýt mở cửa cho bạn xuống xe.
+          </div>
+</div>
+</div>
+</section>
+<!-- 3. Bottom Section: Scenario Lessons & Weekly Rhythm -->
+<section class="flex flex-col gap-6 pt-4">
+<!-- Section Title -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-2 border-b border-outline-variant pb-4">
+<div>
+<h3 class="font-headline text-2xl font-semibold text-on-background">
+            Hành trang hôm nay
+          </h3>
+<p class="font-body text-xs md:text-sm text-on-surface-variant mt-0.5">
+            Các tình huống đời thường thông dụng nhất tại Đài Loan
+          </p>
+</div>
+<a class="font-body text-xs font-semibold text-primary hover:text-primary-container inline-flex items-center gap-1 transition-colors" href="#">
+          Xem tất cả 12 chủ đề thực tế
+          <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</a>
+</div>
+<!-- 3 Scenario Lesson Cards in a 3-Column Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Scenario 1: MRT -->
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm hover:border-primary/50 transition-all duration-200 flex flex-col justify-between group">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-[20px]">train</span>
+</span>
+<span class="font-label text-xs text-on-surface-variant font-medium bg-surface-container px-2 py-0.5 rounded">
+                A1 · 10 phút
+              </span>
+</div>
+<div class="flex items-baseline gap-2 mb-1.5">
+<h4 class="font-headline text-lg font-bold text-on-background">Đi tàu điện MRT</h4>
+<span class="font-headline text-sm text-primary font-medium">搭捷運</span>
+</div>
+<p class="font-body text-xs text-on-surface-variant leading-relaxed mb-6">
+              Cách nạp thẻ EasyCard (悠遊卡), hỏi tuyến ga chuyển tiếp và tìm lối ra cổng xuất phù hợp.
+            </p>
+</div>
+<div class="pt-4 border-t border-outline-variant/40 flex items-center justify-between">
+<span class="font-label text-[11px] text-outline font-medium">Chưa bắt đầu</span>
+<button class="font-body text-xs font-semibold text-primary hover:text-primary-container inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              Xem bài học
+              <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Scenario 2: Dạ thị Night Market -->
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm hover:border-primary/50 transition-all duration-200 flex flex-col justify-between group">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary group-hover:bg-secondary group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-[20px]">storefront</span>
+</span>
+<span class="font-label text-xs text-on-surface-variant font-medium bg-surface-container px-2 py-0.5 rounded">
+                A1 · 12 phút
+              </span>
+</div>
+<div class="flex items-baseline gap-2 mb-1.5">
+<h4 class="font-headline text-lg font-bold text-on-background">Gọi món ăn tại Dạ thị</h4>
+<span class="font-headline text-sm text-secondary font-medium">夜市點餐</span>
+</div>
+<p class="font-body text-xs text-on-surface-variant leading-relaxed mb-6">
+              Gọi bánh bao hàu, mì bò, dặn người bán làm ít đường hoặc mang đi ăn dọc đường (外帶).
+            </p>
+</div>
+<div class="pt-4 border-t border-outline-variant/40 flex items-center justify-between">
+<span class="font-label text-[11px] text-outline font-medium">Chưa bắt đầu</span>
+<button class="font-body text-xs font-semibold text-primary hover:text-primary-container inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              Xem bài học
+              <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Scenario 3: Making Friends -->
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm hover:border-primary/50 transition-all duration-200 flex flex-col justify-between group">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-[20px]">people</span>
+</span>
+<span class="font-label text-xs text-on-surface-variant font-medium bg-surface-container px-2 py-0.5 rounded">
+                A1 · 7 phút
+              </span>
+</div>
+<div class="flex items-baseline gap-2 mb-1.5">
+<h4 class="font-headline text-lg font-bold text-on-background">Làm quen bạn mới</h4>
+<span class="font-headline text-sm text-primary font-medium">結交新朋友</span>
+</div>
+<p class="font-body text-xs text-on-surface-variant leading-relaxed mb-6">
+              Lời chào xã giao chân thành, tự giới thiệu quê hương Việt Nam và cách trao đổi liên hệ LINE.
+            </p>
+</div>
+<div class="pt-4 border-t border-outline-variant/40 flex items-center justify-between">
+<span class="font-label text-[11px] text-outline font-medium">Chưa bắt đầu</span>
+<button class="font-body text-xs font-semibold text-primary hover:text-primary-container inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              Xem bài học
+              <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Compact Weekly Activity Tracker (Honest Zero State) -->
+<div class="bg-surface-container-low rounded-xl p-5 border border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-[20px]">calendar_view_week</span>
+<div>
+<span class="font-body text-xs font-semibold uppercase tracking-wider text-on-surface block">Nhịp độ tuần này</span>
+<span class="font-body text-xs text-on-surface-variant">Tuần mới bắt đầu từ bước chân đầu tiên.</span>
+</div>
+</div>
+<!-- 7 Days Pills with quiet empty state dots -->
+<div class="flex items-center gap-2">
+<!-- Mon -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label text-[11px] text-on-surface-variant">T2</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+</div>
+</div>
+<!-- Tue -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label text-[11px] text-on-surface-variant">T3</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+</div>
+</div>
+<!-- Wed -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label text-[11px] text-on-surface-variant">T4</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+</div>
+</div>
+<!-- Thu (Today) -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label text-[11px] font-bold text-primary">T5</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container-lowest border-2 border-primary flex items-center justify-center shadow-xs">
+<span class="w-2 h-2 rounded-full bg-primary/40 animate-pulse"></span>
+</div>
+</div>
+<!-- Fri -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label text-[11px] text-on-surface-variant">T6</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+</div>
+</div>
+<!-- Sat -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label text-[11px] text-on-surface-variant">T7</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+</div>
+</div>
+<!-- Sun -->
+<div class="flex flex-col items-center gap-1">
+<span class="font-label text-[11px] text-on-surface-variant">CN</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+</body></html>

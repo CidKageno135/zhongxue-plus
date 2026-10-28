@@ -1,0 +1,486 @@
+﻿{
+    "checkpointCommit":  "1cf25f01b7d7f170d34f24ab97b80f503d0fa1b9",
+    "branch":  "remediation/flash-3.8-high",
+    "generatedAt":  "2026-10-22T18:17:41.2364641+08:00",
+    "generator":  {
+                      "agentId":  "I20",
+                      "role":  "Integration Builder",
+                      "model":  "Gemini 3.8 Flash (High) [inherited from main session]"
+                  },
+    "sourceRepo":  "C:/Users/thanh/Desktop/ECC/projects/zhongxue-new",
+    "sourceHead":  "eb4de8ec9fb10371855a12161231c66d2b00b432",
+    "isolatedRepo":  "C:/Users/thanh/Desktop/ECC/projects/zhongxue-remediation",
+    "totalFiles":  94,
+    "files":  [
+                  {
+                      "path":  ".env.example",
+                      "sha256":  "b7a1a7fa397babe2ad2808ad7b37b34812453f15a97758a127efbdcb9e0e3834",
+                      "sizeBytes":  1801
+                  },
+                  {
+                      "path":  ".gitignore",
+                      "sha256":  "ff93e1e081921ab30ebf234e6f3a0bf8fdde5773d89a29a9c484aa5623c8a076",
+                      "sizeBytes":  97
+                  },
+                  {
+                      "path":  ".stitch/designs/dashboard.html",
+                      "sha256":  "9e9ed606af6ee599be63bd53b8e750c3eb97a14f8e2e9bdcac10817cf02be971",
+                      "sizeBytes":  29926
+                  },
+                  {
+                      "path":  ".stitch/designs/dashboard.png",
+                      "sha256":  "ebfc16df09cd33a3a8dbe5a6685a09b66eebd543ac5faa1acd21d29adde30ff0",
+                      "sizeBytes":  108557
+                  },
+                  {
+                      "path":  ".stitch/designs/lesson-mobile.html",
+                      "sha256":  "650fc3fdb602a27eb690f913f34ce5ab2367c3229cec3f703da78349a140bc7e",
+                      "sizeBytes":  23980
+                  },
+                  {
+                      "path":  ".stitch/designs/lesson-mobile.png",
+                      "sha256":  "f3c8baa0e24029c153ba3de63773823d9cb97fb60005a549564db29b1e10af0c",
+                      "sizeBytes":  39392
+                  },
+                  {
+                      "path":  ".stitch/metadata.json",
+                      "sha256":  "6ce101b82a373c2d76723b15d7d11e7cb705124a7610a36578b2ea690b7ce6f8",
+                      "sizeBytes":  793
+                  },
+                  {
+                      "path":  "DESIGN.md",
+                      "sha256":  "bcf972024db9d995f7672ca6d47859f88889a4ca99836fb5101acd99b7d7eda8",
+                      "sizeBytes":  5620
+                  },
+                  {
+                      "path":  "README.md",
+                      "sha256":  "3340dc3ca3919875280ce06bbe6ca518d99188c41bbf85fca24b08d9c6bccb5a",
+                      "sizeBytes":  9350
+                  },
+                  {
+                      "path":  "data/dictionary/CVDICT.u8.gz",
+                      "sha256":  "3f86cb17f70cf7b4e179885a7b9baf36997a4af0dee23fc13410c427ea6f0649",
+                      "sizeBytes":  3912750
+                  },
+                  {
+                      "path":  "data/dictionary/NOTICE.md",
+                      "sha256":  "213a68eedd893c8e2592282aae3c8fab29addc9a3f036a96a068e8ddbdf8d7d0",
+                      "sizeBytes":  1034
+                  },
+                  {
+                      "path":  "data/dictionary/metadata.json",
+                      "sha256":  "902ac1d0d774e24a9f37a965f357ea9de333dd7361933dc2df3a9c17672a8e6d",
+                      "sizeBytes":  713
+                  },
+                  {
+                      "path":  "docs/API-CONTRACT.md",
+                      "sha256":  "5a4896c9c4f1da80e55edf27442da9c387ffba13566a9ba0d8b8d0bf2fddc6da",
+                      "sizeBytes":  26927
+                  },
+                  {
+                      "path":  "docs/PLAN.md",
+                      "sha256":  "eda1daf5d12b4e643200aa205bf544822f9d8124a60740128c068c90a4b3bd78",
+                      "sizeBytes":  5499
+                  },
+                  {
+                      "path":  "docs/PROGRESS.md",
+                      "sha256":  "04eea45fe75b45235bad9fb5305b0ce9b78db7e96d7b3fa26a246a8c01881a99",
+                      "sizeBytes":  10650
+                  },
+                  {
+                      "path":  "docs/QA.md",
+                      "sha256":  "98fdcd90baa28ef7d0029a518ee91d8f130852e9a35a28e291f6f8bccde8c635",
+                      "sizeBytes":  7564
+                  },
+                  {
+                      "path":  "docs/adr/0001-greenfield-local-first.md",
+                      "sha256":  "e04dc12e920d6b6345d0171ab064f565e40323b0bfa80f9df0c4dba433ae4de0",
+                      "sizeBytes":  2583
+                  },
+                  {
+                      "path":  "docs/adr/0001-shared-dev-prod-backend-and-security.md",
+                      "sha256":  "5a4c68c254afc7c4d6e58f9f02c00eb7c8d9041bdb3d4b5c3f101b1c803627a3",
+                      "sizeBytes":  10143
+                  },
+                  {
+                      "path":  "docs/adr/README.md",
+                      "sha256":  "514cdd634ee9f0be4a4e655080aa5efba8e3db0cc254cdd2a40f5a912648a0ef",
+                      "sizeBytes":  404
+                  },
+                  {
+                      "path":  "docs/adr/template.md",
+                      "sha256":  "e3ed1a0431945146ac1a3ae7b205dfc361714551f0bc55a7393acea298ba354c",
+                      "sizeBytes":  190
+                  },
+                  {
+                      "path":  "docs/desktop-preview.png",
+                      "sha256":  "c094d90ca9a3db0419ed3c3b122366ded40235acbbb190fb652cf724b6e67481",
+                      "sizeBytes":  386124
+                  },
+                  {
+                      "path":  "docs/mobile-preview.png",
+                      "sha256":  "c52f7925ae6dd3e8aea8e26a41d00f3a1c2cd36afeaf298840292fe2952d5582",
+                      "sizeBytes":  202859
+                  },
+                  {
+                      "path":  "eslint.config.js",
+                      "sha256":  "366c30f61332a4b41484f38c9213677bc6eddd5717f9b11c853de007580018c5",
+                      "sizeBytes":  464
+                  },
+                  {
+                      "path":  "index.html",
+                      "sha256":  "2b5db09948cb739b43c0dfd8c4bb2d6f417d8931bf0aadfcc7fbfca78ac804d6",
+                      "sizeBytes":  1134
+                  },
+                  {
+                      "path":  "package-lock.json",
+                      "sha256":  "9de39fb43f194025cced493022858069905c89a85456b4240fecb25bab21fe30",
+                      "sizeBytes":  156837
+                  },
+                  {
+                      "path":  "package.json",
+                      "sha256":  "95dd32b4a39e5e63df05ae262d3cf95a63251300d79a16459e6dde6a4a3eec36",
+                      "sizeBytes":  1416
+                  },
+                  {
+                      "path":  "playwright.config.ts",
+                      "sha256":  "db5ac53608374b05ed201d236d694714c3ba2d25bab7481ba7e1d9322999996b",
+                      "sizeBytes":  969
+                  },
+                  {
+                      "path":  "playwright.prod.config.ts",
+                      "sha256":  "2c89ac706030d9a7cef69175bdc184f2995004c3b7cbfecf3482b8ba9a28ced4",
+                      "sizeBytes":  847
+                  },
+                  {
+                      "path":  "public/assets/tea-shop.png",
+                      "sha256":  "e0da2a1b3e62c29c19fa7b3aee18c68534c7e45722d351d9f999a46ea3f94cc2",
+                      "sizeBytes":  74961
+                  },
+                  {
+                      "path":  "server/ai.ts",
+                      "sha256":  "be9f7945717adb320096d5438de9ef4900dc997f6c164c02850f702c3a35c589",
+                      "sizeBytes":  21266
+                  },
+                  {
+                      "path":  "server/aiFallback.ts",
+                      "sha256":  "32eeeaa66c5e5df2cf99b3596d56fba9c501b3ebf30d97930f302da5ce778514",
+                      "sizeBytes":  22824
+                  },
+                  {
+                      "path":  "server/app.ts",
+                      "sha256":  "cb8e6c86351f4e7fd00b22c352dc8ba24d76fa7bb995c0d9de4fad00dced9352",
+                      "sizeBytes":  4045
+                  },
+                  {
+                      "path":  "server/dictionary.ts",
+                      "sha256":  "5d997be5e6a3e98078d5bea0f1955376e6b0dea2810067f9dc6e66058aecd5f7",
+                      "sizeBytes":  20126
+                  },
+                  {
+                      "path":  "server/errors.ts",
+                      "sha256":  "f662b91348695cce5d6aa392dec4a63ab1bfdb92dfcf5ed9fb4ed9cdb42c9440",
+                      "sizeBytes":  7134
+                  },
+                  {
+                      "path":  "server/index.ts",
+                      "sha256":  "705c09a4244bade9976974a1ff468177e09c0c06cf0441bb8a33f58e1f0023ef",
+                      "sizeBytes":  5507
+                  },
+                  {
+                      "path":  "server/routes.ts",
+                      "sha256":  "a4b94f3c93c9d204172f64018ad214173c7194c500ff4dd460277d43fdf0c2a7",
+                      "sizeBytes":  8133
+                  },
+                  {
+                      "path":  "server/security.ts",
+                      "sha256":  "b2f2c89fef61656771729c398a22ef971a9b476c986717c7dbfcb15d8d2bd50d",
+                      "sizeBytes":  17603
+                  },
+                  {
+                      "path":  "server/static.ts",
+                      "sha256":  "fe78252e0038b1abcbb5f40173b7e31290e3debc468f7691f10030ea56a2edc3",
+                      "sizeBytes":  8461
+                  },
+                  {
+                      "path":  "server/validation.ts",
+                      "sha256":  "5897670b30e02f5037743d6757ae216142ccd9dd98a95b1d05bc24a83d88bf3a",
+                      "sizeBytes":  16974
+                  },
+                  {
+                      "path":  "src/App.tsx",
+                      "sha256":  "e749ab8663ab02ebfd3cdd593a0bf75800dd7e3fdb59e1a55e8fa681e3ba4b65",
+                      "sizeBytes":  8678
+                  },
+                  {
+                      "path":  "src/components/Button.tsx",
+                      "sha256":  "5e75841332355cdfb9b266ef6851314e54b5487d8539acbc12e77f5a3267f52c",
+                      "sizeBytes":  837
+                  },
+                  {
+                      "path":  "src/components/HandwritingPad.tsx",
+                      "sha256":  "5837b03866d0bb951e1d1d7e8e91688c25d938bb1fd97b19adf8d59edd016b0c",
+                      "sizeBytes":  26803
+                  },
+                  {
+                      "path":  "src/components/QuizAccuracyCard.tsx",
+                      "sha256":  "d995ce322a13276cd44cb2e452c24a9f4fcae979250bc3b7a0a10b053eb2632e",
+                      "sizeBytes":  1974
+                  },
+                  {
+                      "path":  "src/components/Sidebar.tsx",
+                      "sha256":  "306b18db1ebc0fd9aceafb39dbfc51b0e9588c83409d3a43bb644482c273dd60",
+                      "sizeBytes":  5992
+                  },
+                  {
+                      "path":  "src/components/SpeakButton.tsx",
+                      "sha256":  "9737f0400ca2e7c92c757a1b7e9e89a80e1b0ec504477cafa8b5781f67c826c5",
+                      "sizeBytes":  2394
+                  },
+                  {
+                      "path":  "src/components/Topbar.tsx",
+                      "sha256":  "706b4543ce98245fc68e0fcbb51b5d7410560dac79f81a3bbbdedde0ff174831",
+                      "sizeBytes":  6205
+                  },
+                  {
+                      "path":  "src/components/WeeklyProgressCard.tsx",
+                      "sha256":  "bfddf72f01ae5f6dd2946946b3c47e42e01fd96ec67e3b8c4fe0e8d8168fa2ae",
+                      "sizeBytes":  2432
+                  },
+                  {
+                      "path":  "src/components/WordCard.tsx",
+                      "sha256":  "37a87b859cda5ddc3762032ceea868fa471e4f819e22a019950afac997dc1c80",
+                      "sizeBytes":  2765
+                  },
+                  {
+                      "path":  "src/data/etymologyData.ts",
+                      "sha256":  "40387f23fc88fc7fe32988d2703e8c36ee4afe997a1ad7fd02a0c89a60ab3c97",
+                      "sizeBytes":  36140
+                  },
+                  {
+                      "path":  "src/data/lessons.ts",
+                      "sha256":  "9b7a57aeb5f140a21bc9b96a5f6018d4af73e80a48cd9934766566f5482c09f0",
+                      "sizeBytes":  46140
+                  },
+                  {
+                      "path":  "src/domain/learning.ts",
+                      "sha256":  "b99d01035816b7387ac28eea40f720da03d6809a045618f1f313348aa9be8e48",
+                      "sizeBytes":  36505
+                  },
+                  {
+                      "path":  "src/domain/searchNormalization.ts",
+                      "sha256":  "c65e2a3d03a6a710e95f9749c93c4f90e72cb7ecd50b3aa3cfce91dabb5c3df1",
+                      "sizeBytes":  13002
+                  },
+                  {
+                      "path":  "src/main.tsx",
+                      "sha256":  "d3618f9874a966acb67b63d328465376cab0528d061a14bb6dc9233fe832e33d",
+                      "sizeBytes":  223
+                  },
+                  {
+                      "path":  "src/services/api.ts",
+                      "sha256":  "58eb81daacff70ca6af0f4f9663d99ce02600f53f5f2f398a522a3bab7f3c3b8",
+                      "sizeBytes":  50750
+                  },
+                  {
+                      "path":  "src/services/speech.ts",
+                      "sha256":  "77e3cdc6ba7fe40870c83333652ae2e373051829740f15b536de815c86b5eadf",
+                      "sizeBytes":  17513
+                  },
+                  {
+                      "path":  "src/styles.css",
+                      "sha256":  "e3ef3786d06561348c621a8d98d852a64cb3aabded3ad5852c555678ec2911b9",
+                      "sizeBytes":  27589
+                  },
+                  {
+                      "path":  "src/types.ts",
+                      "sha256":  "41110f6b02d7246196dd5fd54dee8f9a9886cdf7c5f3c933dee9e3c3d99c4e49",
+                      "sizeBytes":  4643
+                  },
+                  {
+                      "path":  "src/views/AiChatView.tsx",
+                      "sha256":  "73cd62aee08a68881f62c6342ba85c2ede8ad194e31fd8ea02bac69e0f8c1268",
+                      "sizeBytes":  79364
+                  },
+                  {
+                      "path":  "src/views/ConversationListView.tsx",
+                      "sha256":  "b989142dca20e2128e0af148be37c718a13c780d02e3bb7151aeed764fba012d",
+                      "sizeBytes":  13062
+                  },
+                  {
+                      "path":  "src/views/DictionaryView.tsx",
+                      "sha256":  "6eecd8798a38cd6f168da4430ed9fe4b8390b8d6cf5defa03dc6d318527df340",
+                      "sizeBytes":  42957
+                  },
+                  {
+                      "path":  "src/views/LessonFlow.tsx",
+                      "sha256":  "3f5c526d4b27ad5c5198e87fb877fa2934850b3668db59b475a40c4b49752e95",
+                      "sizeBytes":  14978
+                  },
+                  {
+                      "path":  "src/views/PathView.tsx",
+                      "sha256":  "a4ba51c25a45df681c0352ca4d7f14ae7a05722cc6157210e671f0313383f9de",
+                      "sizeBytes":  5337
+                  },
+                  {
+                      "path":  "src/views/ReviewView.tsx",
+                      "sha256":  "4a8d721724685b48c44f645224a792fa2c0d6eff3ca2a08c73fb72a4ff975d07",
+                      "sizeBytes":  48543
+                  },
+                  {
+                      "path":  "src/views/ScenarioFlow.tsx",
+                      "sha256":  "85876e0f95ed35e8af7c3d7796a61b33c1fb6a81457340696303c83e2293e45d",
+                      "sizeBytes":  6213
+                  },
+                  {
+                      "path":  "src/views/SettingsView.tsx",
+                      "sha256":  "438dcbf975e5338f290da55e3ed902be4a69533ca357d8ec39d0a1abef91559e",
+                      "sizeBytes":  85291
+                  },
+                  {
+                      "path":  "src/views/TodayView.tsx",
+                      "sha256":  "55107e8fb85a04f3c64920595d3a76b26860ac062ab9d6727f06595b80aba856",
+                      "sizeBytes":  53022
+                  },
+                  {
+                      "path":  "src/viteApiPlugin.ts",
+                      "sha256":  "0355f0f533c6a7fc3247614253202dbf6181ea4f05a28e9598df3a664858b330",
+                      "sizeBytes":  2333
+                  },
+                  {
+                      "path":  "tests/ai-provider.test.ts",
+                      "sha256":  "9d311e758003cab0a878ff9a2e463dd6fc0ae8fbddb4282a12196c26b3db6937",
+                      "sizeBytes":  20627
+                  },
+                  {
+                      "path":  "tests/api-client.test.ts",
+                      "sha256":  "b9f526ff2cd40958f8e672c6d6d627e5be5c70f0e51997db87985bd88c740ed4",
+                      "sizeBytes":  33400
+                  },
+                  {
+                      "path":  "tests/api-validation.test.ts",
+                      "sha256":  "666309135c122a2f4649f9d4377ff54b472d2610388c2ca7c4536b7391c4f776",
+                      "sizeBytes":  26475
+                  },
+                  {
+                      "path":  "tests/custom-word-storage.test.ts",
+                      "sha256":  "8f9817a68d5d92b6b579ad1bf705499929d9a7c94bdd259f10e9a0555e81ac55",
+                      "sizeBytes":  30976
+                  },
+                  {
+                      "path":  "tests/dictionary-engine.test.ts",
+                      "sha256":  "23edb40a088eff009928f471f999d1e81f90bfde2f40de26925eea8993c18c25",
+                      "sizeBytes":  11324
+                  },
+                  {
+                      "path":  "tests/domain.test.ts",
+                      "sha256":  "0b8871ed051f8637f904fb58e5687d3a677f11c9405dd579a32cbc163c417c41",
+                      "sizeBytes":  15014
+                  },
+                  {
+                      "path":  "tests/e2e/accessibility-regression.spec.ts",
+                      "sha256":  "043862996ca43b0f5172cd82b8c5eff71055af247fe60d04faf34408acff38d4",
+                      "sizeBytes":  9271
+                  },
+                  {
+                      "path":  "tests/e2e/ai-settings.spec.ts",
+                      "sha256":  "eec315a4c3e0bbec7d46cc0ed3fc0adb6b098b875e68f3c0f87b0624eaa1a0c9",
+                      "sizeBytes":  8809
+                  },
+                  {
+                      "path":  "tests/e2e/api-resilience.spec.ts",
+                      "sha256":  "49b5ad14c854a299c5337225a1d4b0662e46f9a07e32ab88eddff21c8b8ca44c",
+                      "sizeBytes":  7026
+                  },
+                  {
+                      "path":  "tests/e2e/handwriting-and-ai.spec.ts",
+                      "sha256":  "05dfe9200a854a4f42db67a06e6268f6277fd238a499854bbf6a1d20aadf5e06",
+                      "sizeBytes":  12025
+                  },
+                  {
+                      "path":  "tests/e2e/handwriting-regression.spec.ts",
+                      "sha256":  "5f289574dcd6f1418458d7eefe7e184ad56e4a10ec12fe9eb50a352063f430ab",
+                      "sizeBytes":  8139
+                  },
+                  {
+                      "path":  "tests/e2e/helpers.ts",
+                      "sha256":  "f95ff9fd083bca759cf98d51dba2cc554815d18cfff99a4b6e18cb14b5fc8f99",
+                      "sizeBytes":  487
+                  },
+                  {
+                      "path":  "tests/e2e/learning.spec.ts",
+                      "sha256":  "ad9338d583555fbc898912d8ac1c23f37fc59b1e87ffc5fba54c5e80991a3629",
+                      "sizeBytes":  4139
+                  },
+                  {
+                      "path":  "tests/e2e/lesson.spec.ts",
+                      "sha256":  "b7f53f3310d1a096821745e6010b80b89591cb14c6de284e382c1f9bd3c2ad61",
+                      "sizeBytes":  11819
+                  },
+                  {
+                      "path":  "tests/e2e/review-regression.spec.ts",
+                      "sha256":  "80c060823eecb5eaa43af1a3224cbaaf3b9a0c140e6ab1ff935e483d9474c50f",
+                      "sizeBytes":  9752
+                  },
+                  {
+                      "path":  "tests/e2e/settings-conversation.spec.ts",
+                      "sha256":  "4f06f5ceb820f915e80bdd70dc59a019d67abb6a1e63b4971f3d2839b228af3c",
+                      "sizeBytes":  13215
+                  },
+                  {
+                      "path":  "tests/fixtures/api/mock-upstream-server.ts",
+                      "sha256":  "498eb92c06abf24c6ae74e0901d330647674b4956834732d5103965072edfc19",
+                      "sizeBytes":  7751
+                  },
+                  {
+                      "path":  "tests/fixtures/api/sentinel-secrets.ts",
+                      "sha256":  "ede6e63abba37c17c6c0d0c37da397a7a75f44db464c60bb23e250ee86891238",
+                      "sizeBytes":  1717
+                  },
+                  {
+                      "path":  "tests/fixtures/api/test-server.ts",
+                      "sha256":  "f4345233982969140867b0cfadce8726fc1eabfc532aef9bfc3facb7959a0bef",
+                      "sizeBytes":  16157
+                  },
+                  {
+                      "path":  "tests/integration/api-security.test.ts",
+                      "sha256":  "6fa6e39aa16808a9a1ddb0c121540d0894075a0ebe45754bf5efd34fa59e5eb4",
+                      "sizeBytes":  17736
+                  },
+                  {
+                      "path":  "tests/integration/production-server.test.ts",
+                      "sha256":  "99b71b1d6516bd7f8a4e295de25ce8e5e6b25d7907a40005cc602c275025b128",
+                      "sizeBytes":  8765
+                  },
+                  {
+                      "path":  "tests/search-normalization.test.ts",
+                      "sha256":  "3ecc6aaab71ff0c007be76ecb58d3f11a9d6997733689b5409187224b966f09f",
+                      "sizeBytes":  15067
+                  },
+                  {
+                      "path":  "tests/security-policy.test.ts",
+                      "sha256":  "e63f87c904126e755771c91815848522ea3d24899e8b235125ade0eb18a752e5",
+                      "sizeBytes":  20656
+                  },
+                  {
+                      "path":  "tests/speech.test.ts",
+                      "sha256":  "297975c291cc7c29039bc63d7986b2e13e49aedb53c21bb8e862ff0d90ab147f",
+                      "sizeBytes":  26421
+                  },
+                  {
+                      "path":  "tsconfig.json",
+                      "sha256":  "e1a4f02f3c6610d6e6c7c3950b9663ff0694a79c2b8c0501209a86efb5fee284",
+                      "sizeBytes":  492
+                  },
+                  {
+                      "path":  "tsconfig.server.json",
+                      "sha256":  "374369c55af1239c413c10decbd919a2d3b562d2b0b912a7bb965feb50da00b6",
+                      "sizeBytes":  384
+                  },
+                  {
+                      "path":  "vite.config.ts",
+                      "sha256":  "1e0f56468c1b30485dd7f1e2ea296011cc128078434e87e9464df132e58e5d0d",
+                      "sizeBytes":  748
+                  }
+              ]
+}

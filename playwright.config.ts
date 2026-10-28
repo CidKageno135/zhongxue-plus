@@ -1,25 +1,30 @@
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig, devices } from '@playwright/test';
+
+const isProd = process.env.E2E_PROD === 'true';
+const port = isProd ? 3000 : 4173;
+const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
-  testDir: "./tests/e2e",
-  fullyParallel: false,
+  testDir: './tests/e2e',
+  fullyParallel: true,
+  timeout: 30000,
+  forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: 1,
-  reporter: "list",
+  reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: "http://127.0.0.1:3001",
-    trace: "on-first-retry",
+    baseURL,
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure'
   },
   projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 1000 } } },
+    { name: 'mobile', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
   ],
   webServer: {
-    command: "npm run start",
-    url: "http://127.0.0.1:3001/api/health",
-    reuseExistingServer: true,
-    timeout: 60000,
+    command: isProd ? 'npm run build && npm run start' : 'npm run dev -- --port 4173',
+    url: isProd ? `${baseURL}/api/health` : baseURL,
+    reuseExistingServer: false,
+    timeout: 120000,
+    env: isProd ? { PORT: '3000', HOST: '127.0.0.1' } : {}
   },
 });

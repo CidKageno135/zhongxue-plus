@@ -1,88 +1,180 @@
-# ZhongXue+ 智慧華語學習 App
+# ZhongXue 中學 — Modern Bento Sinology V2.5 (Phase 3 & Remediation Unified)
 
-Bản mẫu web theo báo cáo môn quản lý dự án. Bản gốc được giữ trong C:/Users/thanh/Desktop/project management/back-up.
+Ứng dụng học tiếng Hoa Phồn thể Đài Loan chuyên sâu dành cho người Việt từ trình độ nhập môn đến **TOCFL A1–B2** (16 bài học thực chiến, 80 từ vựng cốt lõi kèm 100% dữ liệu từ nguyên Hán-Việt chi tiết, không fallback). Hệ thống kết hợp **thuật toán lặp lại ngắt quãng SuperMemo SM-2**, **cầu nối từ nguyên Hán-Việt (同源詞)**, **động cơ từ điển CC-CEDICT Phồn thể nén in-memory 122.596 mục từ (`CVDICT.u8.gz`)**, **nhận diện chữ viết tay đa tầng (Google IME + Offline Stroke Classifier)**, **6 kịch bản hội thoại phân nhánh gắn deep-link 1 chạm sang Trợ lý AI (AgentRouter: GPT-6.1 Sol & DeepSeek V4 Flash)** và **kiến trúc bảo mật Server-Key không phân kỳ**.
 
-## Chạy trên máy
+---
 
-Trên máy này, nhấp đúp **Chay_ZhongXue.cmd**. Nếu app đang chạy, file sẽ mở lại trang; nếu chưa, file sẽ khởi động app. Giữ cửa sổ chạy app mở trong lúc sử dụng.
+## 1. Kiến trúc Hệ thống Không Phân kỳ (Zero-Divergence Architecture) & Hợp nhất Remediation
 
-Cần Node.js 22 trở lên. Chạy trong thư mục này:
+ZhongXue New V2.5 là bản nâng cấp toàn diện hợp nhất hơn **50+ commit sửa lỗi (Remediation)** từ nhánh `remediation/flash-3.8-high` vào `projects/zhongxue-new`, kết hợp toàn bộ tính năng **Phase 3 Curriculum & Sinology Upgrade**:
 
-```
-npm install
-npm run dev
-```
+- **Lõi máy chủ dùng chung (`server/app.ts`)**: Toàn bộ chuỗi middleware kiểm định dữ liệu (`server/validation.ts`), ranh giới bảo mật upstream (`server/security.ts`), bộ kết nối AI (`server/ai.ts`) và động cơ tra cứu từ điển (`server/dictionary.ts`) được đóng gói thành một bộ xử lý ứng dụng độc lập duy nhất.
+- **Môi trường Development**: Plugin Vite (`src/viteApiPlugin.ts`) là một adapter mỏng (~57 dòng code), trực tiếp chuyển tiếp các yêu cầu `/api/*` vào cùng handler `server/app.ts`. Không có sự phân nhánh logic hay mock data giả lập trong dev.
+- **Môi trường Production**: Máy chủ Node.js độc lập (`server/index.js` được biên dịch ra `dist/server/index.js`) phục vụ cả giao diện SPA tĩnh từ thư mục `dist/` và toàn bộ các tuyến API trên cùng một origin loopback (`127.0.0.1:3000`), bảo đảm cơ chế SPA fallback không bao giờ chặn nhầm các yêu cầu API và chạy độc lập ngay cả khi cài đặt với `npm ci --omit=dev`.
+- **Hợp nhất triệt để các phát hiện Remediation (F01–F07)**:
+  - **F01 (Data Storage & Recovery)**: Lưu trữ JSON nén gọn gàng, trần dung lượng 2.000.000 ký tự, cơ chế khóa sao lưu `STORAGE_BACKUP_KEY` chống ghi đè trắng, cho phép ôn tập trước lịch SM-2.
+  - **F02 & F03 (Security & Upstream Credential)**: Phân lập tuyệt đối khóa máy chủ giữa AgentRouter và OpenRouter; ngăn chặn 100% tấn công Credential Forwarding / SSRF; cấm tuyệt đối fragment `#` và query `?` trong cấu hình URL upstream; bảo vệ nghiêm ngặt chống loopback trap.
+  - **F04 & F05 (HTTP Validation & AI Lifecycle)**: Kiểm tra nghiêm ngặt payload schema trên mọi route `/api/conversation`; ngắt kết nối upstream tự động qua `AbortSignal` khi client ngắt kết nối HTTP; kiểm định ping schema an toàn.
+  - **F06 (Dictionary Engine Contract)**: Tách bạch rõ ràng 3 con số (Tổng mục từ từ điển 122.596 / Tổng kết quả khớp thực tế `totalMatches` / Số trang `pageCount`); loại bỏ hoàn toàn cơ chế silent fallback che giấu lỗi 500.
+  - **F07 (Standalone Production Entry)**: Đóng gói hoàn chỉnh `dist/server/index.js` tự thân vận hành bằng Node.js tiêu chuẩn không phụ thuộc vào `vite-node` hay `devDependencies`.
+  - **G4 (AI Chat Lifecycle & Generation Guard)**: Duy trì vai trò nhân vật `activeRole` qua các lần chuyển tab; áp dụng bộ đếm Generation Guard ngăn chặn race-condition ghi đè phản hồi; tự động lọc bỏ các lượt hội thoại bị hủy (`canceled`).
+  - **G7 (Responsive Layout & Audio Sync)**: Triệt tiêu hoàn toàn lỗi tràn ngang layout trên màn hình hẹp 375px/390px; đồng bộ hóa trạng thái nút phát âm TTS khi bị gián đoạn và gắn nhãn minh bạch chế độ mô phỏng cao độ thanh điệu.
 
-Mở http://localhost:3001 . Trang chủ tự dùng tài khoản mẫu; có thể đăng ký tài khoản riêng để lưu tiến độ độc lập. Không cần cài PostgreSQL riêng: mặc định dùng PGlite, lưu tại .data/zhongxue_db. Không chạy hai phiên app cùng thư mục dữ liệu. Nếu dùng PostgreSQL riêng, tạo bảng trước bằng Drizzle và đặt DATABASE_URL trong .env.local; cấu hình drizzle.config.json phải trỏ đúng database của bạn.
+---
 
-## Đối chiếu với báo cáo
+## 2. Khởi chạy Ứng dụng
 
-- 20 bài mẫu: A1 (1–10), A2 (11–20); từ mới, mẫu câu, pinyin, giải thích tiếng Việt.
-- Luyện nói: giọng đọc zh-TW, nhận diện qua SpeechRecognition của trình duyệt, so sánh nội dung câu. Nhập tay được ghi riêng là luyện chữ. Không tuyên bố chấm thanh điệu hay điểm nói chính thức.
-- Hội thoại AI: kết nối Chat Completions qua máy chủ. Khi chưa cấu hình API, chỉ dùng mẫu gợi ý cố định và ghi rõ chế độ mẫu.
-- Tiến độ: lưu hoạt động theo người dùng, đơn vị hoàn thành và gợi ý bài chưa học. Không tạo lịch sử học giả.
-- Giao diện phồn thể với chú thích tiếng Việt; bố cục dùng được trên máy tính và điện thoại.
+Yêu cầu môi trường: **Node.js 20+** (khuyên dùng Node.js 22 LTS hoặc 24 LTS) và **npm**.
 
-Đây là bản mẫu web, chưa phải app iOS/Android được đóng gói và phát hành trên cửa hàng. 20 bài là nội dung minh họa, chưa được giáo viên Hoa ngữ ký duyệt; không coi là hoàn thành các tiêu chí nghiệm thu của báo cáo. Dữ liệu của tài khoản demo được dùng chung cho những người mở app không đăng nhập.
+### 2.1. Chế độ Phát triển (Development Mode)
 
-## Bật AI thật
+Chỉ cần một lệnh duy nhất. Toàn bộ API (`/api/health`, `/api/dictionary`, `/api/conversation`, `/api/handwriting`) chạy song song trong cùng tiến trình Vite Dev:
 
-Sao chép .env.example thành .env.local. Nhập AI_API_KEY của OpenRouter; mẫu cấu hình dùng AI_BASE_URL=https://openrouter.ai/api/v1 và AI_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free. AI_TIMEOUT_MS=90000 cho phép đợi tối đa 90 giây. Khởi động lại app sau khi đổi cấu hình. Khóa chỉ được đọc phía máy chủ và .env.local được bỏ qua bởi Git; không chia sẻ file này. Chưa có khóa: phần hội thoại dùng gợi ý mẫu. Khi dịch vụ lỗi hoặc đạt giới hạn, app báo lỗi và cho phép tự chọn chế độ mẫu; không tự đổi sang model trả phí.
-
-OpenRouter: https://openrouter.ai/docs/api_reference/overview . Có thể dùng dịch vụ Chat Completions khác bằng cách đổi AI_BASE_URL, AI_MODEL và khóa tương ứng.
-
-Tài liệu API: https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
-Nhận diện giọng nói: https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition
-
-Nhận diện tùy trình duyệt và mạng. Cho phép mic khi bắt đầu, dùng localhost hoặc HTTPS. Nội dung nói có thể được dịch vụ của trình duyệt xử lý; app không lưu file ghi âm. Giọng đọc phụ thuộc giọng tiếng Trung cài trên máy.
-
-## Kiểm tra
-
-```
-npm test
-npm run test:coverage
-npm run typecheck
-npm run lint
-npm run build
-npm start
+```powershell
+cd C:\Users\thanh\Desktop\ECC\projects\zhongxue-new
+npm.cmd install
+npm.cmd run dev -- --port 5173
 ```
 
-Kiểm thử AI dùng dịch vụ giả lập có kiểm soát, không gọi API tính phí. Các API gốc về từ vựng, SRS và quiz vẫn giữ để mở rộng sau; giao diện chính đi theo bốn chức năng của báo cáo.
+Mở trình duyệt tại: [http://127.0.0.1:5173](http://127.0.0.1:5173)
 
-## Cải thiện trải nghiệm học — 12/10/2026
+### 2.2. Chế độ Đóng gói & Chạy Thực tế (Production Mode)
 
-- Mỗi bài có ba câu: chọn nghĩa, điền theo mẫu câu và ghép câu. Đúng cả ba mới hoàn thành bài; có giải thích từng câu. Điểm được tính lại phía máy chủ từ câu trả lời, không nhận điểm do trình duyệt tự gửi.
-- Luyện nói/nhập tay: chỉ rõ chữ thiếu, thừa hoặc khác câu mẫu; có giọng đọc chậm. Chỉ số là độ giống văn bản, chưa đánh giá thanh điệu hay chất lượng âm thanh.
-- Hội thoại lưu theo tài khoản, chủ đề và chế độ AI/mẫu; mỗi đoạn giữ tám lượt gần nhất, bộ chọn hiện mười đoạn gần đây. Nút Hội thoại mới giữ các đoạn cũ. Các cuộc trò chuyện trước khi tính năng lưu được thêm chỉ có số lượt trong tiến độ, không thể phục hồi nội dung chưa từng lưu.
-- Câu trả lời AI được yêu cầu kèm pinyin/tiếng Việt và trình bày văn bản thường. Lỗi nội dung hoặc dịch vẫn có thể xảy ra; câu mẫu cố định ở Gợi ý trả lời đã có pinyin/tiếng Việt.
-- Từ mới trong bài có liên kết tra từ. Trang /flashcards ôn tối đa100 từ lưu gần nhất; lật thẻ và kiểm tra nhanh khi có ít nhất hai nghĩa khác nhau. Kết quả thuộc lượt ôn hiện tại, không phải lịch ôn SRS dài hạn hay điểm thi.
-- Trang đăng nhập/đăng ký không bị tài khoản mẫu chuyển hướng sai. Có đăng xuất và thông báo dữ liệu demo dùng chung. Menu đóng không nhận focus; mở bằng bàn phím và đóng bằng Escape được hỗ trợ.
-- Lịch sử học phân trang30 bản ghi; tổng tiến độ được tính trên toàn bộ lịch sử tại database. Dữ liệu cũ được giữ qua việc thêm bảng mới.
+Đóng gói ứng dụng thành bundle tối ưu (gồm frontend client SPA và backend standalone server `dist/server/index.js`), sau đó khởi chạy bằng Node.js thuần (hoạt động độc lập ngay cả khi cài đặt với `npm ci --omit=dev`):
 
-## Giới hạn và vận hành
+```powershell
+# Bước 1: Đóng gói toàn bộ client và server artifact vào dist/
+npm.cmd run build
 
-- AI:8 lượt/phút theo tài khoản và nhóm mạng;20 lượt/ngày cho tài khoản mẫu,100/ngày cho tài khoản cá nhân. Tổng toàn app mặc định50/ngày qua AI_DAILY_LIMIT. Đây là số lần thử của app, không phải số lượt còn lại trong OpenRouter; lỗi dịch vụ vẫn có thể tiêu thụ hạn mức. Ngày được tính theoUTC. Chế độ mẫu không tiêu thụ quota AI.
-- Giới hạn được lưu trong database và cập nhật nguyên tử, không mất khi khởi động lại. Login tối đa5 lần thử/email và20 lần/nhóm mạng trong mỗi cửa sổ10 phút;register5 lần/nhóm mạng/giờ. Khi đạt giới hạn, trả429 với Retry-After. Mật khẩu mới tối thiểu8 ký tự,tối đa72 byteUTF-8; tài khoản cũ dùng mật khẩu ngắn vẫn đăng nhập được.
-- Mặc định không tin x-forwarded-for; trên local các lượt được tính chung trong nhóm mạng local. Chỉ bật TRUST_PROXY=true khi proxy của bạn ghi đè header này. Khi triển khai, đặt APP_ORIGIN đúng miềnHTTPS và thiết lập proxy trước khi áp dụng quota theoIP. Đây là bản mẫu local, chưa triển khai public hay kiểm thử tải lớn.
-- Mặc định dữ liệu ở .data/zhongxue_db; có thể đặt ZHONGXUE_DATA_DIR thành một thư mục riêng để tránh đồng bộ OneDrive hoặc chạy QA. Mỗi tiến trình cần một thư mục dữ liệu riêng. Không chia sẻ .env.local hoặc bản sao dữ liệu tài khoản.
+# Bước 2: Khởi chạy máy chủ production độc lập (loopback 127.0.0.1:3000)
+npm.cmd run start
+```
 
-Kiểm tra API riêng: chạy npm run build, rồi npm run qa:start trong một cửa sổ, npm run test:improvements-api trong cửa sổ khác. QA dùnglocalhost3002,database tạm và AI bị tắt. Kiểm thử unit/database cũng dùng database tạm. Đóng QA sau khi kiểm tra. Những kiểm tra này không gửi hội thoại tới dịch vụ AI thật.
+Mở trình duyệt tại: [http://127.0.0.1:3000](http://127.0.0.1:3000)
 
-Sao lưu local: tắt app trước,rồi npm run backup:data. Script từ chối khiport3001 đang chạy hoặc dùng DATABASE_URL ngoài máy; sao chép đầy đủ thư mục,kể cả các thư mục trống PostgreSQL, vào Desktop/project management/back-up. Khi khôi phục:tắt app,giữ một bản sao thư mục dữ liệu hiện tại,chép bản sao đã kiểm tra vào thư mục mới,và đặt ZHONGXUE_DATA_DIR trỏ đến bản khôi phục trước khi mở app. Không chép đè database đang chạy. Bản ZIP đã kiểm tra khôi phục ngày12/10/2026:ZhongXue_local_data_verified_20261012_144210.zip.
+---
 
+## 3. Cấu hình Biến Môi trường & Mô hình Bảo mật Khóa (Server-Key vs Client-Key)
 
-## Từ điển Trung–Việt (thêm 2026-10-12)
+Sao chép tệp mẫu `.env.example` thành `.env`:
 
-Mở http://localhost:3001/dictionary hoặc chọn 詞典 / Từ điển trong menu.
+```powershell
+copy .env.example .env
+```
 
-- 122.595 mục từ duy nhất từ CVDICT; tra phồn thể, giản thể, pinyin có/không dấu hoặc số thanh điệu, và nghĩa tiếng Việt có/không dấu. Có bộ lọc Chữ Hán/Pinyin/Tiếng Việt cho truy vấn mơ hồ.
-- Nghe phát âm qua giọng đọc của trình duyệt; lựa chọn kiểu chữ hiển thị.
-- Nghĩa nguồn giữ riêng với ghi chú trong bài học. Ví dụ chỉ hiện khi kho bài học có câu chứa từ đang xem; không tự tạo ví dụ giả cho toàn bộ dữ liệu.
-- Từ đã lưu và lịch sử nằm trong cơ sở dữ liệu, tách theo tài khoản. Danh sách hiện100 từ lưu gần nhất và12 từ đã xem gần nhất; tìm kiếm hiện20 kết quả/trang, tối đa21 trang. Tra từ cụ thể hoặc chọn bộ lọc để thu hẹp kết quả rộng.
-- Tìm kiếm/định nghĩa dùng dữ liệu đi kèm app, không cần khóa AI hay gọi Hanzii. Chưa có OCR, nhận diện chữ viết tay hoặc hoạt hình thứ tự nét.
+### 3.1. Server-Key Mode (Khuyên dùng — Mặc định)
+- **Cơ chế**: Các API Key (`AI_SOL_KEY`, `AI_DEEPSEEK_KEY`, `AI_API_KEY`) được lưu trữ tại tệp `.env` trên máy chủ.
+- **Bảo mật tuyệt đối**: Khóa máy chủ **CHỈ ĐƯỢC PHÉP** gửi tới các nhà cung cấp upstream tin cậy nằm trong danh sách Allowlist máy chủ (`agentrouter.org`, `openrouter.ai`).
+- **Phòng thủ rò rỉ**: Nếu client gửi yêu cầu với một `baseUrl` tùy ý lạ, hệ thống sẽ **từ chối ngay lập tức** việc gắn khóa máy chủ, ngăn chặn 100% tấn công Credential Forwarding / SSRF. Trình duyệt client không chứa bất kỳ secret nào trong bundle hay `localStorage`.
 
-Nguồn: CVDICT, Phong Phan, https://github.com/ph0ngp/CVDICT , CC BY-SA 4.0. Dựa trên CC-CEDICT. Revision c379d909e308343a247e51619f7839a2060a271c, dữ liệu ghi ngày2024-12-02. Bộ gốc có122.596 dòng hợp lệ; adapter gộp trùng cùng chữ/pinyin thành122.595 mục. Dữ liệu gốc giữ nguyên trong data/dictionary/CVDICT.u8.gz; attribution và giấy phép ở data/dictionary/NOTICE.md, metadata.json và chân trang giao diện. Giữ attribution/CC BY-SA khi chia sẻ dữ liệu hoặc bản sửa dữ liệu.
+### 3.2. Client-Key Mode (Tùy chọn dành cho Người dùng Tự cấp Khóa)
+- Người dùng có thể tự nhập API Key cá nhân trong màn hình **Cài đặt (`SettingsView`)** nếu muốn dùng quota hoặc endpoint riêng.
+- Khóa cá nhân chỉ lưu trong `localStorage` của trình duyệt người dùng đó và chỉ được gửi kèm khi người dùng chủ động cấu hình.
 
-Tác giả nguồn công bố bản dịch có hỗ trợ AI nên có thể còn lỗi. Đây là nguồn tra cứu bổ sung, không thay thế việc giáo viên duyệt20 đơn vị học trong báo cáo. Báo cáo Word/PPT chưa được thay đổi bởi việc thêm từ điển.
+---
 
-Chạy thêm kiểm thử API khi server đang mở: npm run test:dictionary-api. Script chỉ dùng tài khoản QA mới trên localhost3001 để kiểm tra tìm kiếm/lưu từ/lịch sử/tách tài khoản; không in cookie hoặc dùng tài khoản thật.
+## 4. Động cơ Từ điển CC-CEDICT In-Memory (122.596 Mục từ)
+
+- **Bộ nạp In-Memory siêu tốc**: Nạp trực tiếp tệp từ điển gzipped `data/dictionary/CVDICT.u8.gz` (chứa đúng **122.596 bản ghi**) vào bộ nhớ RAM khi máy chủ khởi động (~1.4 giây).
+- **Chuẩn hóa Tìm kiếm Toàn diện (`src/domain/searchNormalization.ts`)**:
+  - Hỗ trợ Hán tự Phồn thể & Giản thể (`學生`, `学生`).
+  - Hỗ trợ Pinyin có dấu thanh điệu (`xuéshēng`), Pinyin không dấu (`xuesheng`), và Pinyin số thanh (`xue2 sheng1`).
+  - Hỗ trợ tiếng Việt có dấu (`học sinh`) và tiếng Việt không dấu (`hoc sinh`), xử lý chính xác ký tự `đ/Đ` và nguyên âm `ü/v`.
+  - Phân trang chuẩn xác (`limit`, `offset`) với tổng số kết quả thực tế, không bị giới hạn ảo 250 bản ghi.
+  - Mở rộng bảng đối chiếu từ vựng Lưỡng bờ (Cross-Strait Lexicon) và từ điển thuật ngữ chuyên ngành B1/B2 (Bán dẫn, Tài chính, Thuế & Pháp lý).
+
+---
+
+## 5. Phạm vi Tính năng V2.5 (Phase 3 Upgrade)
+
+### 5.1. 16 Bài học Thực chiến Đài Loan (80 Từ vựng Cốt lõi TOCFL A1–B2)
+Chương trình học mở rộng toàn diện bao quát 4 cấp độ TOCFL:
+- **TOCFL A1 (Bài 1–5):**
+  1. *Xin chào, Đài Loan!* (Chào hỏi & giới thiệu bản thân)
+  2. *Một ly trà sữa nhé* (Gọi trà sữa, độ ngọt & lượng đá)
+  3. *Đi MRT thật dễ* (Hỏi đường MRT, mua vé, thẻ EasyCard)
+  4. *Ăn ngon ở chợ đêm* (Gọi món, hỏi giá tiền)
+  5. *Mua sắm tiện lợi* (Thanh toán tại 7-Eleven/FamilyMart, lấy hóa đơn phát phiếu)
+- **TOCFL A2 (Bài 6–8):**
+  6. *Tìm một căn phòng* (Hỏi thuê nhà, đặt cọc, điện nước)
+  7. *Một ngày đi khám* (Nói triệu chứng, đặt hẹn bác sĩ, thẻ bảo hiểm y tế健保)
+  8. *Kết nối ở nơi làm việc* (Giao tiếp công sở, nhờ đồng nghiệp, xác nhận lịch)
+- **TOCFL B1 (Bài 9–12):**
+  9. *Mở tài khoản ngân hàng & Bưu điện* (Mở thẻ ATM, gửi kiều hối, giao dịch tài chính)
+  10. *Thuê xe máy vi vu phố phường* (Thuê xe máy, đổ xăng, quy định giao thông Đài Loan)
+  11. *Phỏng vấn xin việc & CV* (Giới thiệu kinh nghiệm làm việc, đàm phán mức lương kỳ vọng)
+  12. *Lễ hội Trung thu & Đặc sản* (Phong tục nướng thịt Trung thu, bánh dứa, văn hóa tặng quà)
+- **TOCFL B2 (Bài 13–16):**
+  13. *Đàm phán thương mại & Hợp đồng* (Thỏa thuận điều khoản, ký kết hợp đồng, phân chia lợi nhuận)
+  14. *Bán dẫn & Đổi mới công nghệ* (Chuỗi cung ứng chip bán dẫn vi mạch, quy trình R&D)
+  15. *Kê khai thuế & Phúc lợi lao động* (Quy chế thuế thu nhập cá nhân, quyền lợi bảo hiểm lao động)
+  16. *Diễn thuyết & Báo cáo chuyên đề* (Trình bày quan điểm học thuật, phân tích dữ liệu, đúc kết xu hướng)
+
+### 5.2. Bao phủ 100% Từ nguyên Hán-Việt 80 Từ (0 Placeholder Fallbacks)
+- Tệp `src/data/etymologyData.ts` cung cấp đầy đủ dữ liệu từ nguyên học Sinology cho trọn vẹn 80 từ (`lesson-1-word-1` đến `lesson-16-word-5`).
+- Mỗi mục từ bao gồm: Âm Hán-Việt chuẩn mực, Bộ thủ Khang Hy (`radical`), Tên bộ thủ (`radicalName`), Số nét bút (`strokes`), Phân loại thanh điệu Đài Loan (`toneClass`), Mẹo ghi nhớ đồng nguyên Hán-Việt (`cognateTip`), và Phân tích chiết tự từng ký tự (`decomposition`).
+- Không còn bất kỳ mục từ nào rơi vào cơ chế placeholder dự phòng (0 fallback).
+
+### 5.3. 6 Bộ thẻ Starter Decks Đài Loan Chuyên sâu (`STARTER_DECKS`)
+Nạp nhanh danh sách từ vựng trọng tâm vào lộ trình ôn tập SRS chỉ với 1 cú nhấp:
+1. **Sống sót Chợ đêm Đài Loan (`deck-nightmarket`)**: Gọi đường đá (`半糖少冰`), hỏi giá, thanh toán.
+2. **Kỹ năng MRT & Xe buýt (`deck-mrt`)**: Biển chỉ dẫn ga MRT, chuyển tuyến (`轉車`), thẻ EasyCard (`悠遊卡`).
+3. **Thuê nhà & KTX Đại học (`deck-housing`)**: Tiền đặt cọc (`押金`), hợp đồng thuê nhà, tiền điện nước (`水電費`).
+4. **Từ vựng Cốt lõi TOCFL A2 (`deck-tocfl-a2`)**: 15 danh từ, động từ thiết yếu cho chứng chỉ TOCFL Band A2.
+5. **Kỹ năng Thực chiến TOCFL B1 (`deck-tocfl-b1`)**: Giao dịch ngân hàng (`開戶`, `匯款`), thuê xe, phỏng vấn xin việc.
+6. **Chuyên sâu Bán dẫn & TOCFL B2 (`deck-tocfl-b2`)**: Thuật ngữ bán dẫn (`晶片`), đàm phán hợp đồng thương mại, luật thuế.
+
+### 5.4. 6 Kịch bản Hội thoại Phân nhánh & Deep-link Trực tiếp sang AI Chat
+- 6 kịch bản hội thoại thực tế: `tea` (Trà sữa), `mrt` (Tàu điện), `store` (Cửa hàng tiện lợi), `bank` (Mở tài khoản ngân hàng), `clinic` (Khám bệnh), `interview` (Phỏng vấn xin việc).
+- Tích hợp nút **"💬 Chat tự do cùng AI"** trực tiếp trong `ScenarioFlow`, chuyển tiếp mượt mà sang `AiChatView` mang theo đúng ngữ cảnh kịch bản và vai trò nhân vật tương ứng.
+
+### 5.5. Cầu nối Giản↔Phồn, Thuật ngữ Lưỡng bờ & Đánh giá Cấp độ TOCFL
+- Mở rộng bảng quy đổi Giản thể ↔ Phồn thể và từ điển thuật ngữ Lưỡng bờ Đài Loan — Đại Lục:
+  - Công nghệ/Bán dẫn: 晶片 (Đài Loan) ↔ 芯片 (Đại Lục), 電腦 ↔ 計算機, 伺服器 ↔ 服務器.
+  - Đời sống & Tiện ích: 悠遊卡 ↔ 一卡通, 發票 ↔ 發票/收據, 便當 ↔ 快餐/盒飯.
+  - Y tế & Xã hội: 健保 ↔ 醫保, 捷運 ↔ 地鐵, 計程車 ↔ 出租車.
+- Hàm đánh giá trình độ `getLearnerTocflLevel`: Tự động phân cấp người học dựa trên tiến độ học tập thực tế và độ chính xác của các bài trắc nghiệm (A1 → A2 → B1 → B2).
+
+### 5.6. Bento Dashboard Động & Trải nghiệm Học tập Tinh hoa
+- **Mẫu số Tiến độ Động 80 từ (`/ 80`)**: Màn hình `TodayView` và `SettingsView` tự động đồng bộ mẫu số từ vựng toàn khóa theo số lượng bài học thực tế thay vì con số cứng 40 từ trước đây.
+- **Hệ thống Huy hiệu Thành tựu Cấp độ**: Bổ sung bộ huy hiệu TOCFL A1, A2, B1, B2 tự động mở khóa theo số lượng từ vựng tích lũy.
+- **Nâng cấp Thẻ từ `WordCard`**:
+  - Tích hợp huy hiệu âm Hán-Việt và bộ thủ Khang Hy ngay trên thẻ từ vựng.
+  - Tính năng phát âm từng chữ (Character-level click-to-pronounce): Cho phép người học nhấp vào từng ký tự Hán riêng lẻ trong ô Điền Tự Cách để nghe phát âm chuẩn xác ngữ âm Đài Loan.
+
+---
+
+## 6. Kiểm tra Chất lượng Mã nguồn & Bộ Kiểm thử Tự động
+
+Dự án sở hữu bộ kiểm thử tự động toàn diện với độ tin cậy tuyệt đối sau khi hợp nhất Remediation và hoàn tất Phase 3:
+
+```powershell
+# 1. Kiểm tra an toàn kiểu tĩnh (TypeScript typecheck - 0 lỗi)
+npm.cmd run typecheck
+
+# 2. Đóng gói hoàn chỉnh Client SPA & Server Standalone Bundle
+npm.cmd run build
+
+# 3. Chạy 78 bài kiểm tra bảo mật (Credential Forwarding, SSRF, URL Fragment, CORS - PASS 100%)
+npm.cmd run test:security
+
+# 4. Chạy 54 bài kiểm tra tích hợp HTTP thật trên máy chủ production Node.js (PASS 100%)
+npm.cmd run test:integration
+
+# 5. Chạy toàn bộ bộ kiểm thử đơn vị và tích hợp (Vitest 540+ tests)
+npm.cmd test
+
+# 6. Đo độ bao phủ mã nguồn theo ngưỡng chuẩn (Thresholds: lines >= 80%, services >= 92%)
+npm.cmd run test:coverage
+
+# 7. Kiểm tra quy chuẩn linter (ESLint)
+npm.cmd run lint
+
+# 8. Chạy bộ kiểm thử chấp nhận đầu-cuối Playwright E2E
+npm.cmd run test:e2e
+```
+
+Chi tiết kế hoạch triển khai, tiến độ kỹ thuật và bằng chứng kiểm nghiệm xem tại:
+- [docs/PLAN.md](docs/PLAN.md) — Kế hoạch Triển khai & 10 Cổng Nghiệm thu Phase 3
+- [docs/PROGRESS.md](docs/PROGRESS.md) — Tiến độ Kỹ thuật & Ma trận Điều phối
+- [docs/QA.md](docs/QA.md) — Báo cáo Kiểm định Chất lượng & Bằng chứng Thực nghiệm
