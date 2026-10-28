@@ -176,7 +176,7 @@ function getServerKeyForProvider(provider, model, env = process.env, destination
   const destination = validateUpstreamUrl(destinationBaseUrl, { env });
   const genericKey = configured.valid && configured.isTrusted && configured.url && destination.valid && destination.isTrusted && destination.url && configured.url.origin === destination.url.origin && getProviderForHostname(configured.url.hostname) === provider ? (env.AI_API_KEY || "").trim() : "";
   if (provider === "agentrouter") {
-    const isSol = modelName === "gpt-6.1-sol" || modelName.includes("sol");
+    const isSol = modelName === "gpt-6.1-sol" || modelName.includes("sol") || modelName.includes("astra") || modelName.startsWith("gpt-");
     const agentRouterKey = (env.AI_AGENTROUTER_KEY || "").trim();
     const solKey = (env.AI_SOL_KEY || "").trim();
     const deepseekKey = (env.AI_DEEPSEEK_KEY || "").trim();
@@ -1912,7 +1912,8 @@ async function executeConversation(body, options) {
   const action = body.action || "chat";
   const tStart = Date.now();
   const model = (body.model || env.AI_MODEL || "gpt-6.1-sol").trim();
-  const isSolModel = model === "gpt-6.1-sol" || model.includes("sol");
+  const lowerModel = model.toLowerCase();
+  const isSolModel = lowerModel === "gpt-6.1-sol" || lowerModel.includes("sol") || lowerModel.includes("astra") || lowerModel.startsWith("gpt-");
   const allowLocalDev = options?.allowLocalDev ?? (env.ALLOW_LOCAL_TEST_UPSTREAM === "true" || env.VITEST === "true" || env.NODE_ENV === "test");
   const creds = resolveUpstreamCredentials({
     model,

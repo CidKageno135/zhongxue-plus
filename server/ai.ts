@@ -171,7 +171,12 @@ export async function executeConversation(
   const tStart = Date.now();
 
   const model = (body.model || env.AI_MODEL || 'gpt-6.1-sol').trim();
-  const isSolModel = model === 'gpt-6.1-sol' || model.includes('sol');
+  const lowerModel = model.toLowerCase();
+  const isSolModel =
+    lowerModel === 'gpt-6.1-sol' ||
+    lowerModel.includes('sol') ||
+    lowerModel.includes('astra') ||
+    lowerModel.startsWith('gpt-');
 
   // Allow local dev/test when running in test environment or explicitly enabled
   const allowLocalDev = options?.allowLocalDev ?? (env.ALLOW_LOCAL_TEST_UPSTREAM === 'true' || env.VITEST === 'true' || env.NODE_ENV === 'test');

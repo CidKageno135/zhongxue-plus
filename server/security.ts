@@ -330,7 +330,7 @@ export function getServerKeyForProvider(
     : '';
 
   if (provider === 'agentrouter') {
-    const isSol = modelName === 'gpt-6.1-sol' || modelName.includes('sol');
+    const isSol = modelName === 'gpt-6.1-sol' || modelName.includes('sol') || modelName.includes('astra') || modelName.startsWith('gpt-');
     const agentRouterKey = (env.AI_AGENTROUTER_KEY || '').trim();
     const solKey = (env.AI_SOL_KEY || '').trim();
     const deepseekKey = (env.AI_DEEPSEEK_KEY || '').trim();
