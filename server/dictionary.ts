@@ -1,6 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { fileURLToPath } from 'node:url';
+
+const moduleDir =
+  typeof (globalThis as Record<string, unknown>).__dirname === 'string'
+    ? ((globalThis as Record<string, unknown>).__dirname as string)
+    : path.dirname(fileURLToPath(import.meta.url));
 import type { DbDictionaryResult } from '../src/types';
 import { normalizeVietnamese as normVi } from '../src/domain/searchNormalization';
 
@@ -188,8 +194,8 @@ export class DictionaryEngine {
             process.env.DICT_PATH,
             path.resolve(cwd, 'data/dictionary/CVDICT.u8.gz'),
             path.resolve(cwd, 'projects/zhongxue-new/data/dictionary/CVDICT.u8.gz'),
-            path.resolve(__dirname, '../data/dictionary/CVDICT.u8.gz'),
-            path.resolve(__dirname, '../../data/dictionary/CVDICT.u8.gz')
+            path.resolve(moduleDir, '../data/dictionary/CVDICT.u8.gz'),
+            path.resolve(moduleDir, '../../data/dictionary/CVDICT.u8.gz')
           ].filter(Boolean) as string[];
 
           for (const candidate of candidates) {

@@ -638,7 +638,13 @@ export function isAllowedOrigin(
   // Check configured production origins
   const configured = [
     env.APP_ORIGIN,
-    env.ALLOWED_ORIGINS
+    env.ALLOWED_ORIGINS,
+    ...[env.VERCEL_URL, env.VERCEL_BRANCH_URL, env.VERCEL_PROJECT_PRODUCTION_URL]
+      .filter((v): v is string => Boolean(v && v.trim()))
+      .map((v) => {
+        const clean = v.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+        return clean ? `https://${clean}` : '';
+      })
   ].filter(Boolean) as string[];
 
   for (const item of configured) {
