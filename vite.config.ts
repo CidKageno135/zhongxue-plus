@@ -3,7 +3,7 @@ import { loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { zhongxueApiPlugin } from './src/viteApiPlugin';
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, isSsrBuild }) => {
   if (mode !== 'test') {
     const env = loadEnv(mode, process.cwd(), '');
     Object.assign(process.env, env);
@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), zhongxueApiPlugin()],
+    build: {
+      copyPublicDir: !isSsrBuild
+    },
     server: {
       host: '127.0.0.1',
       port: 5173,

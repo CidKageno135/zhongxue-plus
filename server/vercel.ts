@@ -1,16 +1,17 @@
 /**
- * api/index.ts
+ * server/vercel.ts
  *
- * Vercel Serverless Function Adapter for ZhongXue+ V2 Backend API.
- * Dispatches all /api/* requests to the unified server handler in server/app.ts.
+ * Source entrypoint for the pre-bundled Vercel Serverless Function (compiled to api/vercel.js).
+ * Bundled via Vite SSR so that runtime execution on Vercel uses pure ESM JavaScript
+ * with zero .ts extension imports and automatic dictionary initialization.
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { URL, fileURLToPath } from 'node:url';
-import { handleApiRequest } from '../server/app.ts';
-import { dictionaryEngine } from '../server/dictionary.ts';
+import { handleApiRequest } from './app.ts';
+import { dictionaryEngine } from './dictionary.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,10 +23,20 @@ if (typeof (globalThis as Record<string, unknown>).__filename === 'undefined') {
   (globalThis as Record<string, unknown>).__filename = __filename;
 }
 
-// Explicit static path reference so @vercel/nft bundles data/dictionary/CVDICT.u8.gz
-const BUNDLED_DICTIONARY_PATH = path.join(process.cwd(), 'data', 'dictionary', 'CVDICT.u8.gz');
-if (!process.env.DICT_PATH && fs.existsSync(BUNDLED_DICTIONARY_PATH)) {
-  process.env.DICT_PATH = BUNDLED_DICTIONARY_PATH;
+// Explicit static path references so @vercel/nft traces and bundles data/dictionary/CVDICT.u8.gz
+const DICT_CANDIDATES = [
+  path.join(process.cwd(), 'data', 'dictionary', 'CVDICT.u8.gz'),
+  path.resolve(__dirname, '../data/dictionary/CVDICT.u8.gz'),
+  fileURLToPath(new URL('../data/dictionary/CVDICT.u8.gz', import.meta.url))
+];
+
+if (!process.env.DICT_PATH) {
+  for (const candidate of DICT_CANDIDATES) {
+    if (fs.existsSync(candidate)) {
+      process.env.DICT_PATH = candidate;
+      break;
+    }
+  }
 }
 
 export const config = {
@@ -50,13 +61,22 @@ export default async function vercelApiHandler(
   const parsedUrl = new URL(req.url || '/api', `http://${host}`);
 
   if (
+    parsedUrl.pathname === '/api/vercel' ||
+    parsedUrl.pathname === '/api/vercel.js' ||
     parsedUrl.pathname === '/api/index' ||
     parsedUrl.pathname === '/api/index.ts' ||
     parsedUrl.pathname === '/api/index.js'
   ) {
     const subPath = parsedUrl.searchParams.get('__zhongxue_path') || '';
     const cleanSubPath = subPath.replace(/^\/+/, '');
-    parsedUrl.pathname = cleanSubPath ? `/api/${cleanSubPath}` : '/api';
+    if (cleanSubPath && cleanSubPath !== '$1' && cleanSubPath !== ':path*') {
+      parsedUrl.pathname = `/api/${cleanSubPath}`;
+    } else {
+      parsedUrl.pathname = '/api';
+    }
+  } else if (!parsedUrl.pathname.startsWith('/api')) {
+    const cleanPath = parsedUrl.pathname.replace(/^\/+/, '');
+    parsedUrl.pathname = cleanPath ? `/api/${cleanPath}` : '/api';
   }
 
   parsedUrl.searchParams.delete('__zhongxue_path');

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --configLoader runner --host 127.0.0.1",
     "build": "tsc -b && vite build --configLoader runner && npm run build:server",
-    "build:server": "vite build --ssr server/index.ts --outDir dist/server --configLoader runner",
+    "build:server": "vite build --ssr server/index.ts --outDir dist/server --configLoader runner && vite build --ssr server/vercel.ts --outDir api --emptyOutDir --configLoader runner",
     "start": "node dist/server/index.js",
     "lint": "eslint .",
     "typecheck": "tsc -b --pretty false",
